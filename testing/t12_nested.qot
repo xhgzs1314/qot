@@ -1,0 +1,13 @@
+var total = 0;
+for(i in 3){
+    for(j in 3){
+        total += i * 10 + j;
+    }
+}
+output(total);
+var s = 0;
+for(k in 100){
+    if(k == 5){ stop; }
+    s += k;
+}
+output(s);

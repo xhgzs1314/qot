@@ -1,0 +1,6 @@
+get_address|str|ptr
+get_const|str|dword
+call_address|...|dword
+call_func|...|dword
+get_last_error||dword
+set_last_error|dword|void

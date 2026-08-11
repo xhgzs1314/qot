@@ -1,0 +1,373 @@
+<html>
+
+<head>
+    <title>更多例子</title>
+    <meta charset="UTF-8">
+</head>
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        line-height: 1.6;
+        color: #333;
+        background-color: #f8f9fa;
+        padding: 0;
+        margin: 0;
+    }
+
+
+    body {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 20px;
+        background-color: #ffffff;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.05);
+    }
+
+
+    h1,
+    h2,
+    h3,
+    h4 {
+        color: #2c3e50;
+        margin-bottom: 1rem;
+        font-weight: 600;
+    }
+
+    h1 {
+        font-size: 2.2rem;
+        padding: 2rem 0;
+        border-bottom: 3px solid #3498db;
+        margin-top: 1rem;
+    }
+
+    h2 {
+        font-size: 1.8rem;
+        margin-top: 2rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #e1e4e8;
+    }
+
+    h3 {
+        font-size: 1.4rem;
+        margin-top: 1.5rem;
+    }
+
+    h4 {
+        font-size: 1.2rem;
+        margin-top: 1rem;
+    }
+
+
+    p {
+        margin-bottom: 1rem;
+        color: #555;
+        font-size: 1rem;
+    }
+
+
+    ul {
+        margin-left: 1.5rem;
+        margin-bottom: 1rem;
+    }
+
+    li {
+        margin-bottom: 0.5rem;
+        color: #555;
+    }
+
+
+    pre {
+        background-color: #f8f9fa;
+        border: 1px solid #e1e4e8;
+        border-radius: 4px;
+        padding: 1rem;
+        margin: 1rem 0;
+        overflow-x: auto;
+        font-family: 'Consolas', 'Monaco', monospace;
+    }
+
+    code {
+        font-family: 'Consolas', 'Monaco', monospace;
+        background-color: #f1f1f1;
+        padding: 0.2rem 0.4rem;
+        border-radius: 3px;
+        font-size: 0.95rem;
+    }
+
+
+    .code-highlight {
+        color: #333;
+    }
+
+    .line-number {
+        color: #999;
+        padding-right: 0.8rem;
+        border-right: 1px solid #ccc;
+        margin-right: 0.8rem;
+
+    }
+
+
+    pre .comment {
+        color: #6a9955;
+    }
+
+
+    blockquote {
+        border-left: 4px solid #3498db;
+        padding: 0.5rem 1rem;
+        background-color: #f1f8ff;
+        margin: 1rem 0;
+        color: #555;
+    }
+
+
+    body>blockquote:last-of-type {
+        margin-top: 3rem;
+        margin-bottom: 2rem;
+        font-size: 0.9rem;
+    }
+
+
+    @media (max-width: 768px) {
+        h1 {
+            font-size: 1.8rem;
+        }
+
+        h2 {
+            font-size: 1.5rem;
+        }
+
+        h3 {
+            font-size: 1.2rem;
+        }
+
+        pre {
+            padding: 0.8rem;
+        }
+    }
+
+    ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: #f1f1f1;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 10px;
+    }
+</style>
+
+<body>
+    <h1>QOT-More Demos</h1>
+    <h2>Qot-A001 数据库操作</h2>
+    <pre><code class="code-highlight">require "mysqli";
+var linkings = "555555:555555@tcp(localhost:3306)/555555?charset=utf8mb4";
+var conn = MySQLConnect(linkings);
+MySQLExecute(conn,"DELETE FROM users WHERE username = 'admin';");</code></pre>
+    <h2>Qot-A002</h2>
+    <pre><code class="code-highlight">var students = [["张三", 90], ["李四", 85], ["王五", 78]];
+any_t func add_score(arr, name, score) {
+    push(arr, [name, score]);
+    return true;
+}
+number_t func average_score(arr) {
+    var sums = 0;
+    var count = glen(arr);
+    for (i in count-1) {
+        var student = arr[i];  
+        sums = sums + student[1];  
+    }
+    return sums / count;
+}
+
+
+for (i in glen(students)-1) {
+    var student = students[i];  
+    output("姓名：", student[0], "，成绩：", student[1]);  
+}
+
+add_score(students, "赵六", 92);
+
+var avg = average_score(students);
+output("平均分：", avg);
+if (avg > 85) {
+    output("优秀");
+} else {
+    output("待提升");
+}</code></pre>
+    <h2>Qot-A003 绘图</h2>
+    <pre><code class="code-highlight">//QOT-Demo-PD库-绘图
+require "painting";
+var turtle = Turtle_Create(800, 600, "绘图演示");
+turtle->Turtle_SetSpeed(0);
+turtle->Turtle_SetPenColor(0, 0, 255);
+turtle->Turtle_SetPenWidth(5);
+turtle->Turtle_SetBgColor(240, 240, 240);
+turtle->Turtle_PenDown();  
+turtle->Turtle_Forward(100, 30);  
+turtle->Turtle_Left(90, 20);       
+turtle->Turtle_Forward(100, 30);
+turtle->Turtle_Left(90, 20);
+turtle->Turtle_Forward(100, 30);
+turtle->Turtle_Left(90, 20);
+turtle->Turtle_Forward(100, 30);
+turtle->Turtle_Left(90, 20);
+turtle->Turtle_PenUp();
+turtle->Turtle_SetPenColor(255, 165, 0);  
+turtle->Turtle_PenDown();
+turtle->Turtle_Circle(80, 360, 50);  
+turtle->Turtle_PenUp();
+turtle->Turtle_SetPenColor(255, 215, 0); 
+turtle->Turtle_PenDown();
+var i = 0;
+loop(i < 5) {
+    turtle->Turtle_Forward(100, 30);
+    turtle->Turtle_Left(144, 20);  
+    i = i + 1;
+}
+turtle->Turtle_PenUp();
+turtle->Turtle_Goto(100, 250, 30);
+turtle->Turtle_SetPenColor(0, 255, 0);  
+turtle->Turtle_PenDown();
+var len = 10;
+var j = 0;
+loop(j < 20) {
+    turtle->Turtle_Forward(len, 20);
+    turtle->Turtle_Left(90, 15);
+    len = len + 5;
+    j = j + 1;
+}
+turtle->Turtle_ShowTurtle();
+turtle->Turtle_PenUp();
+turtle->Turtle_SetPenColor(128, 0, 128);  
+turtle->Turtle_SetFillColor(173, 216, 230);  
+turtle->Turtle_BeginFill();
+turtle->Turtle_PenDown();
+turtle->Turtle_Forward(80, 20);
+turtle->Turtle_Left(90, 15);
+turtle->Turtle_Forward(80, 20);
+turtle->Turtle_Left(90, 15);
+turtle->Turtle_Forward(80, 20);
+turtle->Turtle_Left(90, 15);
+turtle->Turtle_Forward(80, 20);
+turtle->Turtle_Left(90, 15);
+turtle->Turtle_EndFill();
+turtle->Turtle_PenUp();
+turtle->Turtle_SetPenColor(99, 102, 241);
+turtle->Turtle_Write(L"绘图演示", false, "center", 20);
+turtle->Turtle_MainLoop();
+turtle->Turtle_ExitOnClick();
+turtle->Turtle_Destroy();</code></pre>
+    <h2>Qot-A004 音乐播放</h2>
+    <pre><code class="code-highlight">require "miaudio";
+var player = miaudio##MusicPlayer_Create();
+var result = miaudio##MusicPlayer_Open(player, "chengnan.mp3"); //城南花已开...
+if (result == 0) {
+    output("打开文件失败！");
+    return false;
+}
+miaudio##MusicPlayer_Play(player);
+loop (true) {
+    var state = miaudio##MusicPlayer_GetState(player);
+    var position = miaudio##MusicPlayer_GetPosition(player);
+    var duration = miaudio##MusicPlayer_GetDuration(player);
+    if (state == 3 || position >= duration) {
+        output("\n播放结束！");
+        stop;
+    }
+    sleep(100);
+}
+miaudio##MusicPlayer_Destroy(player);</code></pre>
+    <h2>Qot-A005 Win-API</h2>
+    <pre><code class="code-highlight">require "win32";
+var MB_OK = win32##get_const("MB_OK");
+var msgBoxAddr = win32##get_address("MessageBoxW");
+var title ="Hellos";
+var text = "你好世界";
+var result = win32##call_address(msgBoxAddr, 4, 0, title, text, 0);</code></pre>
+ <h2>Qot-A006 天气API调用</h2>
+    <pre><code class="code-highlight">//Thanks to uapis.cn
+http_set_user_agent("QOT-WeatherClient/1.0");
+http_set_verify_ssl(0);
+output("请输入城市名称: ");
+var city = cinget();
+var url = "https://uapis.cn/api/v1/misc/weather?city=" + city;
+output("正在查询 " + city + " 的天气...");
+var result = http_send(url, null, "GET", 10000);
+var statusCode = result[0];
+var responseData = result[2];
+if (statusCode == 200) {
+    var weatherData = json_decode(responseData);
+    if (weatherData != null) {
+        output("========== 天气查询结果 ==========");
+        output("城市: " + weatherData["city"]);
+        output("天气状况: " + weatherData["weather"]);
+        output("温度: " + strings(weatherData["temperature"]) + "°C");
+        output("风向: " + weatherData["wind_direction"]);
+        output("风力: " + weatherData["wind_power"]);
+        output("湿度: " + strings(weatherData["humidity"]) + "%");
+        output("发布时间: " + weatherData["report_time"]);
+        output("=================================");
+        // 给出建议
+        var condition = weatherData["weather"];
+        if (strrep(condition, "雨", "") != condition) {
+            output("💡 建议：有雨，出门请带伞");
+        } eif (strrep(condition, "雪", "") != condition) {
+            output("💡 建议：下雪，注意保暖和出行安全");
+        } eif (strrep(condition, "晴", "") != condition) {
+            output("💡 建议：天气晴朗，适合户外活动");
+        } eif (strrep(condition, "云", "") != condition) {
+            output("💡 建议：多云天气，适宜出行");
+        } else {
+            output("💡 建议：请关注天气变化");
+        }
+    } else {
+        output("解析天气数据失败");
+    }
+} else {
+    output("查询失败，HTTP状态码: " + strings(statusCode));
+    if (responseData != null && responseData != "") {
+        output("错误信息: " + responseData);
+    }
+}</code></pre>
+<h2>Qot-A007 Vgui</h2>
+<pre><code class="code-highlight">any_t func on_button_click() {
+    output("按钮被点击了!");
+    vg_button_set_text(label, "按钮已被点击！");
+    vg_button_set_color(btn, [0.3, 0.8, 0.4, 1.0]);
+}
+var window;
+var btn;
+var label;
+vg_init();
+window = vg_create_window("My-QOT-Application", 800, 600);
+vg_set_window_bg_gradient([0.05, 0.05, 0.12, 1], [0.12, 0.08, 0.22, 1]);
+btn = vg_create_button(300, 250, 200, 50, "点击我");
+vg_button_set_color(btn, [0.2, 0.6, 1.0, 1.0]);
+vg_button_set_hover_color(btn, [0.3, 0.7, 1.0, 1.0]);
+vg_button_set_border_radius(btn, 25);
+vg_button_on_click(btn, on_button_click);
+label = vg_create_button(300, 200, 200, 40, "等待点击...");
+vg_button_set_color(label, [0.12, 0.12, 0.18, 1.0]);
+vg_button_set_hover_color(label, [0.12, 0.12, 0.18, 1.0]);
+vg_show_window(window);
+vg_run();
+vg_uninit();</code></pre>
+    <blockquote>
+        <a href="index.html">回退</a></br>
+    </blockquote>
+
+</body>
+
+</html>

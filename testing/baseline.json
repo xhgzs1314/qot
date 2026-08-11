@@ -1,0 +1,146 @@
+{
+ "t01_arith.qot": {
+  "compile_ok": true,
+  "qtc_sha": "826225dfc420edf5",
+  "stdout": [
+   "14.000000",
+   "20.000000",
+   "1024.000000",
+   "2.000000"
+  ],
+  "secs": 0.327
+ },
+ "t02_forloop.qot": {
+  "compile_ok": true,
+  "qtc_sha": "7f49ccd2e0904b0b",
+  "stdout": [
+   "10.000000",
+   "0.000000",
+   "1.000000",
+   "2.000000"
+  ],
+  "secs": 0.3
+ },
+ "t03_ifarr.qot": {
+  "compile_ok": true,
+  "qtc_sha": "d62036a460b192e5",
+  "stdout": [
+   "mid",
+   "50.000000",
+   "hi there"
+  ],
+  "secs": 0.305
+ },
+ "t04_fib.qot": {
+  "compile_ok": true,
+  "qtc_sha": "79d54e74affd9faa",
+  "stdout": [
+   "55.000000"
+  ],
+  "secs": 0.306
+ },
+ "t05_float.qot": {
+  "compile_ok": true,
+  "qtc_sha": "c773c169bfafe5db",
+  "stdout": [
+   "6.000000",
+   "2.500000",
+   "3.333333",
+   "0.000000"
+  ],
+  "secs": 0.293
+ },
+ "t06_logic.qot": {
+  "compile_ok": true,
+  "qtc_sha": "1577cfe213476e25",
+  "stdout": [
+   "true",
+   "false",
+   "true",
+   "true",
+   "true",
+   "true",
+   "true",
+   "false"
+  ],
+  "secs": 0.303
+ },
+ "t07_array.qot": {
+  "compile_ok": true,
+  "qtc_sha": "a1e324a9727261de",
+  "stdout": [
+   "4.000000",
+   "4.000000",
+   "99.000000",
+   "3.000000"
+  ],
+  "secs": 0.307
+ },
+ "t08_dict.qot": {
+  "compile_ok": true,
+  "qtc_sha": "0204eb978ff21cfb",
+  "stdout": [
+   "Alice",
+   "30.000000",
+   "BJ"
+  ],
+  "secs": 0.435
+ },
+ "t09_unary.qot": {
+  "compile_ok": true,
+  "qtc_sha": "16d5d9e299bc5a1c",
+  "stdout": [
+   "-5.000000",
+   "7.000000",
+   "-5.000000"
+  ],
+  "secs": 0.301
+ },
+ "t11_funcs.qot": {
+  "compile_ok": true,
+  "qtc_sha": "c28fce4a42827622",
+  "stdout": [
+   "7.000000",
+   "31.000000"
+  ],
+  "secs": 0.284
+ },
+ "t12_nested.qot": {
+  "compile_ok": true,
+  "qtc_sha": "ac08890c1a4c34ef",
+  "stdout": [
+   "99.000000",
+   "10.000000"
+  ],
+  "secs": 0.331
+ },
+ "t13_foreach.qot": {
+  "compile_ok": true,
+  "qtc_sha": "47fc5a58ecd17271",
+  "stdout": [
+   "60.000000",
+   "6.000000",
+   "10.000000"
+  ],
+  "secs": 0.286
+ },
+ "t14_loopsum.qot": {
+  "compile_ok": true,
+  "qtc_sha": "b1c5f717a98ff86d",
+  "stdout": [
+   "4999950000.000000"
+  ],
+  "secs": 0.364
+ },
+ "t15_funcloop.qot": {
+  "compile_ok": true,
+  "qtc_sha": "87e8fbd5f0855f79",
+  "stdout": [
+   "4950.000000",
+   "20.000000",
+   "7.000000",
+   "3.000000"
+  ],
+  "secs": 0.303
+ }
+}

@@ -1,0 +1,8 @@
+var a = [1, 2, 3];
+a->push(4);
+output(a->glen());
+output(a[3]);
+a[0] = 99;
+output(a[0]);
+var nested = [[1,2],[3,4]];
+output(nested[1][0]);

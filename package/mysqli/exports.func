@@ -1,0 +1,6 @@
+MySQLConnect|str|int
+MySQLClose|int|int
+MySQLExecute|int,str|long
+MySQLQuery|int,str|str
+MySQLPrepare|int,str,str|long
+MySQLFreeString|str|void

@@ -1,0 +1,145 @@
+
+#pragma once
+#include "ui_component.h"
+#include "renderer.h"
+#include "animation.h"
+
+namespace gui {
+
+
+class ProgressBar : public UIComponent {
+public:
+    ProgressBar();
+    ~ProgressBar();
+    
+    void SetValue(float value);  
+    void SetTargetValue(float value, float duration = 0.3f);
+    float GetValue() const { return m_value; }
+    
+    void SetBackgroundColor(const Color& color);
+    void SetProgressColor(const Color& color);
+    void SetProgressGradient(const Color& start, const Color& end);
+    void SetBorderRadius(float radius);
+    void SetShowPercentage(bool show);
+    void SetHeight(float height);
+    
+    void Draw(Renderer* renderer) override;
+    void Update(float deltaTime) override;
+    
+private:
+    float m_value;
+    float m_targetValue;
+    Color m_backgroundColor;
+    Color m_progressColorStart;
+    Color m_progressColorEnd;
+    float m_borderRadius;
+    float m_height;
+    bool m_showPercentage;
+    bool m_useGradient;
+    
+    std::unique_ptr<Animation> m_valueAnim;
+};
+
+
+inline ProgressBar::ProgressBar()
+    : m_value(0)
+    , m_targetValue(0)
+    , m_backgroundColor(0.2f, 0.2f, 0.3f, 0.5f)
+    , m_progressColorStart(0.2f, 0.6f, 1.0f, 1.0f)
+    , m_progressColorEnd(0.4f, 0.8f, 1.0f, 1.0f)
+    , m_borderRadius(10.0f)
+    , m_height(8.0f)
+    , m_showPercentage(true)
+    , m_useGradient(true) {
+    
+    m_valueAnim = std::make_unique<Animation>();
+    m_valueAnim->OnUpdate([this](float value) {
+        m_value = value;
+    });
+}
+
+inline ProgressBar::~ProgressBar() = default;
+
+inline void ProgressBar::SetValue(float value) {
+    m_targetValue = std::max(0.0f, std::min(1.0f, value));
+    m_value = m_targetValue;
+    if (m_valueAnim->IsPlaying()) m_valueAnim->Stop();
+}
+
+inline void ProgressBar::SetTargetValue(float value, float duration) {
+    m_targetValue = std::max(0.0f, std::min(1.0f, value));
+    m_valueAnim->Start(m_value, m_targetValue, duration, EasingType::QuadOut);
+}
+
+inline void ProgressBar::SetBackgroundColor(const Color& color) {
+    m_backgroundColor = color;
+}
+
+inline void ProgressBar::SetProgressColor(const Color& color) {
+    m_progressColorStart = color;
+    m_progressColorEnd = color;
+    m_useGradient = false;
+}
+
+inline void ProgressBar::SetProgressGradient(const Color& start, const Color& end) {
+    m_progressColorStart = start;
+    m_progressColorEnd = end;
+    m_useGradient = true;
+}
+
+inline void ProgressBar::SetBorderRadius(float radius) {
+    m_borderRadius = radius;
+}
+
+inline void ProgressBar::SetShowPercentage(bool show) {
+    m_showPercentage = show;
+}
+
+inline void ProgressBar::SetHeight(float height) {
+    m_height = height;
+}
+
+inline void ProgressBar::Draw(Renderer* renderer) {
+    if (!m_visible || !renderer) return;
+    
+    
+    RoundedRect bgRect;
+    bgRect.rect = Rect(m_bounds.left, m_bounds.top, m_bounds.right, m_bounds.top + m_height);
+    bgRect.radiusX = m_borderRadius;
+    bgRect.radiusY = m_borderRadius;
+    renderer->FillRoundedRect(bgRect, m_backgroundColor);
+    
+    
+    float progressWidth = m_bounds.Width() * m_value;
+    if (progressWidth > 0) {
+        RoundedRect progressRect;
+        progressRect.rect = Rect(m_bounds.left, m_bounds.top, m_bounds.left + progressWidth, m_bounds.top + m_height);
+        progressRect.radiusX = m_borderRadius;
+        progressRect.radiusY = m_borderRadius;
+        
+        if (m_useGradient) {
+            renderer->FillRoundedRectGradient(progressRect, m_progressColorStart, m_progressColorEnd, true);
+        } else {
+            renderer->FillRoundedRect(progressRect, m_progressColorStart);
+        }
+    }
+    
+    
+    if (m_showPercentage) {
+        wchar_t text[32];
+        swprintf_s(text, L"%.0f%%", m_value * 100);
+        
+        Rect textRect = m_bounds;
+        textRect.top -= 25;
+        textRect.bottom = textRect.top + 20;
+        renderer->DrawText(text, textRect, Color(0.7f, 0.7f, 0.85f, 0.9f), 12.0f, false, true);
+    }
+}
+
+inline void ProgressBar::Update(float deltaTime) {
+    if (m_valueAnim && m_valueAnim->IsPlaying()) {
+        m_valueAnim->Update(deltaTime);
+    }
+}
+
+} 

@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vgui 扩展开发文档 - 控件与动画系统完全指南</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #f5f7fb;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: #1e293b;
+            padding: 2rem 1rem;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 24px;
+            box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .doc-header {
+            background: linear-gradient(135deg, #1e2a2e 0%, #0f1a1f 100%);
+            color: white;
+            padding: 3rem 3rem;
+            border-bottom: 4px solid #d4af7a;
+        }
+
+        .doc-header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            margin-bottom: 0.75rem;
+        }
+
+        .doc-header .version {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(8px);
+            display: inline-block;
+            padding: 0.25rem 1rem;
+            border-radius: 40px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            margin-top: 0.5rem;
+        }
+
+        .doc-header p {
+            margin-top: 1.25rem;
+            opacity: 0.9;
+            max-width: 75%;
+            font-size: 1.05rem;
+            color: #4f46e5;
+        }
+
+        .doc-body {
+            display: flex;
+            flex-wrap: wrap;
+        }
+
+        .sidebar {
+            flex: 1;
+            min-width: 280px;
+            background: #f8fafc;
+            border-right: 1px solid #e9edf2;
+            padding: 2rem 1rem;
+            position: sticky;
+            top: 0;
+            height: fit-content;
+        }
+
+        .sidebar nav ul {
+            list-style: none;
+        }
+
+        .sidebar nav li {
+            margin: 0.25rem 0;
+        }
+
+        .sidebar nav a {
+            text-decoration: none;
+            color: #475569;
+            font-weight: 450;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0.6rem 1rem;
+            border-radius: 12px;
+            font-size: 0.9rem;
+        }
+
+        .sidebar nav a:hover {
+            background: #eef2ff;
+            color: #4f46e5;
+            transform: translateX(4px);
+        }
+
+        .content {
+            flex: 4;
+            padding: 2.5rem 3rem;
+            background: white;
+            max-width: calc(100% - 280px);
+        }
+
+        h2 {
+            font-size: 1.8rem;
+            font-weight: 650;
+            margin: 2rem 0 1.25rem 0;
+            padding-bottom: 0.5rem;
+            border-bottom: 3px solid #eef2ff;
+            color: #0f172a;
+            letter-spacing: -0.01em;
+        }
+
+        h3 {
+            font-size: 1.35rem;
+            font-weight: 600;
+            margin: 1.5rem 0 0.75rem 0;
+            color: #1e293b;
+        }
+
+        h4 {
+            font-weight: 600;
+            margin: 1.2rem 0 0.5rem 0;
+            color: #475569;
+            font-size: 1.05rem;
+        }
+
+        p {
+            margin-bottom: 1rem;
+            color: #334155;
+        }
+
+        code {
+            font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+            background: #f1f5f9;
+            padding: 0.2rem 0.45rem;
+            border-radius: 8px;
+            font-size: 0.85em;
+            color: #be123c;
+            font-weight: 500;
+        }
+
+        pre {
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 1.2rem 1.5rem;
+            border-radius: 16px;
+            overflow-x: auto;
+            margin: 1.25rem 0;
+            font-size: 0.82rem;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            line-height: 1.5;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        pre code {
+            background: transparent;
+            color: inherit;
+            padding: 0;
+            font-weight: normal;
+        }
+
+        .note {
+            background: #ecfdf5;
+            border-left: 4px solid #10b981;
+            padding: 1rem 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 12px;
+            color: #065f46;
+        }
+
+        .warning {
+            background: #fffbeb;
+            border-left: 4px solid #f59e0b;
+            padding: 1rem 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 12px;
+            color: #92400e;
+        }
+
+        .tip {
+            background: #eff6ff;
+            border-left: 4px solid #3b82f6;
+            padding: 1rem 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 12px;
+            color: #1e40af;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        th, td {
+            border: 1px solid #e2e8f0;
+            padding: 0.85rem 1.2rem;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        th {
+            background: #f8fafc;
+            font-weight: 600;
+            color: #1e293b;
+        }
+
+        .file-path {
+            background: #1e293b;
+            color: #cbd5e1;
+            padding: 0.2rem 0.6rem;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.8rem;
+        }
+
+        .badge {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            font-size: 0.7rem;
+            padding: 0.2rem 0.7rem;
+            border-radius: 30px;
+            display: inline-block;
+            margin-right: 0.6rem;
+            font-weight: 500;
+        }
+
+        ul, ol {
+            margin: 0.8rem 0 1rem 1.5rem;
+            color: #334155;
+        }
+
+        li {
+            margin: 0.4rem 0;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        footer {
+            background: #f8fafc;
+            padding: 1.5rem;
+            text-align: center;
+            font-size: 0.8rem;
+            color: #64748b;
+            border-top: 1px solid #e9edf2;
+        }
+
+        @media (max-width: 960px) {
+            .sidebar {
+                display: none;
+            }
+            .content {
+                max-width: 100%;
+                padding: 1.8rem;
+            }
+            .doc-header p {
+                max-width: 100%;
+            }
+            .doc-header {
+                padding: 2rem 1.5rem;
+            }
+            .doc-header h1 {
+                font-size: 1.8rem;
+            }
+        }
+
+        @media (max-width: 640px) {
+            body {
+                padding: 0.5rem;
+            }
+            .content {
+                padding: 1.2rem;
+            }
+            pre {
+                padding: 0.8rem 1rem;
+                font-size: 0.7rem;
+            }
+            h2 {
+                font-size: 1.4rem;
+            }
+            h3 {
+                font-size: 1.15rem;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="doc-header">
+        <h1> Vgui 扩展开发文档</h1>
+        <span class="version">基于 QOT GUI v1.0</span>
+        <p>深入 Vgui 图形界面内核，从渲染器、动画系统到控件实现，系统性如何扩展和定制现代化 GUI。</p>
+    </div>
+    <div class="doc-body">
+        <div class="sidebar">
+            <nav>
+                <ul>
+                    <li><a href="#overview"> 概述</a></li>
+                    <li><a href="#architecture"> Vgui 架构全景</a></li>
+                    <li><a href="#core-types"> 核心类型系统 (core_types.h)</a></li>
+                    <li><a href="#renderer"> 渲染器扩展 (Renderer)</a></li>
+                    <li><a href="#animation"> 动画系统扩展 (Animation)</a></li>
+                    <li><a href="#component"> 创建新控件 (UIComponent)</a></li>
+                    <li><a href="#controls-basic"> 基础控件源码分析</a></li>
+                    <li><a href="#controls-extended"> 扩展控件开发</a></li>
+                    <li><a href="#layout"> 布局与主题系统 (LayoutHelper / ThemeManager)</a></li>
+                    <li><a href="#event"> 事件系统与回调</a></li>
+                    <li><a href="#window"> 窗口扩展 (ModernWindow)</a></li>
+                    <li><a href="#binding"> 绑定到 QOT 脚本 (gui_module.cpp)</a></li>
+                    <li><a href="#faq"> 常见问题</a></li>
+                </ul>
+            </nav>
+        </div>
+        <div class="content">
+
+            <section id="overview">
+                <h2> 概述</h2>
+                <p>Vgui 是 QOT 内置的现代化图形界面库，基于 <strong>Direct2D + DirectWrite</strong> 硬件加速渲染，提供以下核心能力：</p>
+                <ul>
+                    <li><strong>20+ 内置控件</strong>：Button、Card、CheckBox、Toggle、TextBox、Slider、ProgressBar、ComboBox、ListBox、TabControl、Spinner 等</li>
+                    <li><strong>完整动画系统</strong>：支持 12 种缓动曲线（Linear、Quad、Cubic、Sine、Elastic、Bounce）</li>
+                    <li><strong>主题系统</strong>：深色/浅色主题 + 自定义配色方案</li>
+                    <li><strong>布局辅助</strong>：Anchor、Dock、Flex、Grid 布局支持</li>
+                    <li><strong>IME 输入法支持</strong>：完整的输入法组合窗口处理</li>
+                </ul>
+                <div class="note">
+                    <strong> 扩展目标：</strong> 你可以为 Vgui 添加新控件、扩展动画缓动函数、创建自定义主题、定制布局行为。
+                </div>
+            </section>
+
+            <section id="architecture">
+                <h2> Vgui 架构全景</h2>
+                <p>Vgui 的核心文件结构如下：</p>
+                <table>
+                    <tr><th>文件</th><th>职责</th></tr>
+                    <tr><td class="file-path">core_types.h</td><td>基础类型定义：Color、Rect、Point、Size、Ellipse、RoundedRect</td></tr>
+                    <tr><td class="file-path">renderer.h/cpp</td><td>Direct2D/DirectWrite 渲染封装，提供绘制原语</td></tr>
+                    <tr><td class="file-path">animation.h</td><td>动画系统：缓动曲线、Animation 类、AnimationManager</td></tr>
+                    <tr><td class="file-path">ui_component.h</td><td>UIComponent 基类，所有控件的抽象</td></tr>
+                    <tr><td class="file-path">button.h / card.h / ...</td><td>具体控件实现</td></tr>
+                    <tr><td class="file-path">controls_basic.h</td><td>基础控件：CheckBox、RadioButton、ToggleSwitch、TextBox</td></tr>
+                    <tr><td class="file-path">controls_extended.h</td><td>扩展控件：ComboBox、ListBox、TabControl、Spinner、Tooltip、MessageBox</td></tr>
+                    <tr><td class="file-path">modern_window.h/cpp</td><td>窗口管理与消息循环，IME 输入法支持</td></tr>
+                    <tr><td class="file-path">layout_theme.h</td><td>布局辅助（LayoutHelper）、主题系统（ThemeManager）、配色方案</td></tr>
+                    <tr><td class="file-path">gui_module.h/cpp</td><td>QOT 脚本绑定层，将 C++ 控件暴露为 QOT 内置函数</td></tr>
+                </table>
+
+                <pre>
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                              Vgui 架构层次                                       │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│  QOT 脚本层 (vg_create_button, vg_button_on_click, ...)                         │
+│         ↓                                                                       │
+│  gui_module.cpp (BuiltinManager 注册，C++ ↔ QOT 双向绑定)                        │
+│         ↓                                                                       │
+│  ModernWindow (窗口管理、消息分发、IME 输入法)                                    │
+│         ↓                                                                       │
+│  UIComponent 子类 (Button, Card, TextBox, ...)                                  │
+│         ↓                                                                       │
+│  AnimationManager (动画更新) + LayoutHelper (布局计算)                           │
+│         ↓                                                                       │
+│  Renderer (Direct2D/DirectWrite 硬件加速绘制)                                   │
+└─────────────────────────────────────────────────────────────────────────────────┘
+                </pre>
+            </section>
+
+            <section id="core-types">
+                <h2> 核心类型系统</h2>
+                <p><code class="file-path">core_types.h</code> 定义了 Vgui 的所有基础数据类型：</p>
+
+                <h3>Color 颜色</h3>
+                <pre>
+struct Color {
+    float r, g, b, a;  // 0.0f - 1.0f
+    
+    static Color FromRGB(int r, int g, int b, int a = 255);
+    static Color Lerp(const Color& a, const Color& b, float t);
+    D2D1_COLOR_F ToD2D() const;
+};</pre>
+
+                <h3>几何类型</h3>
+                <pre>
+struct Point { float x, y; };
+struct Size { float width, height; };
+struct Rect {
+    float left, top, right, bottom;
+    float Width() const;
+    float Height() const;
+    Point Center() const;
+};
+struct RoundedRect { Rect rect; float radiusX, radiusY; };
+struct Ellipse { Point center; float radiusX, radiusY; };</pre>
+
+                <h3>扩展自定义几何类型</h3>
+                <pre>
+// 例如添加三角形
+struct Triangle {
+    Point p1, p2, p3;
+    
+    Triangle(const Point&amp; a, const Point&amp; b, const Point&amp; c)
+        : p1(a), p2(b), p3(c) {}
+};</pre>
+            </section>
+
+            <section id="renderer">
+                <h2> 渲染器扩展</h2>
+                <p><code class="file-path">renderer.h</code> 中的 <code>Renderer</code> 类封装了 Direct2D 绘制操作。</p>
+
+                <h3>现有绘制原语</h3>
+                <ul>
+                    <li><code>FillRect / DrawRect</code> - 矩形填充/描边</li>
+                    <li><code>FillRoundedRect / DrawRoundedRect</code> - 圆角矩形</li>
+                    <li><code>FillEllipse / DrawEllipse</code> - 椭圆</li>
+                    <li><code>DrawLine</code> - 线段</li>
+                    <li><code>FillRectGradient / FillRoundedRectGradient</code> - 渐变填充</li>
+                    <li><code>DrawText / MeasureText</code> - 文本渲染与测量</li>
+                    <li><code>PushClip / PopClip</code> - 裁剪区域</li>
+                </ul>
+
+                <h3>添加新绘制原语（例如绘制三角形）</h3>
+                <pre>
+// 在 renderer.h 中添加声明
+void FillTriangle(const Triangle&amp; triangle, const Color&amp; color);
+
+// 在 renderer.cpp 中实现
+void Renderer::FillTriangle(const Triangle&amp; triangle, const Color&amp; color) {
+    if (!m_renderTarget) return;
+    
+    ID2D1SolidColorBrush* brush = GetBrush(color);
+    if (!brush) return;
+    
+    // 使用 Direct2D 的 FillGeometry 绘制三角形
+    ID2D1PathGeometry* pathGeometry = nullptr;
+    ID2D1GeometrySink* sink = nullptr;
+    
+    m_d2dFactory->CreatePathGeometry(&amp;pathGeometry);
+    pathGeometry->Open(&amp;sink);
+    
+    sink->BeginFigure(
+        D2D1::Point2F(triangle.p1.x, triangle.p1.y),
+        D2D1_FIGURE_BEGIN_FILLED);
+    sink->AddLine(D2D1::Point2F(triangle.p2.x, triangle.p2.y));
+    sink->AddLine(D2D1::Point2F(triangle.p3.x, triangle.p3.y));
+    sink->EndFigure(D2D1_FIGURE_END_CLOSED);
+    sink->Close();
+    
+    m_renderTarget->FillGeometry(pathGeometry, brush);
+    
+    SafeRelease(&amp;sink);
+    SafeRelease(&amp;pathGeometry);
+}</pre>
+            </section>
+
+            <section id="animation">
+                <h2> 动画系统扩展</h2>
+                <p><code class="file-path">animation.h</code> 提供了完整的动画框架。</p>
+
+                <h3>现有缓动函数</h3>
+                <table>
+                    <tr><th>EasingType</th><th>说明</th></tr>
+                    <tr><td>Linear</td><td>线性</td></tr>
+                    <tr><td>QuadIn / QuadOut / QuadInOut</td><td>二次缓动</td></tr>
+                    <tr><td>CubicIn / CubicOut / CubicInOut</td><td>三次缓动</td></tr>
+                    <tr><td>SineIn / SineOut / SineInOut</td><td>正弦缓动</td></tr>
+                    <tr><td>ElasticOut</td><td>弹性缓动</td></tr>
+                    <tr><td>BounceOut</td><td>弹跳缓动</td></tr>
+                </table>
+
+                <h3>添加新的缓动函数（例如 BackOut）</h3>
+                <pre>
+// 在 animation.h 的 EasingType 枚举中添加
+enum class EasingType {
+    // ... 现有 ...
+    BackOut
+};
+
+// 实现缓动函数
+inline float EasingBackOut(float t) {
+    const float c1 = 1.70158f;
+    const float c3 = c1 + 1;
+    return 1 + c3 * powf(t - 1, 3) + c1 * powf(t - 1, 2);
+}
+
+// 在 Animation::EvaluateEasing 中添加 case
+case EasingType::BackOut:
+    return EasingBackOut(t);</pre>
+
+                <h3>动画使用示例</h3>
+                <pre>
+// 创建动画
+auto anim = std::make_unique&lt;Animation&gt;();
+anim->OnUpdate([this](float value) {
+    m_currentValue = value;
+    Invalidate();  // 触发重绘
+});
+anim->Start(0.0f, 1.0f, 0.3f, EasingType::QuadOut);
+
+// 在 Update 中驱动
+void Update(float deltaTime) override {
+    anim->Update(deltaTime);
+}</pre>
+            </section>
+
+            <section id="component">
+                <h2> 创建新控件</h2>
+                <p>所有控件继承自 <code>UIComponent</code> 基类：</p>
+                <pre>
+class UIComponent {
+public:
+    virtual ~UIComponent() = default;
+    virtual void Draw(Renderer* renderer) = 0;
+    virtual void Update(float deltaTime) {}
+    virtual bool HandleMouseMove(const Point& mousePos) { return false; }
+    virtual bool HandleMouseDown(const Point& mousePos, int button) { return false; }
+    virtual bool HandleMouseUp(const Point& mousePos, int button) { return false; }
+    
+    void SetBounds(const Rect& bounds) { m_bounds = bounds; }
+    Rect GetBounds() const { return m_bounds; }
+    void SetVisible(bool visible) { m_visible = visible; }
+    void SetEnabled(bool enabled) { m_enabled = enabled; }
+};</pre>
+
+                <h3>示例：创建 Image 控件（显示图片）</h3>
+                <pre>
+class Image : public UIComponent {
+public:
+    Image() : m_opacity(1.0f) {}
+    
+    void SetImage(ID2D1Bitmap* bitmap) { m_bitmap = bitmap; }
+    void SetOpacity(float opacity) { m_opacity = opacity; }
+    
+    void Draw(Renderer* renderer) override {
+        if (!m_visible || !m_bitmap) return;
+        
+        // 获取 D2D 渲染目标
+        auto* rt = renderer->GetRenderTarget();
+        if (rt) {
+            D2D1_RECT_F destRect = m_bounds.ToD2D();
+            rt->DrawBitmap(m_bitmap, destRect, m_opacity);
+        }
+    }
+    
+private:
+    ID2D1Bitmap* m_bitmap = nullptr;
+    float m_opacity;
+};</pre>
+
+                <h3>添加支持圆角的 Image 控件</h3>
+                <pre>
+class RoundedImage : public UIComponent {
+public:
+    void SetImage(ID2D1Bitmap* bitmap) { m_bitmap = bitmap; }
+    void SetCornerRadius(float radius) { m_radius = radius; }
+    
+    void Draw(Renderer* renderer) override {
+        if (!m_visible || !m_bitmap) return;
+        
+        // 创建圆角矩形裁剪层
+        RoundedRect clipRect;
+        clipRect.rect = m_bounds;
+        clipRect.radiusX = m_radius;
+        clipRect.radiusY = m_radius;
+        
+        renderer->PushClip(m_bounds);  // 或者使用圆角裁剪
+        renderer->GetRenderTarget()->DrawBitmap(m_bitmap, m_bounds.ToD2D());
+        renderer->PopClip();
+    }
+    
+private:
+    ID2D1Bitmap* m_bitmap = nullptr;
+    float m_radius = 0;
+};</pre>
+            </section>
+
+            <section id="controls-basic">
+                <h2> 基础控件源码分析</h2>
+
+                <h3>Button（按钮）</h3>
+                <p><code class="file-path">button.h</code> 实现了完整的按钮交互：</p>
+                <ul>
+                    <li>三种状态：Normal、Hovered、Pressed</li>
+                    <li>悬停动画：使用 Animation 实现颜色/大小渐变</li>
+                    <li>点击回调：<code>ClickCallback</code></li>
+                </ul>
+
+                <h3>TextBox（文本框）关键特性</h3>
+                <ul>
+                    <li>IME 输入法支持（组合窗口位置跟随）</li>
+                    <li>光标闪烁动画</li>
+                    <li>滚动偏移（长文本自动滚动）</li>
+                    <li>占位符文本</li>
+                    <li>文本选择（可扩展）</li>
+                </ul>
+
+                <h3>TextBox 的 IME 处理流程</h3>
+                <pre>
+// 在 ModernWindow 中处理 IME 消息
+case WM_IME_STARTCOMPOSITION:
+    // 通知 TextBox 开始输入
+    textBox->SetImeComposing(true);
+    // 设置组合窗口位置
+    SetCompositionWindow(hImc, textBox->GetBounds());
+    break;
+
+case WM_IME_COMPOSITION:
+    // 获取组合字符串，通知 TextBox 显示
+    textBox->HandleImeComposition(compStr);
+    break;
+
+case WM_IME_ENDCOMPOSITION:
+    // 提交最终文本
+    textBox->HandleImeCommit(result);
+    textBox->SetImeComposing(false);
+    break;</pre>
+            </section>
+
+            <section id="controls-extended">
+                <h2> 扩展控件开发</h2>
+
+                <h3>添加新的扩展控件：日期选择器 (DatePicker)</h3>
+                <pre>
+class DatePicker : public UIComponent {
+public:
+    using DateCallback = std::function&lt;void(int year, int month, int day)&gt;;
+    
+    DatePicker() : m_year(2024), m_month(1), m_day(1), m_expanded(false) {}
+    
+    void Draw(Renderer* renderer) override {
+        // 绘制显示区域（年月日）
+        std::wstring display = std::to_wstring(m_year) + L"/" +
+                               std::to_wstring(m_month) + L"/" +
+                               std::to_wstring(m_day);
+        renderer->DrawText(display, m_bounds, m_textColor, 14, false, true);
+        
+        // 绘制下拉箭头
+        DrawArrow(renderer);
+        
+        // 如果展开，绘制日历面板
+        if (m_expanded) {
+            DrawCalendarPanel(renderer);
+        }
+    }
+    
+    bool HandleMouseDown(const Point&amp; mousePos, int button) override {
+        if (IsPointInside(mousePos)) {
+            m_expanded = !m_expanded;
+            return true;
+        }
+        
+        if (m_expanded) {
+            // 处理日历面板点击
+            return HandleCalendarClick(mousePos);
+        }
+        return false;
+    }
+    
+    void OnDateSelected(DateCallback callback) { m_callback = callback; }
+    
+private:
+    void DrawCalendarPanel(Renderer* renderer) {
+        // 绘制 7x6 的日历网格
+        // 实现省略...
+    }
+    
+    int m_year, m_month, m_day;
+    bool m_expanded;
+    DateCallback m_callback;
+};</pre>
+
+                <h3>添加速率计 (Gauge) 控件</h3>
+                <pre>
+class Gauge : public UIComponent {
+public:
+    Gauge() : m_value(0), m_min(0), m_max(100), m_angle(-135), m_targetAngle(-135) {
+        m_anim = std::make_unique&lt;Animation&gt;();
+        m_anim->OnUpdate([this](float value) {
+            m_angle = m_startAngle + value * (m_targetAngle - m_startAngle);
+        });
+    }
+    
+    void SetValue(float value) {
+        value = std::max(m_min, std::min(m_max, value));
+        m_value = value;
+        
+        m_startAngle = m_angle;
+        m_targetAngle = -135 + (value - m_min) / (m_max - m_min) * 270;
+        m_anim->Start(0, 1, 0.3f, EasingType::QuadOut);
+    }
+    
+    void Draw(Renderer* renderer) override {
+        float cx = (m_bounds.left + m_bounds.right) / 2;
+        float cy = (m_bounds.bottom - 20);
+        float radius = std::min(m_bounds.Width(), m_bounds.Height() - 40) / 2;
+        
+        // 绘制背景弧
+        DrawArc(renderer, cx, cy, radius, -135, 270, m_trackColor);
+        
+        // 绘制进度弧
+        DrawArc(renderer, cx, cy, radius, -135, (m_angle + 135), m_progressColor);
+        
+        // 绘制指针
+        DrawNeedle(renderer, cx, cy, radius, m_angle);
+        
+        // 绘制数值文本
+        wchar_t buf[32];
+        swprintf_s(buf, L"%.0f", m_value);
+        renderer->DrawText(buf, Rect(cx - 30, cy - 40, cx + 30, cy), 
+                           m_textColor, 24, true, true);
+    }
+    
+private:
+    float m_value, m_min, m_max;
+    float m_angle, m_startAngle, m_targetAngle;
+    std::unique_ptr&lt;Animation&gt; m_anim;
+};</pre>
+            </section>
+
+            <section id="layout">
+                <h2> 布局与主题系统</h2>
+
+                <h3>LayoutHelper 锚点布局</h3>
+                <pre>
+// 设置组件的锚点行为
+LayoutHelper::SetAnchor(button, AnchorType::BottomRight);
+LayoutHelper::SetAnchor(button, AnchorType::Center);
+LayoutHelper::GetProps(button).offsetX = 20;
+LayoutHelper::GetProps(button).offsetY = 20;
+
+// 在窗口 Resize 时应用布局
+void ModernWindow::OnResize() {
+    for (auto&amp; comp : m_components) {
+        LayoutHelper::ApplyAnchor(comp.get(), m_bounds, comp->GetBounds());
+    }
+}</pre>
+
+                <h3>主题系统扩展</h3>
+                <pre>
+// 创建自定义配色方案
+ColorScheme MyCustomTheme() {
+    ColorScheme scheme;
+    scheme.background = Color(0.08f, 0.05f, 0.12f, 1.0f);   // 深紫色背景
+    scheme.surface = Color(0.12f, 0.08f, 0.18f, 1.0f);       // 表面色
+    scheme.primary = Color(0.9f, 0.3f, 0.6f, 1.0f);          // 粉红主色
+    scheme.primaryHover = Color(1.0f, 0.4f, 0.7f, 1.0f);
+    scheme.primaryPress = Color(0.7f, 0.2f, 0.5f, 1.0f);
+    scheme.text = Color(0.95f, 0.95f, 1.0f, 1.0f);
+    scheme.textSecondary = Color(0.65f, 0.65f, 0.8f, 1.0f);
+    scheme.border = Color(0.3f, 0.25f, 0.4f, 1.0f);
+    return scheme;
+}
+
+// 应用主题
+ThemeManager::Instance().SetTheme(MyCustomTheme());
+
+// 注册主题变更回调
+ThemeManager::Instance().RegisterCallback([this](const ColorScheme&amp; scheme) {
+    m_button->SetBackgroundColor(scheme.primary);
+    m_button->SetTextColor(scheme.text);
+});</pre>
+            </section>
+
+            <section id="event">
+                <h2> 事件系统与回调</h2>
+
+                <h3>EventHelper 辅助类</h3>
+                <pre>
+// 使用 EventHelper 为任意组件添加事件
+EventHelper::SetOnHover(button, [](bool hovered) {
+    if (hovered) std::cout << "Mouse entered" << std::endl;
+});
+
+EventHelper::SetOnFocus(textbox, [](bool focused) {
+    if (focused) std::cout << "Textbox focused" << std::endl;
+});
+
+EventHelper::SetOnDrag(slider, [](const Point&amp; pos, bool dragging) {
+    if (dragging) std::cout << "Dragging at " << pos.x << "," << pos.y << std::endl;
+});
+
+// 在控件内部触发事件
+void Button::HandleMouseMove(const Point&amp; mousePos) {
+    bool inside = IsPointInside(mousePos);
+    EventHelper::UpdateHover(this, inside);
+}</pre>
+
+                <h3>Tooltip 提示框扩展</h3>
+                <pre>
+// 为任意组件添加 Tooltip
+Tooltip::Instance().SetTooltip(button, L"这是一个按钮");
+
+// 在组件鼠标悬停时显示
+void SomeComponent::HandleMouseMove(const Point&amp; mousePos) {
+    if (IsPointInside(mousePos)) {
+        Tooltip::Instance().Show(m_tooltipText, mousePos, this);
+    } else {
+        if (Tooltip::Instance().GetTarget() == this) {
+            Tooltip::Instance().Hide();
+        }
+    }
+}</pre>
+            </section>
+
+            <section id="window">
+                <h2>🪟 窗口扩展 (ModernWindow)</h2>
+
+                <h3>窗口扩展点</h3>
+                <ul>
+                    <li><code>OnPaint()</code> - 自定义窗口绘制（已有渐变背景，可扩展为纹理背景）</li>
+                    <li><code>OnResize()</code> - 响应窗口大小变化，重新布局</li>
+                    <li><code>HandleMouse()</code> - 鼠标事件分发</li>
+                    <li><code>OnChar / OnKeyDown</code> - 键盘事件</li>
+                    <li><code>OnImeXXX</code> - IME 输入法事件</li>
+                </ul>
+
+                <h3>添加窗口圆角</h3>
+                <pre>
+// 在窗口创建时设置圆角区域
+HRGN CreateRoundedWindowRegion(const Rect&amp; rect, float radius) {
+    HRGN region = CreateRoundRectRgn(
+        (int)rect.left, (int)rect.top,
+        (int)rect.right, (int)rect.bottom,
+        (int)radius, (int)radius);
+    SetWindowRgn(m_hwnd, region, TRUE);
+    return region;
+}
+
+// 在 Initialize 中调用
+CreateRoundedWindowRegion(Rect(0, 0, width, height), m_cornerRadius);</pre>
+            </section>
+
+            <section id="binding">
+                <h2> 绑定到 QOT 脚本</h2>
+                <p><code class="file-path">gui_module.cpp</code> 和 <code class="file-path">builtin.cpp</code> 将 C++ 控件暴露为 QOT 内置函数。</p>
+
+                <h3>添加新控件的绑定步骤</h3>
+
+                <h4>步骤1：在 gui_module.h 中声明绑定函数</h4>
+                <pre>
+Value builtin_vg_create_datepicker(const std::vector&lt;Value&gt;&amp; args);
+Value builtin_vg_datepicker_get_value(const std::vector&lt;Value&gt;&amp; args);
+Value builtin_vg_datepicker_on_changed(const std::vector&lt;Value&gt;&amp; args);</pre>
+
+                <h4>步骤2：在 gui_module.cpp 中实现绑定函数</h4>
+                <pre>
+Value builtin_vg_create_datepicker(const std::vector&lt;Value&gt;&amp; args) {
+    auto* window = GUIManager::instance().getMainWindow();
+    if (!window) return Value(nullptr);
+    
+    float x = args.size() > 0 ? gui_valueToFloat(args[0]) : 50;
+    float y = args.size() > 1 ? gui_valueToFloat(args[1]) : 50;
+    float w = args.size() > 2 ? gui_valueToFloat(args[2]) : 200;
+    float h = args.size() > 3 ? gui_valueToFloat(args[3]) : 30;
+    
+    auto datepicker = std::make_unique&lt;gui::DatePicker&gt;();
+    datepicker->SetBounds(gui::Rect(x, y, x + w, y + h));
+    
+    gui::DatePicker* ptr = datepicker.get();
+    window->AddComponent(std::move(datepicker));
+    
+    return Value(GUIManager::instance().storeObject(
+        GUIObject::Type::DatePicker, ptr));
+}
+
+Value builtin_vg_datepicker_get_value(const std::vector&lt;Value&gt;&amp; args) {
+    if (args.empty()) return Value(nullptr);
+    
+    std::string objId = args[0].toString();
+    auto* picker = static_cast&lt;gui::DatePicker*&gt;(
+        GUIManager::instance().getPtr(objId));
+    
+    if (!picker) return Value(nullptr);
+    
+    Value result = Value::createArray();
+    result.asArray().push_back(Value(static_cast&lt;double&gt;(picker->GetYear())));
+    result.asArray().push_back(Value(static_cast&lt;double&gt;(picker->GetMonth())));
+    result.asArray().push_back(Value(static_cast&lt;double&gt;(picker->GetDay())));
+    return result;
+}</pre>
+
+                <h4>步骤3：在 GUIManager 中注册回调支持</h4>
+                <pre>
+// 在 GUIManager 类中添加
+std::unordered_map&lt;std::string, Value&gt; m_datepickerCallbacks;
+
+void registerDatepickerCallback(const std::string&amp; id, const Value&amp; callback) {
+    m_datepickerCallbacks[id] = callback;
+}
+
+void triggerDatepickerChange(const std::string&amp; id, int year, int month, int day) {
+    auto it = m_datepickerCallbacks.find(id);
+    if (it != m_datepickerCallbacks.end() &amp;&amp; m_callbackExecutor) {
+        m_callbackExecutor("", {it->second, 
+                                Value(static_cast&lt;double&gt;(year)),
+                                Value(static_cast&lt;double&gt;(month)),
+                                Value(static_cast&lt;double&gt;(day))});
+    }
+}</pre>
+
+                <h4>步骤4：在 builtin.cpp 中注册函数</h4>
+                <pre>
+void BuiltinManager::registerBuiltins() {
+    // ... 现有注册 ...
+    registerFunction("vg_create_datepicker", builtin_vg_create_datepicker);
+    registerFunction("vg_datepicker_get_value", builtin_vg_datepicker_get_value);
+    registerFunction("vg_datepicker_on_changed", builtin_vg_datepicker_on_changed);
+}</pre>
+
+                <h4>步骤5：QOT 脚本中使用</h4>
+                <pre>
+var picker = vg_create_datepicker(100, 100, 200, 30);
+
+func on_date_changed(year, month, day) {
+    output("Selected: " + year + "/" + month + "/" + day);
+}
+
+vg_datepicker_on_changed(picker, on_date_changed);
+
+var [y, m, d] = vg_datepicker_get_value(picker);</pre>
+            </section>
+
+            <section id="faq">
+                <h2> 常见问题</h2>
+
+                <h3>Q1: 如何实现控件的动画过渡效果？</h3>
+                <p>A: 在控件中添加 <code>std::unique_ptr&lt;Animation&gt;</code>，在 <code>Update</code> 中更新，在 <code>Draw</code> 中使用当前动画值。参考 <code>Button</code> 的悬停动画实现。</p>
+
+                <h3>Q2: 如何支持高 DPI 缩放？</h3>
+                <p>A: 在窗口初始化时调用 <code>SetProcessDPIAware()</code>，并使用 <code>GetDpiForWindow</code> 获取 DPI，按比例缩放控件尺寸。</p>
+
+                <h3>Q3: 如何处理 WM_PAINT 时的闪烁？</h3>
+                <p>A: 使用双缓冲（Direct2D 默认支持），并处理 <code>WM_ERASEBKGND</code> 返回 1。</p>
+
+                <h3>Q4: 如何添加右键菜单？</h3>
+                <p>A: 在 <code>HandleMouseDown</code> 中检测右键按钮（button == 1），创建 <code>TrackPopupMenu</code>。</p>
+
+                <h3>Q5: 控件太多导致渲染性能下降？</h3>
+                <p>A: 使用 <code>Renderer</code> 的 <code>PushClip</code>/<code>PopClip</code> 裁剪不可见区域，避免无效绘制。</p>
+
+                <h3>Q6: TextBox 如何支持多行？</h3>
+                <p>A: 修改 <code>TextBox::Draw</code> 使用 <code>DrawText</code> 的自动换行模式（设置 <code>DWRITE_WORD_WRAPPING_WRAP</code>），并添加滚动支持。</p>
+
+                 </section>
+
+            <section>
+                <h2> 总结</h2>
+                <p>Vgui 提供了完整的扩展能力：</p>
+                <ul>
+                    <li><strong>渲染扩展</strong> - 添加新几何形状、特效、自定义绘制</li>
+                    <li><strong>动画扩展</strong> - 添加缓动函数、复合动画、关键帧动画</li>
+                    <li><strong>控件扩展</strong> - 继承 UIComponent 创建任意自定义控件</li>
+                    <li><strong>布局扩展</strong> - 实现自定义布局算法</li>
+                    <li><strong>主题扩展</strong> - 定义配色方案、全局样式</li>
+                    <li><strong>脚本绑定</strong> - 将 C++ 控件无缝暴露给 QOT 脚本</li>
+                </ul>
+                <div class="note">
+                    <strong> 下一步：</strong> 参考 <code>button.h</code> 实现简单控件，参考 <code>controls_extended.h</code> 实现复杂组合控件，参考 <code>gui_module.cpp</code> 绑定到 QOT 脚本。
+                </div>
+            </section>
+
+        </div>
+    </div>
+    <footer>
+        © Vgui · QOT 图形界面库 · 开源
+    </footer>
+</div>
+</body>
+</html>
+<script>
+(function() {
+    const sidebar = document.querySelector('.sidebar');
+    if (!sidebar) return;
+
+    const container = document.querySelector('.container');
+    const content = document.querySelector('.content');
+    
+    let initialLeft = null;
+    let initialTop = null;
+    
+    function initPositions() {
+        const sidebarRect = sidebar.getBoundingClientRect();
+        initialLeft = sidebarRect.left;
+        initialTop = sidebarRect.top + window.scrollY;
+    }
+    
+    initPositions();
+    window.addEventListener('resize', initPositions);
+    
+    window.addEventListener('scroll', function() {
+        const scrollY = window.scrollY;
+        
+        if (scrollY + 20 > initialTop) {
+            sidebar.style.position = 'fixed';
+            sidebar.style.top = '20px';
+            sidebar.style.left = initialLeft + 'px';
+            sidebar.style.width = '20px';
+            sidebar.style.zIndex = '100';
+            if (content) {
+                content.style.marginLeft = sidebar.offsetWidth + 20 + 'px';
+            }
+        } else {
+            sidebar.style.position = '';
+            sidebar.style.top = '';
+            sidebar.style.left = '';
+            sidebar.style.width = '';
+            sidebar.style.zIndex = '';
+            if (content) {
+                content.style.marginLeft = '';
+            }
+        }
+    });
+})();
+</script>

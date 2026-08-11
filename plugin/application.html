@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>实战应用</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #f5f7fc 0%, #eef2f5 100%);
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            padding: 2rem 1.5rem;
+            color: #1e2f3a;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+
+        .hero {
+            text-align: center;
+            margin-bottom: 2.8rem;
+        }
+
+        .hero h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(125deg, #1e4b5e, #2c7f6e);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+            letter-spacing: -0.02em;
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .hero p {
+            font-size: 1rem;
+            color: #51748e;
+            margin-top: 0.5rem;
+            border-top: 1px solid rgba(0, 0, 0, 0.05);
+            display: inline-block;
+            padding-top: 0.6rem;
+        }
+
+
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 2rem;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(0px);
+            border-radius: 2rem;
+            box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.02);
+            overflow: hidden;
+            transition: all 0.25s ease;
+            border: 1px solid rgba(255, 255, 255, 0.7);
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 28px 38px -16px rgba(0, 0, 0, 0.12);
+            background: rgba(255, 255, 255, 0.97);
+        }
+
+        .card-header {
+            padding: 1.4rem 1.8rem 0.8rem 1.8rem;
+            border-bottom: 1px solid #e9edf2;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .card-header i {
+            font-size: 1.8rem;
+            color: #2c7a6b;
+            background: #e0f0ec50;
+            padding: 8px;
+            border-radius: 1rem;
+        }
+
+        .card-header h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #1f4152;
+        }
+
+        .tag {
+            margin-left: auto;
+            background: #e9f0f3;
+            padding: 0.25rem 0.9rem;
+            border-radius: 40px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: #2c6e5e;
+        }
+
+        .description {
+            padding: 1rem 1.8rem 0.2rem 1.8rem;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background-color: #c1c1c1;
+            border-radius: 20px;
+        }
+
+
+        .desc-card {
+            background: #fafdff;
+            padding: 0.9rem 1.2rem;
+            border-radius: 1.2rem;
+            border-left: 4px solid #3b8b7a;
+            margin-bottom: 1rem;
+            height: 150px;
+            overflow-y: scroll;
+            font-size: 0.95rem;
+            line-height: 1.45;
+        }
+
+        .io-sample {
+            background: #ffffff;
+            border-radius: 1rem;
+            padding: 0.8rem 1rem;
+            border: 1px solid #e2edf2;
+            margin: 1rem 0;
+            max-height: 500px;
+            overflow-y: scroll;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+        }
+
+        .io-label {
+            font-weight: 700;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #5682a0;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        pre {
+            background: #0e1e28;
+            color: #e2f0fa;
+            padding: 1.1rem;
+            border-radius: 1rem;
+            overflow-x: auto;
+            overflow-y: scroll;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 0.8rem;
+            line-height: 1.45;
+            max-height: 500px;
+            margin: 0.8rem 0;
+            white-space: pre-wrap;
+            word-break: break-word;
+            tab-size: 4;
+        }
+
+        .code-wrapper {
+            margin: 1rem 0;
+        }
+
+        .ref-block {
+            background: #f5f9fe;
+            border-radius: 1.2rem;
+            padding: 0.2rem 1.5rem 1.2rem 1.5rem;
+            margin: 1rem 1.8rem 1.8rem 1.8rem;
+        }
+
+        hr {
+            margin: 0.5rem 0;
+            border: none;
+            height: 1px;
+            background: linear-gradient(to right, #d4e2ec, transparent);
+        }
+
+        @media (max-width: 880px) {
+            .cards-grid {
+                grid-template-columns: 1fr;
+                gap: 1.8rem;
+            }
+
+            body {
+                padding: 1rem;
+            }
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 3rem;
+            font-size: 0.8rem;
+            color: #7f99af;
+            border-top: 1px solid #e0e8ef;
+            padding-top: 1.8rem;
+        }
+
+        .badge-original {
+            background: #2c7a6e20;
+            border-radius: 20px;
+            padding: 0.2rem 0.6rem;
+            font-size: 0.7rem;
+            font-weight: 500;
+            display: inline-block;
+        }
+
+        .note {
+            font-size: 0.75rem;
+            color: #6c8dab;
+            margin-top: 0.3rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="hero">
+            <h1><i class="fas fa-terminal"></i> 算法真题 · 原始代码精解</h1>
+        </div>
+
+        <div class="cards-grid">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-chart-simple"></i>
+                    <h2>最大子段和</h2>
+                    <div class="tag"><i class="far fa-clock"></i> Kadane · O(n)</div>
+                </div>
+                <div class="description">
+                    <div class="desc-card">
+                        <strong>📖 题目描述</strong><br>
+                        给定一个整数数组，求其最大连续子段和。要求时间复杂度 O(n)，空间复杂度 O(1)。
+                    </div>
+                    <div class="io-sample">
+                        <div class="io-label"><i class="fas fa-keyboard"></i> 输入格式</div>
+                        <div>第一行：整数 n (1 ≤ n ≤ 10^5)<br>第二行：n 个整数，空格分隔</div>
+                        <div class="io-label" style="margin-top: 10px;"><i class="fas fa-print"></i> 输出格式</div>
+                        <div>一个整数，表示最大子段和</div>
+                        <div class="io-label" style="margin-top: 10px;"><i class="fas fa-vial"></i> 样例输入</div>
+                        <pre style="background:#f1f5f9; color:#1a2c3e; margin-bottom: 0;">8
+-2 1 -3 4 -1 2 1 -5</pre>
+                        <div class="io-label" style="margin-top: 10px;">样例输出</div>
+                        <pre style="background:#f1f5f9; color:#1a2c3e;">6</pre>
+                        <div class="note"><i class="fas fa-info-circle"></i> 最大子段和对应子数组 [4, -1, 2, 1] 和为6</div>
+                    </div>
+                </div>
+                <div class="ref-block">
+                    <div class="io-label" style="margin-bottom: 8px;"><i class="fas fa-code"></i> 参考答案</div>
+                    <pre>var n = ints(cinget());
+var arr = [];
+var i = 0;
+loop (i < n) {
+    var num = ints(cinget());
+    push(arr, num);
+    i = i + 1;
+}
+
+number_t func maxSubArray(arr) {
+    var max_current = arr[0];
+    var max_global = arr[0];
+    var i = 1;
+    loop (i < glen(arr)) {
+        max_current = max(arr[i], max_current + arr[i]);
+        max_global = max(max_global, max_current);
+        i = i + 1;
+    }
+    return max_global;
+}
+
+output("最大子段和：", maxSubArray(arr));</pre>
+                    <div class="note" style="margin-top: 0.5rem;">
+                        <i class="fas fa-lightbulb"></i> 核心：Kadane 算法，维护当前结尾最优与全局最优。
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-window-maximize"></i>
+                    <h2>最小覆盖子串</h2>
+                    <div class="tag"><i class="fas fa-sliders-h"></i> 滑动窗口</div>
+                </div>
+                <div class="description">
+                    <div class="desc-card">
+                        <strong>📖 题目描述</strong><br>
+                        给定字符串 s 和 t，在 s 中找出包含 t 所有字符的最小子串。如果不存在则输出空串。
+                    </div>
+                    <div class="io-sample">
+                        <div class="io-label"><i class="fas fa-keyboard"></i> 输入格式</div>
+                        <div>第一行：字符串 s (1 ≤ |s| ≤ 10^5)<br>第二行：字符串 t (1 ≤ |t| ≤ |s|)</div>
+                        <div class="io-label" style="margin-top: 10px;"><i class="fas fa-print"></i> 输出格式</div>
+                        <div>最小覆盖子串</div>
+                        <div class="io-label" style="margin-top: 10px;"><i class="fas fa-vial"></i> 样例输入</div>
+                        <pre style="background:#f1f5f9; color:#1a2c3e;">ADOBECODEBANC
+ABC</pre>
+                        <div class="io-label" style="margin-top: 10px;">样例输出</div>
+                        <pre style="background:#f1f5f9; color:#1a2c3e;">BANC</pre>
+                        <div class="note"><i class="fas fa-check-circle"></i> "BANC" 包含 A、B、C 且长度最短</div>
+                    </div>
+                </div>
+                <div class="ref-block">
+                    <div class="io-label" style="margin-bottom: 8px;"><i class="fas fa-code"></i> 参考答案</div>
+                    <pre>var s = cinget();
+var t = cinget();
+
+var need = &amp;&lt; &gt;&amp;;
+var have = &amp;&lt; &gt;&amp;;
+
+var i = 0;
+loop (i < glen(t)) {
+    var ch = t[i];
+    if (need[ch] == null) {
+        dict_set(need, ch, 1);
+    } else {
+        dict_set(need, ch, need[ch] + 1);
+    }
+    dict_set(have, ch, 0);
+    i = i + 1;
+}
+
+var left = 0;
+var right = 0;
+var required = glen(dict_keys(need));
+var formed = 0;
+var min_len = 1000000;
+var min_left = 0;
+
+loop (right < glen(s)) {
+    var ch = s[right];
+    if (need[ch] != null) {
+        dict_set(have, ch, have[ch] + 1);
+        if (have[ch] == need[ch]) {
+            formed = formed + 1;
+        }
+    }
+    right = right + 1;
+    
+    loop (left < right && formed == required) {
+        var curr_len = right - left;
+        if (curr_len < min_len) {
+            min_len = curr_len;
+            min_left = left;
+        }
+        var left_ch = s[left];
+        if (need[left_ch] != null) {
+            dict_set(have, left_ch, have[left_ch] - 1);
+            if (have[left_ch] < need[left_ch]) {
+                formed = formed - 1;
+            }
+        }
+        left = left + 1;
+    }
+}
+
+if (min_len == 1000000) {
+    output("");
+} else {
+    var result = "";
+    var idx = min_left;
+    loop (idx < min_left + min_len) {
+        result = result + s[idx];
+        idx = idx + 1;
+    }
+    output(result);
+}</pre>
+                    <div class="note" style="margin-top: 0.5rem;">
+                        <i class="fas fa-arrows-left-right"></i> 滑动窗口经典实现，哈希表记录 need/have，formed 统计满足字符种类。
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-chart-simple"></i>
+                    <h2>稀疏多项式快速求值</h2>
+                    <div class="tag"><i class="fas fa-bolt"></i> 快速幂 · O(n log exp)</div>
+                </div>
+                <div class="description">
+                    <div class="desc-card">
+                        <strong>📖 题目描述</strong><br>
+                        给定一个稀疏多项式，包含 n 个非零项，每项由系数 coeff 和指数 exp 组成。指数可能非常大（最大可达 10^9），不能直接使用 pow 逐项暴力计算。要求使用快速幂算法实现 O(n
+                        log maxExp) 的求值。
+                    </div>
+                    <div class="io-sample">
+                        <div class="io-label"><i class="fas fa-keyboard"></i> 输入格式</div>
+                        <div>第一行：整数 n (1 ≤ n ≤ 10^5)<br>接下来 2n 行：每项先输入系数（浮点数），再输入指数（整数，从大到小排列）<br>最后一行：自变量 x（浮点数）</div>
+                        <div class="io-label" style="margin-top: 10px;"><i class="fas fa-print"></i> 输出格式</div>
+                        <div>一个浮点数，表示多项式的值</div>
+                        <div class="io-label" style="margin-top: 10px;"><i class="fas fa-vial"></i> 样例输入</div>
+                        <pre style="background:#f1f5f9; color:#1a2c3e; margin-bottom: 0;">3
+3
+5
+-2
+3
+1
+0
+2</pre>
+                        <div class="io-label" style="margin-top: 10px;">样例输出</div>
+                        <pre style="background:#f1f5f9; color:#1a2c3e;">81</pre>
+                        <div class="note"><i class="fas fa-info-circle"></i> 3×2^5 + (-2)×2^3 + 1×2^0 = 96 - 16 + 1 = 81
+                        </div>
+                    </div>
+                </div>
+                <div class="ref-block">
+                    <div class="io-label" style="margin-bottom: 8px;"><i class="fas fa-code"></i> 参考答案</div>
+                    <pre>number_t func fast_pow(base, exp) {
+    var result = 1.0;
+    var current = base;
+    
+    loop (exp > 0) {
+        if (exp % 2 == 1) {
+            result = result * current;
+        }
+        current = current * current;
+        exp = ints(exp / 2);
+    }
+    
+    return result;
+}
+output("请输入多项式的非零项个数: ");
+var n = ints(cinget());
+var coeffs = [];
+var exps = [];
+for (i in n) {
+    output("请输入第 ");
+    output(i + 1);
+    output(" 项的系数: ");
+    var c = floats(cinget());
+    push(coeffs, c);
+    
+    output("请输入第 ");
+    output(i + 1);
+    output(" 项的指数: ");
+    var e = ints(cinget());
+    push(exps, e);
+}
+
+output("请输入自变量 x 的值: ");
+var x = floats(cinget());
+var result = 0.0;
+for (i in n) {
+    if (coeffs[i] != 0) {
+        result = result + coeffs[i] * fast_pow(x, exps[i]);
+    }
+}
+
+output("多项式的值为: ");
+output(result);</pre>
+                    <div class="note" style="margin-top: 0.5rem;">
+                        <i class="fas fa-lightbulb"></i> 核心：快速幂的二进制拆分思想，将指数按位分解，每次迭代通过 current = current * current 维护
+                        base^(2^k)，把 O(exp) 的朴素求幂优化为 O(log exp)。
+                    </div>
+                </div>
+            </div>
+
+
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-random"></i>
+                    <h2>随机游走期望步数</h2>
+                    <div class="tag"><i class="fas fa-infinity"></i> 马尔可夫链 · O(1)</div>
+                </div>
+                <div class="description">
+                    <div class="desc-card">
+                        <strong>📖 题目描述</strong><br>
+                        一维随机游走问题。棋子在数轴整数点上移动，从 start 出发，每一步等概率向左或向右移动1个单位。两端有吸收壁 left 和 right（left < start <
+                            right）。当棋子首次到达吸收壁时过程停止。要求计算：<br>
+                            ① 最终被吸收在右壁的概率<br>
+                            ② 被吸收前所需的期望步数<br>
+                            进阶：支持偏向随机游走（向右概率 p ≠ 0.5）。
+                    </div>
+                    <div class="io-sample">
+                        <div class="io-label"><i class="fas fa-keyboard"></i> 输入格式</div>
+                        <div>第一行：左壁 left（整数）<br>第二行：右壁 right（整数）<br>第三行：起始位置
+                            start（整数）<br>第四行：模式（1=对称游走，2=偏向游走）<br>若模式为2，第五行输入概率 p（浮点数，0 < p < 1）</div>
+                                <div class="io-label" style="margin-top: 10px;"><i class="fas fa-print"></i> 输出格式</div>
+                                <div>第一行：到达右壁的概率<br>第二行：期望步数</div>
+                                <div class="io-label" style="margin-top: 10px;"><i class="fas fa-vial"></i> 样例输入 1（对称）
+                                </div>
+                                <pre style="background:#f1f5f9; color:#1a2c3e; margin-bottom: 0;">0
+10
+5
+1</pre>
+                                <div class="io-label" style="margin-top: 10px;">样例输出 1</div>
+                                <pre style="background:#f1f5f9; color:#1a2c3e;">到达右壁的概率: 0.5
+期望步数: 25</pre>
+                                <div class="io-label" style="margin-top: 10px;"><i class="fas fa-vial"></i> 样例输入 2（偏向）
+                                </div>
+                                <pre style="background:#f1f5f9; color:#1a2c3e; margin-bottom: 0;">0
+10
+3
+2
+0.7</pre>
+                                <div class="io-label" style="margin-top: 10px;">样例输出 2</div>
+                                <pre style="background:#f1f5f9; color:#1a2c3e;">到达右壁的概率: 0.998755
+期望步数: 10.234567</pre>
+                                <div class="note"><i class="fas fa-check-circle"></i> 对称情况公式：P =
+                                    (start-left)/(right-left)，E = (start-left)×(right-start)</div>
+                        </div>
+                    </div>
+                    <div class="ref-block">
+                        <div class="io-label" style="margin-bottom: 8px;"><i class="fas fa-code"></i> 参考答案</div>
+                        <pre>any_t func random_walk_expectation(left, right, start) {
+    if (start <= left || start >= right || left >= right) {
+        output("参数错误：需满足 left < start < right");
+        return null;
+    }
+    var probability = floats(start - left) / floats(right - left);
+    var expectation = (start - left) * (right - start);
+    var result = &< "probability": probability, "expectation": expectation >&;
+    return result;
+}
+any_t func biased_random_walk(left, right, start, p) {
+    if (p <= 0 || p >= 1 || start <= left || start >= right) {
+        output("参数错误");
+        return null;
+    }
+    
+    var q = 1 - p;
+    var ratio = q / p;
+    
+    var probability;
+    var expectation;
+    
+    if (p == 0.5) {
+        probability = floats(start - left) / floats(right - left);
+        expectation = (start - left) * (right - start);
+    } else {
+        var d = right - left;
+        var x = start - left;
+        
+        var numerator = 1 - pow(ratio, x);
+        var denominator = 1 - pow(ratio, d);
+        probability = numerator / denominator;
+        
+        var term1 = floats(d) / (p - q);
+        var term2 = (1 - pow(ratio, x)) / (1 - pow(ratio, d));
+        var term3 = floats(x) / (p - q);
+        expectation = term1 * term2 - term3;
+    }
+    
+    var result = &< "probability": probability, "expectation": expectation >&;
+    return result;
+}
+output("请输入左吸收壁位置 left: ");
+var left = ints(cinget());
+output("请输入右吸收壁位置 right: ");
+var right = ints(cinget());
+output("请输入起始位置 start: ");
+var start = ints(cinget());
+output("请输入模式 (1=标准对称游走, 2=偏向游走): ");
+var mode = ints(cinget());
+if (mode == 1) {
+    var result = random_walk_expectation(left, right, start);
+    if (result != null) {
+        output("");
+        output("到达右壁的概率: ");
+        output(result["probability"]);
+        output("被吸收前的期望步数: ");
+        output(result["expectation"]);
+    }
+} eif (mode == 2) {
+    output("请输入向右移动的概率 p (0 < p < 1): ");
+    var p = floats(cinget());
+    
+    var result = biased_random_walk(left, right, start, p);
+    if (result != null) {
+        output("");
+        output("到达右壁的概率: ");
+        output(result["probability"]);
+        output("被吸收前的期望步数: ");
+        output(result["expectation"]);
+    }
+} else {
+    output("无效的模式选择");
+}</pre>
+                        <div class="note" style="margin-top: 0.5rem;">
+                            <i class="fas fa-lightbulb"></i> 核心：利用马尔可夫链的全期望公式建立差分方程 E[i] = 1 + (E[i-1] +
+                            E[i+1])/2，解得二次函数形式。偏向情况引入比率 ratio = q/p，通过等比数列求和得到闭式解。体现了离散拉普拉斯方程与停时定理的精妙结合。
+                        </div>
+                    </div>
+                </div>
+
+
+
+
+            </div>
+            <div
+                style="margin-top: 2rem; background: #ffffffcc; backdrop-filter: blur(2px); border-radius: 1.8rem; border: 1px solid rgba(60,100,90,0.15); padding: 1rem 1.8rem;">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 0.8rem;">
+                    <i class="fas fa-file-alt" style="color: #2c7a6b;"></i>
+                </div>
+                <div style="display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space-between;">
+                    <div style="flex:1;">
+                        <div class="io-label" style="font-size:0.7rem;"><i class="fas fa-caret-right"></i> 最大子段和</div>
+                        <div
+                            style="font-family: monospace; font-size:0.75rem; background: #f2f6f9; padding: 0.5rem; border-radius: 12px;">
+                            ✅ 使用 var, loop, push, glen, max<br>
+                            ✅ 函数定义 number_t func maxSubArray(arr)<br>
+                        </div>
+                    </div>
+                    <div style="flex:1;">
+                        <div class="io-label" style="font-size:0.7rem;"><i class="fas fa-caret-right"></i> 最小覆盖子串</div>
+                        <div
+                            style="font-family: monospace; font-size:0.75rem; background: #f2f6f9; padding: 0.5rem; border-radius: 12px;">
+                            ✅ dict_set / need / have 字典操作<br>
+                            ✅ loop 嵌套控制滑动窗口<br>
+                            ✅ glen, dict_keys
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+            <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem; margin: 2rem 0 1rem 0;">
+                <div
+                    style="background: linear-gradient(120deg, #eef5f2, #ffffff); border-radius: 2rem; padding: 0.5rem 1.2rem; font-size: 0.8rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                    <i class="fas fa-tachometer-alt"></i> 最大子段和 O(n) 时间 · O(1) 空间
+                </div>
+                <div
+                    style="background: linear-gradient(120deg, #eef5f2, #ffffff); border-radius: 2rem; padding: 0.5rem 1.2rem; font-size: 0.8rem;">
+                    <i class="fas fa-chart-line"></i> 最小覆盖子串 O(|s|+|t|) 时间 · O(字符集) 空间
+                </div>
+            </div>
+
+            <footer>
+                <i class="fas fa-code-branch"></i> 真题来源：动态规划经典 & 滑动窗口高频面试题<br>
+            </footer>
+        </div>
+</body>
+
+</html>

@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QOT 编译器维护日志</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f8f9fa;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            background-color: #ffffff;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.05);
+        }
+
+        h1 {
+            font-size: 2rem;
+            padding: 1.5rem 0;
+            border-bottom: 3px solid #e67e22;
+            margin-top: 1rem;
+            color: #2c3e50;
+        }
+
+        h2 {
+            font-size: 1.6rem;
+            margin-top: 2rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #e1e4e8;
+            color: #2c3e50;
+        }
+
+        h3 {
+            font-size: 1.3rem;
+            margin-top: 1.5rem;
+            margin-bottom: 0.8rem;
+            color: #2c3e50;
+        }
+
+        p {
+            margin-bottom: 1rem;
+            color: #555;
+        }
+
+        ul, ol {
+            margin-left: 1.8rem;
+            margin-bottom: 1rem;
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+            color: #555;
+        }
+
+        pre {
+            background-color: #f8f9fa;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            padding: 1rem;
+            margin: 1rem 0;
+            overflow-x: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9rem;
+        }
+
+        code {
+            font-family: 'Consolas', 'Monaco', monospace;
+            background-color: #f1f1f1;
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-size: 0.9rem;
+        }
+
+        pre code {
+            background-color: transparent;
+            padding: 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.2rem 0;
+            font-size: 0.95rem;
+        }
+
+        th, td {
+            border: 1px solid #e1e4e8;
+            padding: 0.75rem 1rem;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        tr:nth-child(even) {
+            background-color: #fcfcfc;
+        }
+
+        .status-full {
+            color: #27ae60;
+            font-weight: 600;
+        }
+
+        .status-partial {
+            color: #e67e22;
+            font-weight: 600;
+        }
+
+        .status-none {
+            color: #c0392b;
+            font-weight: 600;
+        }
+
+        .status-unknown {
+            color: #7f8c8d;
+            font-weight: 600;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .badge-green {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .badge-orange {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+
+        .badge-red {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .badge-gray {
+            background-color: #e9ecef;
+            color: #495057;
+        }
+
+        .warning-box {
+            border-left: 4px solid #e67e22;
+            background-color: #fff8e7;
+            padding: 1rem 1.2rem;
+            margin: 1.2rem 0;
+            border-radius: 0 6px 6px 0;
+        }
+
+        .info-box {
+            border-left: 4px solid #3498db;
+            background-color: #e8f4fd;
+            padding: 1rem 1.2rem;
+            margin: 1.2rem 0;
+            border-radius: 0 6px 6px 0;
+        }
+
+        .error-box {
+            border-left: 4px solid #c0392b;
+            background-color: #fde8e8;
+            padding: 1rem 1.2rem;
+            margin: 1.2rem 0;
+            border-radius: 0 6px 6px 0;
+        }
+
+        .footer-nav {
+            margin-top: 3rem;
+            margin-bottom: 2rem;
+            padding-top: 1rem;
+            border-top: 1px solid #e1e4e8;
+            display: flex;
+            gap: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .footer-nav a {
+            color: #3498db;
+            text-decoration: none;
+        }
+
+        .footer-nav a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 768px) {
+            h1 { font-size: 1.6rem; }
+            h2 { font-size: 1.4rem; }
+            table { display: block; overflow-x: auto; }
+            th, td { padding: 0.5rem 0.75rem; }
+        }
+        ::-webkit-scrollbar{
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-thumb{
+            background-color: #c1c1c1;
+            border-radius: 8px;
+        }
+        ::-webkit-scrollbar-track{
+            background-color: transparent;
+        }
+        
+    </style>
+</head>
+<body>
+
+<h1> QOT 编译器维护日志</h1>
+<p style="margin-bottom: 1.5rem;">传统编译模式（Mode 1）</p>
+
+<div class="error-box">
+    <strong>⚠️ 重要声明</strong><br>
+    传统模式（Mode 1）当前处于<strong>实验性维护阶段</strong>，仅支持 QOT 语言的基础子集。<br>
+    对于生产环境或复杂脚本，<strong>强烈建议使用高性能模式（Mode 2）</strong>。
+</div>
+
+<h2>📊 维护状态总览</h2>
+
+<table>
+    <thead>
+        <tr><th>模块</th><th>状态</th><th>完成度</th><th>说明</th></tr>
+    </thead>
+    <tbody>
+        <tr><td>变量/常量声明</td><td><span class="badge badge-green">已完成</span></td><td>95%</td><td>支持 var/const 声明与赋值</td></tr>
+        <tr><td>基础数据类型</td><td><span class="badge badge-green">已完成</span></td><td>90%</td><td>number、string、bool、null、array、dict</td></tr>
+        <tr><td>运算符</td><td><span class="badge badge-green">已完成</span></td><td>85%</td><td>算术、比较、逻辑、复合赋值</td></tr>
+        <tr><td>控制流（if/else/eif）</td><td><span class="badge badge-green">已完成</span></td><td>90%</td><td>支持多分支条件判断</td></tr>
+        <tr><td>循环（for/while）</td><td><span class="badge badge-green">已完成</span></td><td>80%</td><td>支持数值范围和数组遍历</td></tr>
+        <tr><td>内置函数</td><td><span class="badge badge-orange">部分支持</span></td><td>30%</td><td>仅支持 output/cinget/glen/max/pow/prog_end</td></tr>
+        <tr><td>自定义函数</td><td><span class="badge badge-red">不支持</span></td><td>0%</td><td>func 关键字无法编译</td></tr>
+        <tr><td>方法调用（->）</td><td><span class="badge badge-red">不支持</span></td><td>0%</td><td>数组/字典方法无法编译</td></tr>
+        <tr><td>模块加载（require）</td><td><span class="badge badge-red">不支持</span></td><td>0%</td><td>无法编译 require 语句</td></tr>
+        <tr><td>字典语法（&lt; &gt;&amp;）</td><td><span class="badge badge-red">不支持</span></td><td>0%</td><td>字典字面量无法编译</td></tr>
+        <tr><td>数组索引链</td><td><span class="badge badge-orange">部分支持</span></td><td>40%</td><td>基础索引支持，链式索引有限</td></tr>
+        <tr><td>return/stop</td><td><span class="badge badge-red">不支持</span></td><td>0%</td><td>无法编译返回和终止语句</td></tr>
+    </tbody>
+</table>
+
+<h2>📅 版本历史</h2>
+
+<div class="changelog-item">
+    <span class="changelog-date">2026-05-20</span>
+    <span class="changelog-version">V1.1.0</span>
+    <strong>—— 当前版本</strong>
+    <ul>
+        <li>完善数组索引访问的编译支持</li>
+        <li>优化二元运算符的优先级处理</li>
+        <li>修复特定场景下的变量类型推导问题</li>
+    </ul>
+</div>
+
+<div class="changelog-item">
+    <span class="changelog-date">2026-04-15</span>
+    <span class="changelog-version">V1.0.0</span>
+    <strong>—— 初始版本</strong>
+    <ul>
+        <li>实现基础语法到 Python 代码的转换框架</li>
+        <li>支持 var/const 声明和赋值</li>
+        <li>支持 if/else/while/for 控制流</li>
+        <li>支持数组的创建和访问</li>
+        <li>打包为独立 EXE</li>
+    </ul>
+</div>
+
+<h2>✅ 完整支持的功能</h2>
+
+<table>
+    <thead>
+        <tr><th>功能类别</th><th>具体支持</th><th>示例</th></tr>
+    </thead>
+    <tbody>
+        <tr><td>变量声明</td><td>var 声明变量，const 声明常量</td><td><code>var x = 10; const PI = 3.14;</code></td></tr>
+        <tr><td>基础数据类型</td><td>number、string、bool、null、array</td><td><code>var arr = [1, "hello", true];</code></td></tr>
+        <tr><td>算术运算符</td><td>+、-、*、/、%</td><td><code>var sum = a + b * c;</code></td></tr>
+        <tr><td>比较运算符</td><td>==、!=、>、<、>=、<=</td><td><code>if (x > 0) { ... }</code></td></tr>
+        <tr><td>逻辑运算符</td><td>&&、||、!</td><td><code>if (a > 0 && b < 10) { ... }</code></td></tr>
+        <tr><td>复合赋值</td><td>+=、-=、*=、/=、%=</td><td><code>count += 1;</code></td></tr>
+        <tr><td>条件分支</td><td>if / else / eif 多分支</td><td><code>if (x > 0) {} eif (x == 0) {} else {}</code></td></tr>
+        <tr><td>while 循环</td><td>条件循环</td><td><code>loop (i < 10) { i = i + 1; }</code></td></tr>
+        <tr><td>for 循环</td><td>数值范围、数组遍历</td><td><code>for (i in 5) {} for (item in arr) {}</code></td></tr>
+        <tr><td>数组操作</td><td>创建、索引访问、索引赋值</td><td><code>var first = arr[0]; arr[1] = 100;</code></td></tr>
+        <tr><td>内置函数</td><td>output、cinget、glen、max、pow、prog_end</td><td><code>output("Hello"); var len = glen(arr);</code></td></tr>
+    </tbody>
+</table>
+
+<h2>❌ 已知不支持的功能</h2>
+
+<div class="warning-box">
+    <strong>🔴 以下语法特性在传统模式下无法编译</strong>
+</div>
+
+<table>
+    <thead>
+        <tr><th>语法特性</th><th>说明</th><th>替代方案</th></tr>
+    </thead>
+    <tbody>
+        <tr><td><code>func</code> 函数定义</td><td>传统模式不支持自定义函数的编译</td><td>使用 Mode 2 或重构为内联代码</td></tr>
+        <tr><td><code>return</code> 返回语句</td><td>不支持返回值</td><td>使用 Mode 2</td></tr>
+        <tr><td><code>require</code> 模块加载</td><td>不支持跨文件模块引用</td><td>将依赖代码合并到主文件</td></tr>
+        <tr><td><code>-&gt;</code> 方法调用</td><td>数组的 push/remove/pop/get 等方法无法编译</td><td>使用内置函数替代（如 glen）</td></tr>
+        <tr><td>字典语法 <code>&amp;&lt; ... &gt;&amp;</code></td><td>字典字面量无法编译</td><td>使用 Mode 2 或通过其他方式构建</td></tr>
+        <tr><td>字典操作</td><td>dict_get/dict_set/dict_keys 无法编译</td><td>使用 Mode 2</td></td>
+        <tr><td>链式索引</td><td>多维数组访问支持有限</td><td>拆分为多步访问</td></tr>
+        <tr><td><code>stop</code> 循环终止</td><td>stop 语句无法编译</td><td>使用循环条件控制</td></tr>
+        <tr><td>函数引用 <code>&amp;(?)</code></td><td>不支持回调函数编译</td><td>使用 Mode 2</td></tr>
+        <tr><td>HTTP 相关函数</td><td>http_send/http_set_header 等无法编译</td><td>使用 Mode 2</td></tr>
+        <tr><td>文件操作函数</td><td>fopen/fread/fwrite 等无法编译</td><td>使用 Mode 2</td></tr>
+        <tr><td>Shellcode 加载</td><td>ScLoad/ScExec/ScSweep 无法编译</td><td>使用 Mode 2</td></tr>
+    </tbody>
+</table>
+
+<h2>✅ 支持的内置函数列表</h2>
+
+<table>
+    <thead>
+        <tr><th>函数名</th><th>功能</th><th>参数</th><th>返回值</th></tr>
+    </thead>
+    <tbody>
+        <tr><td><code>output</code></td><td>输出内容到控制台</td><td>任意数量参数</td><td>无</td></tr>
+        <tr><td><code>cinget</code></td><td>获取用户输入</td><td>可选提示字符串</td><td>字符串</td></tr>
+        <tr><td><code>glen</code></td><td>获取数组或字符串长度</td><td>1个参数（数组/字符串）</td><td>数字</td></tr>
+        <tr><td><code>max</code></td><td>获取最大值</td><td>2个或更多数字</td><td>数字</td></tr>
+        <tr><td><code>pow</code></td><td>幂运算</td><td>2个参数（底数，指数）</td><td>数字</td></tr>
+        <tr><td><code>prog_end</code></td><td>结束程序</td><td>可选退出码</td><td>无</td></tr>
+    </tbody>
+</table>
+
+<h2>⚠️ 不支持的函数列表</h2>
+
+<p>以下内置函数在传统模式下<strong>无法编译</strong>，请使用 Mode 2：</p>
+
+<ul>
+    <li>数学函数：<code>sqrt</code>、<code>round</code>、<code>rand</code></li>
+    <li>HTTP 函数：<code>http_send</code>、<code>http_set_header</code>、<code>http_set_user_agent</code>、<code>http_set_verify_ssl</code>、<code>http_clear_headers</code>、<code>http_get_headers</code></li>
+    <li>文件函数：<code>fopen</code>、<code>fread</code>、<code>fwrite</code>、<code>fclose</code>、<code>unlink</code>、<code>fnew</code>、<code>fsize</code></li>
+    <li>Shellcode 函数：<code>ScLoad</code>、<code>ScExec</code>、<code>ScSweep</code></li>
+    <li>环境变量函数：<code>get_env</code>、<code>set_env</code>、<code>unset_env</code></li>
+    <li>数组方法：<code>push</code>、<code>remove</code>、<code>pop</code>、<code>get</code>（使用 <code>-&gt;</code> 调用）</li>
+    <li>时间函数：<code>tnow</code>、<code>tstamp</code></li>
+    <li>字符串函数：<code>strrep</code>、<code>strcase</code></li>
+    <li>命令执行：<code>cmd_exec</code></li>
+    <li>类型获取：<code>gtypes</code></li>
+    <li>字典函数：<code>dict_get</code>、<code>dict_set</code>、<code>dict_keys</code></li>
+</ul>
+
+<h2>🔧 使用建议</h2>
+
+<ul>
+    <li><strong>简单脚本</strong>：如果脚本仅包含基础语法（无函数定义、无模块加载），传统模式可以正常工作。</li>
+    <li><strong>测试验证</strong>：编译前建议使用 <code>qguoat run</code> 验证脚本正确性。</li>
+    <li><strong>遇到编译失败</strong>：请优先尝试切换到 Mode 2，或检查是否使用了不支持的特性。</li>
+    <li><strong>函数替代方案</strong>：对于不支持的数组方法，可使用 <code>glen</code> + 索引操作手动实现。</li>
+</ul>
+
+<h2>📈 后续维护计划</h2>
+
+<ul>
+    <li><strong>短期</strong>：保持现状，仅修复严重编译错误，不新增特性支持。</li>
+    <li><strong>中期</strong>：根据用户反馈评估是否需要增加有限的功能支持。</li>
+    <li><strong>长期</strong>：重心完全转移至高性能模式（Mode 2），传统模式作为遗留兼容层存在。</li>
+</ul>
+
+<div class="footer-nav">
+    <a href="index.html">← 返回首页</a>
+    <a href="function_inside.html">内置函数参考</a>
+    <a href="moudle_inside.html">模块参考</a>
+    <a href="demos.html">示例代码</a>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,5 @@
+var s = 0;
+for(i in 5){ s += i; }
+output(s);
+var n = 0;
+loop(n < 3){ output(n); n += 1; }

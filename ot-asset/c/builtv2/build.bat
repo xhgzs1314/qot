@@ -1,0 +1,2 @@
+g++ -O2 -s -static -Os -fno-exceptions -fno-rtti -DWIN32_LEAN_AND_MEAN packer_simple.cpp -o ../../qotbuild.exe
+g++ -O2 -s -static -Os -fno-exceptions -fno-rtti -DWIN32_LEAN_AND_MEAN stexe_template.cpp -o ../../template.exe

@@ -1,0 +1,5 @@
+number_t func add(a, b){ return a + b; }
+number_t func mul(a, b){ return a * b; }
+number_t func poly(x){ return add(mul(x, x), add(x, 1)); }
+output(add(3, 4));
+output(poly(5));

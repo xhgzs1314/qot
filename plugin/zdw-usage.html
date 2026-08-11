@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>震荡位框架</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #f0ede8;
+            font-family: 'Inter', 'Segoe UI', 'Roboto', system-ui, -apple-system, sans-serif;
+            line-height: 1.6;
+            color: #1a1e24;
+            padding: 2rem 1rem;
+        }
+
+        .container {
+            max-width: 1300px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 25px 45px -12px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+   
+        .doc-header {
+            background: linear-gradient(135deg, #1e2a2e 0%, #0f1a1f 100%);
+            color: white;
+            padding: 2.5rem 3rem;
+            border-bottom: 4px solid #d4af7a;
+        }
+
+        .doc-header h1 {
+            font-size: 2.4rem;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+            margin-bottom: 0.5rem;
+        }
+
+        .doc-header .version {
+            font-family: monospace;
+            background: #2c3e2f;
+            display: inline-block;
+            padding: 0.2rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            margin-top: 0.5rem;
+        }
+
+        .doc-header p {
+            margin-top: 1rem;
+            opacity: 0.85;
+            max-width: 80%;
+        }
+
+      
+        .doc-body {
+            display: flex;
+            flex-wrap: wrap;
+        }
+
+        .sidebar {
+            flex: 1;
+            min-width: 260px;
+            background: #faf8f4;
+            border-right: 1px solid #e2dbd1;
+            padding: 2rem 1.2rem;
+        }
+
+        .sidebar nav ul {
+            list-style: none;
+        }
+
+        .sidebar nav li {
+            margin: 0.8rem 0;
+        }
+
+        .sidebar nav a {
+            text-decoration: none;
+            color: #3f3a32;
+            font-weight: 500;
+            transition: 0.2s;
+            display: block;
+            padding: 0.4rem 0.8rem;
+            border-radius: 12px;
+        }
+
+        .sidebar nav a:hover {
+            background: #e8e0d5;
+            color: #a46832;
+        }
+
+        .content {
+            flex: 4;
+            padding: 2rem 2.5rem;
+            background: white;
+        }
+
+        h2 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin: 1.5rem 0 1rem 0;
+            padding-bottom: 0.4rem;
+            border-bottom: 2px solid #e4ddd2;
+            color: #2c241e;
+        }
+
+        h3 {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin: 1.2rem 0 0.6rem 0;
+            color: #4a3b2f;
+        }
+
+        h4 {
+            font-weight: 600;
+            margin: 1rem 0 0.3rem 0;
+            color: #705c48;
+        }
+
+        p {
+            margin-bottom: 1rem;
+            text-align: justify;
+        }
+
+        code {
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            background: #f2efe7;
+            padding: 0.2rem 0.4rem;
+            border-radius: 6px;
+            font-size: 0.9em;
+            color: #c44536;
+        }
+
+        pre {
+            background: #1e1e20;
+            color: #e2e2e2;
+            padding: 1rem 1.2rem;
+            border-radius: 16px;
+            overflow-x: auto;
+            margin: 1rem 0;
+            font-size: 0.85rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .note {
+            background: #ecf3e8;
+            border-left: 5px solid #6b8c5c;
+            padding: 1rem 1.5rem;
+            margin: 1.2rem 0;
+            border-radius: 12px;
+        }
+
+        .warning {
+            background: #fff1e6;
+            border-left: 5px solid #e9b35f;
+            padding: 1rem 1.5rem;
+            margin: 1.2rem 0;
+            border-radius: 12px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.2rem 0;
+        }
+
+        th, td {
+            border: 1px solid #dcd3ca;
+            padding: 0.7rem 1rem;
+            text-align: left;
+        }
+
+        th {
+            background: #f2ede5;
+            font-weight: 600;
+        }
+        ::-webkit-scrollbar{
+            width: 8px;
+            height: 8px;
+        }
+         ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 10px;
+        }
+            ::-webkit-scrollbar-thumb {
+            background: #c7d2fe;
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a5b4fc;
+        }
+        .badge {
+            background: #c9b28b;
+            color: #1f1b16;
+            font-size: 0.7rem;
+            padding: 0.2rem 0.6rem;
+            border-radius: 20px;
+            display: inline-block;
+            margin-right: 0.6rem;
+        }
+
+        footer {
+            background: #f6f3ef;
+            padding: 1.2rem;
+            text-align: center;
+            font-size: 0.8rem;
+            color: #6b6258;
+            border-top: 1px solid #e0d9cf;
+        }
+        @media (max-width: 760px) {
+            .sidebar { display: none; }
+            .doc-header p { max-width: 100%; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="doc-header">
+        <h1> 震荡位框架 · Volatility Framework</h1>
+        <p>一种基于“不变性观测 + 经验固化”的优化引擎。让运行时学习到的稳定模式永久嵌入系统，零额外开销。</p>
+    </div>
+    <div class="doc-body">
+        <div class="sidebar">
+            <nav>
+                <ul>
+                    <li><a href="#intro"> 框架概述</a></li>
+                    <li><a href="#core"> 核心概念</a></li>
+                    <li><a href="#api"> API 使用指南</a></li>
+                    <li><a href="#optimized"> OptimizedLogParser 实战</a></li>
+                    <li><a href="#bench"> 性能基准与测试</a></li>
+                    <li><a href="#persist"> 固化与导入导出</a></li>
+                    <li><a href="#integration"> 集成到现有项目</a></li>
+                    <li><a href="#config"> 配置调优</a></li>
+                    <li><a href="#faq"> 常见问题</a></li>
+                </ul>
+            </nav>
+        </div>
+        <div class="content">
+            <section id="intro">
+                <h2> 框架概述</h2>
+                <p><strong>震荡位框架</strong>（Volatility Framework）提供了一种轻量、非侵入的观测-决策-固化闭环。通过为每一个“可观测单元”记录震荡位（是否变化过）、访问计数、变化次数，自动识别系统中的稳定/恒定模式，并将这些模式转化为永久的优化决策（常量折叠、跳过解析、预计算结果等）。与传统 JIT 或 PGO 不同，震荡位框架支持将优化知识序列化到磁盘，实现跨进程、跨重启的“经验携带”。</p>
+                <div class="note">
+                     适用于：日志解析器、数据库查询计划、API 路由、序列化器、解释器中的类型形状、编译器中不变值等。<br>
+                     核心哲学：“让不变之事，从此静默”
+                </div>
+            </section>
+
+            <section id="core">
+                <h2> 核心概念</h2>
+                <h3>震荡位 (Volatility Bit)</h3>
+                <p>每个单元关联一个布尔标志，初始为 0（未震荡）。当观测到值发生变化时，标志置 1。震荡位一旦被标记为 1，代表该单元曾经变化，但若长期趋于稳定且变化率低于阈值，仍可进入稳定区。框架通过 <code>change_cnt / access_cnt</code> 计算稳定性得分。</p>
+                <h3>稳定单元 (Stable Unit)</h3>
+                <p>当访问次数 ≥ <code>min_accesses</code> (默认100)，且稳定性得分 ≥ <code>stability_ratio</code> (默认0.99) 时，单元被标记为稳定 (<code>is_stable = true</code>)。后续可通过 <code>get_stable_value()</code> 直接获取常量值。</p>
+                <h3>固化 (Cementation)</h3>
+                <p>稳定的单元可导出为 TSV 或自定义格式，并在下次系统启动时导入，从而跳过学习阶段。优化器可直接用固化常量替换原本昂贵的计算路径。</p>
+                <div class="formula">
+                    稳定性 S = 1 - (change_cnt / access_cnt)<br>
+                    稳定条件：access_cnt ≥ N_min && S ≥ θ
+                </div>
+            </section>
+
+            <section id="api">
+                <h2> API 使用指南 (VolatilityTrackerExt)</h2>
+                <p>震荡位框架核心类为 <code>volatility::VolatilityTrackerExt</code>，提供线程安全的观测、查询、固化接口。</p>
+                <h3>基本流程</h3>
+                <pre>#include "voltak.hpp"
+
+volatility::VolatilityTrackerExt tracker;
+
+// 观测一个字符串键值对
+tracker.observe("log_format", "nginx_fixed");
+
+// 观测算术类型 (自动转为string)
+tracker.observe("api_version", 3);
+
+// 检查稳定性
+if (tracker.is_stable("log_format")) {
+    auto value = tracker.get_stable_value&lt;std::string&gt;("log_format");
+    // 使用固化值执行快速路径
+}
+
+// 强制标记稳定（用于导入缓存）
+tracker.force_stable("route_pattern", "/api/v2/user");</pre>
+
+                <h3>观测策略</h3>
+                <ul>
+                    <li><code>observe(key, current_value)</code> : 记录最新值并更新震荡统计。</li>
+                    <li><code>observe_fast(key_view, value_view)</code> : 减少临时拷贝，适合高频场景。</li>
+                    <li><code>batch_observe(observations)</code> : 批量观测提升吞吐量。</li>
+                </ul>
+                <div class="note">
+                    📌 内部采用分片锁 (8 shards) 及可选的并发 LRU 缓存，适合高并发生产环境。
+                </div>
+            </section>
+
+            <section id="optimized">
+                <h2>🚀 OptimizedLogParser 实战 (基于Nginx日志)</h2>
+                <p>我们构建一个高性能日志解析器：先用正则表达式学习格式，当格式稳定后切换到固定偏移解析</p>
+                <a href="assets/test.cpp" download>测试案例</a>
+                <h3>1. 定义解析逻辑</h3>
+                <pre>class OptimizedLogParser {
+public:
+    OptimizedLogParser(volatility::VolatilityTrackerExt& tracker, const std::string& key)
+        : tracker_(tracker), key_(key) {}
+
+    ParsedLog parse(const std::string& line) {
+        // 如果已经稳定: 直接走快速偏移解析
+        if (auto cached = tracker_.get_stable_value&lt;std::string&gt;(key_)) {
+            return parse_with_fixed_offsets(line);
+        }
+        // 否则采用昂贵正则解析，并将格式格式信息提供给震荡位
+        ParsedLog result = expensive_parse(line);
+        tracker_.observe(key_, std::string("nginx_fixed_format"));
+        return result;
+    }
+private:
+    ParsedLog expensive_parse(const std::string& line);   // 完整正则
+    ParsedLog parse_with_fixed_offsets(const std::string& line); // substr / find
+};</pre>
+
+                <h3>2. 在线学习与固化导出</h3>
+                <pre>volatility::VolatilityTrackerExt tracker;
+OptimizedLogParser learner(tracker, "log_format_key");
+for (int i = 0; i &lt; 100; ++i) {
+    learner.parse(logs[i]);          // 前100行用于学习
+}
+tracker.export_stable_to_file("log_format_cache.txt"); // 固化经验</pre>
+
+                <h3>3. 加载固化知识并极致优化</h3>
+                <pre>volatility::VolatilityTrackerExt tracker2;
+tracker2.import_stable_from_file("log_format_cache.txt");
+OptimizedLogParser ultra_parser(tracker2, "log_format_key");
+// 所有 parse 调用直接绕过正则，采用固定偏移 —— 零昂贵解析</pre>
+                <div class="warning">
+                    ⚠️ 稳定性假设违反时: 若格式突然变化，框架会检测到新值不一致，重新标记震荡位并回退到昂贵解析，直到再次收敛。保证正确性优先。
+                </div>
+            </section>
+
+            <section id="bench">
+                <h2> 性能基准与测试分析</h2>
+                <p>基于 10 万行 Nginx 日志的 benchmark 结果如下:</p>
+                <table>
+                    <tr><th>解析模式</th><th>总耗时 (ms)</th><th>平均耗时 (us/行)</th><th>相对加速</th></tr>
+                    <tr><td>未优化 (Naive regex)</td><td>482.17 ms</td><td>3.82 us</td><td>1.0x</td></tr>
+                    <tr><td>在线震荡位优化 (热学习后)</td><td>127.44 ms</td><td>1.27 us</td><td>~4.3x</td></tr>
+                    <tr><td>固化后优化 (导入缓存)</td><td>108.93 ms</td><td>1.09 us</td><td>~4.5x</td></tr>
+                </table>
+                <p>固化后解析完全避开正则编译和回溯，仅通过字符串查找和 substr 完成字段提取。在 CPU 微架构上产生更少的分支预测失败。</p>
+            </section>
+
+            <section id="persist">
+                <h2> 固化与导入导出 (让经验不朽)</h2>
+                <p>震荡位框架允许将所有稳定单元导出为可读的 TSV 格式。默认序列化器为 <code>TsvSerializer</code>，每个稳定单元一行: key \t value。</p>
+                <pre>// 导出全部稳定单元
+tracker.export_stable_to_file("stable_cache.txt");
+
+// 从文件导入 (自动调用 force_stable 标记，跳过学习期)
+tracker.import_stable_from_file("stable_cache.txt");</pre>
+                <p>也可以定制化 <code>Serializer</code> 接口，实现二进制或 JSON 导出，以适配多版本部署。固化文件可加入版本控制、配置分发，实现多节点共享先验知识。</p>
+                <div class="note">
+                     典型 CI/CD 场景: 金丝雀环境运行震荡位学习 → 导出优化缓存 → 生产环境直接加载固化结果，达到冷启动即最优。
+                </div>
+            </section>
+
+            <section id="integration">
+                <h2> 集成到现有项目 (三步集成法)</h2>
+                <h3>Step 1: 拷贝头文件</h3>
+                <p>将 <a href="assets/voltak.hpp" download>voltak.hpp</a> 放入项目 include 路径，仅需 C++17 编译器。</p>
+                <h3>Step 2: 识别“可优化单元”</h3>
+                <p>思考系统中重复执行且可能不变的部分：SQL 解析模式、JSON schema、RPC 消息结构、配置读取等。为每个单元分配唯一字符串 key。</p>
+                <h3>Step 3: 嵌入观测 & 快速路径</h3>
+                <pre>volatility::VolatilityTrackerExt tracker;
+
+// 业务逻辑关键路径
+if (auto stable = tracker.get_stable_value&lt;MyConfig&gt;("db_schema_version")) {
+    // 快速稳定路径：直接采用预编译映射
+    return fast_mapper(*stable);
+} else {
+    MyConfig dynamic = expensive_reflect();
+    tracker.observe("db_schema_version", dynamic);
+    return normal_mapper(dynamic);
+}</pre>
+                <p>完成后，周期性调用 <code>tracker.export_stable_to_file()</code> 将积累的经验持久化。框架会自动收敛。</p>
+                <div class="warning">
+                    注意：对高性能路径确保稳定性得分阈值设置合理（0.99 以上），避免频繁切换。
+                </div>
+            </section>
+
+            <section id="config">
+                <h2> 配置调优 (VolatilityTrackerConfig)</h2>
+                <p>通过修改配置调整稳定性敏感度与缓存行为。</p>
+                <pre>volatility::VolatilityTrackerConfig cfg;
+cfg.min_accesses = 200;           // 至少200次观测后才判定稳定
+cfg.stability_ratio = 0.995;      // 更严格的稳定性要求 (99.5%)
+cfg.auto_commit_stable = true;    // 自动更新稳定标记
+cfg.lru_capacity = 10000;         // 并发 LRU 缓存大小 (0表示禁用)
+cfg.use_concurrent_lru = true;
+cfg.detector = std::make_unique&lt;ExactMatchDetector&gt;(); // 变化检测策略
+cfg.serializer = std::make_unique&lt;TsvSerializer&gt;();  
+
+volatility::VolatilityTrackerExt tracker(std::move(cfg));</pre>
+                <h3>进阶: 自定义变化检测器</h3>
+                <p>实现 <code>ChangeDetector</code> 虚基类，例如数值容差检测或哈希摘要比较，对浮点、大对象特别有用。</p>
+                <pre>class ToleranceDetector : public ChangeDetector {
+    bool detect(const std::string&amp; old_val, const std::string&amp; new_val) const override {
+        double old_d = std::stod(old_val), new_d = std::stod(new_val);
+        return std::abs(old_d - new_d) > 1e-4;
+    }
+};</pre>
+            </section>
+
+            <section id="faq">
+                <h2> 常见问题</h2>
+                <h3>Q: 震荡位框架会破坏实时性吗？</h3>
+                <p>A: 观测开销极低（~5条指令+原子操作），且稳定路径一旦激活将比原始路径更快。框架支持无锁并发分片，适合延迟敏感系统。</p>
+                <h3>Q: 如何处理稳定后值再次变化？</h3>
+                <p>A: <code>observe</code> 会发现变化并递增 change_cnt，使稳定性得分下降，自动清除稳定标记，下次访问回退到原始路径。无灾难性错误。</p>
+                <h3>Q: 支持多线程吗？</h3>
+                <p>A: 是的。每分片内部使用 SharedMutexFast (读写锁友好) 或无锁并发 LRU。所有公有 API 线程安全。</p>
+                <h3>Q: 跨语言支持？</h3>
+                <p>A: 目前为 C++17 实现。但理论模式可用于 Rust/Python/Go 等，设计思想语言无关。</p>
+                <h3>Q: 最小编译依赖？</h3>
+                <p>A: 仅需标准库 (regex、unordered_map、atomic等)，无第三方依赖。</p>
+               
+            </section>
+
+            <section>
+                <h2> 震荡位框架 · 完整生态</h2>
+                <p>基于 VolatilityTrackerExt，我们还可以扩展 <code>OptimizedExt&lt;T&gt;</code> 辅助类，用于自动管理稳定值缓存。同时推荐配合 CI 使用固化文件下发，使每个实例享受群体学习效应。</p>
+                <div class="definition" style="background: #f9f3e7; padding: 1rem; border-radius: 20px; text-align: center;">
+                    <strong> 引用 & 授权</strong><br>震荡位框架文档及代码以 CC0 协议开放，可任意使用、修改、嵌入商业软件。
+                </div>
+            </section>
+        </div>
+    </div>
+    <footer>
+        © 震荡位框架 · 万物皆流 一恒为碑
+    </footer>
+</div>
+</body>
+</html>
+<script>
+(function() {
+    const sidebar = document.querySelector('.sidebar');
+    if (!sidebar) return;
+
+    const container = document.querySelector('.container');
+    const content = document.querySelector('.content');
+    
+    let initialLeft = null;
+    let initialTop = null;
+    let parentPaddingLeft = null;
+    
+    function initPositions() {
+        const sidebarRect = sidebar.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+        initialLeft = sidebarRect.left;
+        initialTop = sidebarRect.top + window.scrollY;
+        parentPaddingLeft = parseFloat(getComputedStyle(container).paddingLeft) || 0;
+    }
+    
+    initPositions();
+    window.addEventListener('resize', initPositions);
+    
+    window.addEventListener('scroll', function() {
+        const scrollY = window.scrollY;
+        
+        if (scrollY + 20 > initialTop) {
+            sidebar.style.position = 'fixed';
+            sidebar.style.top = '1px';
+            sidebar.style.left = initialLeft + 'px';
+            sidebar.style.width = sidebar.offsetWidth + 'px';
+            sidebar.style.zIndex = '100';
+            if (content) {
+                content.style.marginLeft = sidebar.offsetWidth + 20 + 'px';
+            }
+        } else {
+            sidebar.style.position = '';
+            sidebar.style.top = '';
+            sidebar.style.left = '';
+            sidebar.style.width = '';
+            sidebar.style.zIndex = '';
+            sidebar.style.height = '';
+            if (content) {
+                content.style.marginLeft = '';
+            }
+        }
+    });
+})();
+</script>

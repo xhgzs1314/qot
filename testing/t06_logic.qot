@@ -1,0 +1,4 @@
+output(3 > 2); output(2 > 3); output(2 == 2); output(2 != 3);
+output(1 < 2 && 3 < 4);
+output(1 > 2 || 3 < 4);
+output(5 >= 5); output(4 <= 3);

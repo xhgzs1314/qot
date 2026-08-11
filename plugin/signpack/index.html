@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>库签名工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+            padding: 30px;
+            transition: transform 0.3s ease;
+        }
+
+        .container:hover {
+            transform: translateY(-5px);
+        }
+
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+            font-weight: 600;
+            position: relative;
+            padding-bottom: 15px;
+        }
+
+        h1:after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60px;
+            height: 3px;
+            background-color: #3498db;
+            border-radius: 3px;
+        }
+
+        .file-upload {
+            position: relative;
+            margin-bottom: 25px;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .upload-label {
+            display: block;
+            width: 100%;
+            padding: 20px;
+            border: 2px dashed #bdc3c7;
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background-color: #f8f9fa;
+        }
+
+        .upload-label:hover {
+            border-color: #3498db;
+            background-color: #f1f7fc;
+        }
+
+        .upload-icon {
+            font-size: 32px;
+            color: #3498db;
+            margin-bottom: 10px;
+        }
+
+        .upload-text {
+            color: #7f8c8d;
+            font-size: 16px;
+        }
+
+        .upload-text strong {
+            color: #3498db;
+        }
+
+        #fileName {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+            background-color: #f1f1f1;
+            font-size: 14px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: none;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status-message {
+            margin-top: 20px;
+            padding: 12px;
+            border-radius: 6px;
+            text-align: center;
+            display: none;
+        }
+
+        .success {
+            background-color: #d5f5e3;
+            color: #27ae60;
+        }
+
+        .error {
+            background-color: #fadbd8;
+            color: #e74c3c;
+        }
+
+        .loading {
+            background-color: #fef5d4;
+            color: #f39c12;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, .3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            display: none;
+        }
+
+        button.loading .spinner {
+            display: block;
+        }
+
+        .footer {
+            margin-top: 30px;
+            color: #7f8c8d;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 20px 15px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            .upload-label {
+                padding: 15px;
+            }
+
+            button {
+                padding: 12px;
+                font-size: 15px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>库签名工具</h1>
+
+        <div class="file-upload">
+            <input type="file" id="fileInput" />
+            <label for="fileInput" class="upload-label">
+                <div class="upload-icon">📂</div>
+                <div class="upload-text">点击或拖拽到此处选择需要签名的库导出表文件</div>
+                <div class="upload-text">支持所有文件类型</div>
+            </label>
+            <div id="fileName"></div>
+        </div>
+
+        <button onclick="signFile()" id="signButton">
+            <span class="spinner"></span>
+            签名
+        </button>
+
+        <div class="status-message" id="statusMessage"></div>
+    </div>
+
+
+
+    <script>
+
+        document.getElementById('fileInput').addEventListener('change', function (e) {
+            const fileNameEl = document.getElementById('fileName');
+            if (this.files.length > 0) {
+                fileNameEl.textContent = `已选择: ${this.files[0].name}`;
+                fileNameEl.style.display = 'block';
+            } else {
+                fileNameEl.style.display = 'none';
+            }
+        });
+
+        async function packageFileEncode(content) {
+            const encoded = new Uint8Array(content.length);
+            let key = 0x5A;
+            for (let i = 0; i < content.length; i++) {
+                encoded[i] = (content[i] ^ key) & 0xFF;
+                key = (key + encoded[i]) & 0xFF;
+            }
+            return encoded;
+        }
+
+        async function signFile() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            const signButton = document.getElementById('signButton');
+            const statusMessage = document.getElementById('statusMessage');
+
+            if (!file) {
+                showMessage(statusMessage, '请先选择文件', 'error');
+                return;
+            }
+
+
+            signButton.disabled = true;
+            signButton.classList.add('loading');
+            showMessage(statusMessage, '正在处理文件...', 'loading');
+
+            try {
+                const key = 'yhsndnggc_ab_qguoat';
+                const chunkSize = 1024 * 1024;
+                let contentArray = new Uint8Array();
+                let offset = 0;
+
+                while (offset < file.size) {
+                    const chunk = await file.slice(offset, offset + chunkSize).arrayBuffer();
+                    const chunkArray = new Uint8Array(chunk);
+                    const newArray = new Uint8Array(contentArray.length + chunkArray.length);
+                    newArray.set(contentArray);
+                    newArray.set(chunkArray, contentArray.length);
+                    contentArray = newArray;
+
+                    offset += chunkSize;
+
+                    const progress = Math.round((offset / file.size) * 100);
+                    showMessage(statusMessage, `正在读取文件... ${progress}%`, 'loading');
+                }
+
+                showMessage(statusMessage, '正在编码文件...', 'loading');
+                const encodedContent = await packageFileEncode(contentArray);
+
+                showMessage(statusMessage, '正在生成签名...', 'loading');
+                const encoder = new TextEncoder();
+                const keyMaterial = await window.crypto.subtle.importKey(
+                    'raw',
+                    encoder.encode(key),
+                    { name: 'HMAC', hash: 'SHA-256' },
+                    false,
+                    ['sign']
+                );
+
+                const signature = await window.crypto.subtle.sign(
+                    'HMAC',
+                    keyMaterial,
+                    encodedContent
+                );
+
+                showMessage(statusMessage, '正在准备下载...', 'loading');
+                const versionMarker = encoder.encode('QOT_SIGN_v1|');
+                const separator = encoder.encode('||SIGNATURE||');
+                const signatureB64 = encoder.encode(btoa(String.fromCharCode(...new Uint8Array(signature))));
+                const resultArray = new Uint8Array([
+                    ...versionMarker,
+                    ...encodedContent,
+                    ...separator,
+                    ...signatureB64
+                ]);
+
+                const blob = new Blob([resultArray], { type: 'application/octet-stream' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = file.name;
+                a.click();
+                URL.revokeObjectURL(url);
+                showMessage(statusMessage, '文件签名成功并开始下载', 'success');
+            } catch (error) {
+                console.error('签名失败:', error);
+                showMessage(statusMessage, `签名失败: ${error.message}`, 'error');
+            } finally {
+
+                signButton.disabled = false;
+                signButton.classList.remove('loading');
+            }
+        }
+
+
+        function showMessage(element, text, type) {
+            element.textContent = text;
+            element.className = 'status-message ' + type;
+            element.style.display = 'block';
+        }
+    </script>
+</body>
+
+</html>

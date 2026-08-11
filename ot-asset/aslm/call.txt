@@ -1,0 +1,2 @@
+uasm -win64 main.asm
+gcc -m64 -e start -nostdlib main.obj -o main.exe -lkernel32 -luser32 -lgcc -lmingw32

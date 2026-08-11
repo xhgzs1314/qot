@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QOT-GUI可视化-Design</title>
+    <link href="bootstrap.min.css" rel="stylesheet">
+    <style>
+        .designer-container {
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .left-panel {
+            flex: 4;
+            display: flex;
+            flex-direction: column;
+            background-color: #f0f0f0;
+            border-right: 1px solid #ccc;
+        }
+
+        .canvas-frame {
+            flex: 3;
+            background-color: white;
+            border: 2px solid #ccc;
+            margin: 10px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #canvas {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        .property-frame {
+            flex: 2;
+            background-color: #f0f0f0;
+            border: 2px solid #ccc;
+            margin: 10px;
+            padding: 10px;
+            overflow-y: auto;
+        }
+
+        .right-panel {
+            flex: 1;
+            background-color: #e0e0e0;
+            padding: 10px;
+        }
+
+        .component-library {
+            background-color: #e6b0b0;
+            padding: 10px;
+            text-align: center;
+            margin-bottom: 20px;
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .draggable-component {
+            margin: 15px auto;
+            cursor: move;
+            text-align: center;
+            padding: 5px;
+            width: 100px;
+        }
+
+        .property-group {
+            margin-bottom: 15px;
+        }
+
+        .property-label {
+            display: inline-block;
+            width: 80px;
+            font-weight: 500;
+        }
+
+        .property-input {
+            width: 150px;
+            margin-right: 10px;
+        }
+
+        .code-modal-body {
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+
+        .widget {
+            position: absolute;
+            cursor: move;
+            user-select: none;
+        }
+
+        .widget-selected {
+            box-shadow: 0 0 0 2px #2196F3;
+        }
+
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background-color: #555;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="designer-container">
+        <div class="left-panel">
+            <div class="canvas-frame">
+                <div id="canvas"></div>
+            </div>
+            <div class="property-frame">
+                <h5>属性编辑</h5>
+
+                <div class="property-group">
+                    <span class="property-label">X坐标:</span>
+                    <input type="number" id="x-entry" class="property-input form-control form-control-sm">
+
+                    <span class="property-label">Y坐标:</span>
+                    <input type="number" id="y-entry" class="property-input form-control form-control-sm">
+                </div>
+
+                <div class="property-group">
+                    <span class="property-label">宽度:</span>
+                    <input type="number" id="width-entry" class="property-input form-control form-control-sm">
+
+                    <span class="property-label">高度:</span>
+                    <input type="number" id="height-entry" class="property-input form-control form-control-sm">
+                </div>
+
+                <div class="property-group">
+                    <span class="property-label">文本:</span>
+                    <input type="text" id="text-entry" class="property-input form-control form-control-sm"
+                        style="width: 200px;">
+
+                    <span class="property-label">背景色:</span>
+                    <button id="bg-color-btn" class="btn btn-sm btn-secondary">选择</button>
+
+                    <span class="property-label">前景色:</span>
+                    <button id="fg-color-btn" class="btn btn-sm btn-secondary">选择</button>
+                </div>
+
+                <div class="property-group">
+                    <span class="property-label">字体大小:</span>
+                    <input type="number" id="font-size" class="property-input form-control form-control-sm" min="8"
+                        max="72" step="2" style="width: 80px;">
+
+                    <button id="clear-btn" class="btn btn-sm btn-outline-dark" style="margin-left: 10px;">清除选中</button>
+                    <button id="delete-btn" class="btn btn-sm btn-danger" style="margin-left: 10px;">删除组件</button>
+                    <button id="gen-code-btn" class="btn btn-sm btn-primary" style="margin-left: 10px;">生成代码</button>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="right-panel">
+            <div class="component-library">组件库</div>
+
+            <div id="button-component" class="draggable-component">
+                <button class="btn btn-secondary">按钮</button>
+            </div>
+
+            <div id="label-component" class="draggable-component">
+                <div class="border p-2 bg-light">标签</div>
+            </div>
+
+            <div id="entry-component" class="draggable-component">
+                <input type="text" class="form-control" value="输入框" readonly>
+            </div>
+        </div>
+    </div>
+
+
+    <div class="modal fade" id="codeModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">生成的代码</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body code-modal-body">
+                    <pre id="codeContent"></pre>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                    <button type="button" class="btn btn-primary" id="copyCodeBtn">复制代码</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="bootstrap.bundle.min.js"></script>
+    <script>
+        function colorToHex(color) {
+            if (/^#([0-9A-F]{3}){1,2}$/i.test(color)) {
+                if (color.length === 4) {
+                    return '#' +
+                        color[1] + color[1] +
+                        color[2] + color[2] +
+                        color[3] + color[3];
+                }
+                return color;
+            }
+            if (color.startsWith('rgb(')) {
+                const rgbMatch = color.match(/^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/);
+                if (rgbMatch) {
+                    const r = parseInt(rgbMatch[1], 10);
+                    const g = parseInt(rgbMatch[2], 10);
+                    const b = parseInt(rgbMatch[3], 10);
+                    if (r >= 0 && r <= 255 && g >= 0 && g <= 255 && b >= 0 && b <= 255) {
+                        return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase()}`;
+                    }
+                }
+                return null;
+            }
+            const tempDiv = document.createElement('div');
+            tempDiv.style.color = color;
+            document.body.appendChild(tempDiv);
+            const computedColor = getComputedStyle(tempDiv).color;
+            document.body.removeChild(tempDiv);
+            if (computedColor.startsWith('rgb(')) {
+                return colorToHex(computedColor);
+            }
+            return null;
+        }
+        class Component {
+            createWidget(parent) { }
+            getTypeName() { }
+            getDefaultProps() { }
+        }
+
+
+        class ButtonComponent extends Component {
+            createWidget(parent) {
+                const btn = document.createElement('button');
+                btn.className = 'btn btn-secondary widget';
+                return btn;
+            }
+
+            getTypeName() {
+                return "button";
+            }
+
+            getDefaultProps() {
+                return {
+                    width: 100,
+                    height: 30,
+                    text: "按钮",
+                    bg: "#6c757d",
+                    fg: "white",
+                    font: ["SimHei", 10]
+                };
+            }
+        }
+
+
+        class LabelComponent extends Component {
+            createWidget(parent) {
+                const label = document.createElement('div');
+                label.className = 'border p-2 bg-light widget';
+                return label;
+            }
+
+            getTypeName() {
+                return "label";
+            }
+
+            getDefaultProps() {
+                return {
+                    width: 100,
+                    height: 30,
+                    text: "标签",
+                    bg: "#f8f9fa",
+                    fg: "black",
+                    font: ["SimHei", 10],
+                    borderwidth: 2,
+                    relief: "solid"
+                };
+            }
+        }
+
+
+        class EntryComponent extends Component {
+            createWidget(parent) {
+                const entry = document.createElement('input');
+                entry.type = 'text';
+                entry.className = 'form-control widget';
+                return entry;
+            }
+
+            getTypeName() {
+                return "entry";
+            }
+
+            getDefaultProps() {
+                return {
+                    width: 100,
+                    height: 30,
+                    bg: "white",
+                    fg: "black",
+                    font: ["SimHei", 10],
+                    borderwidth: 2,
+                    relief: "solid",
+                    text: ""
+                };
+            }
+        }
+
+
+        class BasicPropertyHandler {
+            getSupportedProps() {
+                return ["x", "y", "width", "height", "text", "bg", "fg", "font"];
+            }
+
+            updateWidgetProp(widget, propName, value) {
+                switch (propName) {
+                    case "x":
+                        widget.style.left = `${value}px`;
+                        break;
+                    case "y":
+                        widget.style.top = `${value}px`;
+                        break;
+                    case "width":
+                        widget.style.width = `${value}px`;
+                        break;
+                    case "height":
+                        widget.style.height = `${value}px`;
+                        break;
+                    case "text":
+                        if (widget.tagName === "INPUT") {
+                            widget.value = value;
+                        } else {
+                            widget.textContent = value;
+                        }
+                        break;
+                    case "bg":
+                        widget.style.backgroundColor = value;
+                        break;
+                    case "fg":
+                        widget.style.color = value;
+                        break;
+                    case "font":
+                        widget.style.fontFamily = value[0];
+                        widget.style.fontSize = `${value[1]}px`;
+                        break;
+                }
+            }
+
+            getWidgetProp(widget, propName) {
+                switch (propName) {
+                    case "x":
+                        return parseInt(widget.style.left) || 0;
+                    case "y":
+                        return parseInt(widget.style.top) || 0;
+                    case "width":
+                        return parseInt(widget.style.width) || 0;
+                    case "height":
+                        return parseInt(widget.style.height) || 0;
+                    case "text":
+                        return widget.tagName === "INPUT" ? widget.value : widget.textContent;
+                    case "bg":
+                        return widget.style.backgroundColor;
+                    case "fg":
+                        return widget.style.color;
+                    case "font":
+                        return [
+                            widget.style.fontFamily || "SimHei",
+                            parseInt(widget.style.fontSize) || 10
+                        ];
+                    default:
+                        return null;
+                }
+            }
+        }
+
+
+        class TkinterCodeGenerator {
+            generateImports() {
+                return "";
+            }
+
+            generateClassDef() {
+                return "";
+            }
+
+            generateWidgetCode(widget, index) {
+                const handler = new BasicPropertyHandler();
+                const props = {
+                    x: handler.getWidgetProp(widget, "x"),
+                    y: handler.getWidgetProp(widget, "y"),
+                    width: handler.getWidgetProp(widget, "width"),
+                    height: handler.getWidgetProp(widget, "height"),
+                    text: handler.getWidgetProp(widget, "text").replace(/"/g, '\\"'),
+                    bg: colorToHex(handler.getWidgetProp(widget, "bg")),
+                    fg: colorToHex(handler.getWidgetProp(widget, "fg")),
+                    font: handler.getWidgetProp(widget, "font")
+                };
+
+                const varName = `widget_${index}`;
+                let fontStr = `["${props.font[0]}", ${props.font[1]}]`;
+
+                let code = "";
+                if (widget.tagName === "BUTTON") {
+                    code = `var ${varName} = window_button(root, "${props.text}", `;
+                } else if (widget.tagName === "DIV") {
+                    code = `var ${varName} = window_label(root, "${props.text}", `;
+                } else if (widget.tagName === "INPUT") {
+                    code = `var ${varName} = window_entry(root, "${props.text}", `;
+                } else {
+                    code = `var ${varName} = window_widget(root,"${props.text}", `;
+                }
+
+                code += `"${props.bg}", "${props.fg}", ${fontStr});\n`;
+                code += `${varName}->window_place(${props.x}, ${props.y}, `;
+                code += `${props.width}, ${props.height});\n\n`;
+                return code;
+            }
+
+            generateMainCode() {
+                return (
+                    "var root = window_new();\n"
+                    + "root->window_title(\"GUI-QOT\");\n"
+                    + "root->window_size(\"800x400\");\n\n"
+                );
+            }
+        }
+
+
+        class GUIDesigner {
+            constructor() {
+                this.canvas = document.getElementById('canvas');
+                this.selectedWidget = null;
+                this.canvasWidgets = [];
+                this.dragging = false;
+                this.dragData = { x: 0, y: 0, widget: null, type: null };
+
+                this.componentRegistry = {
+                    "button": ButtonComponent,
+                    "label": LabelComponent,
+                    "entry": EntryComponent
+                };
+
+                this.propertyHandler = new BasicPropertyHandler();
+                this.codeGenerator = new TkinterCodeGenerator();
+
+                this.initEventListeners();
+            }
+
+            initEventListeners() {
+                document.getElementById('button-component').addEventListener('mousedown', (e) =>
+                    this.startDrag(e, 'button'));
+                document.getElementById('label-component').addEventListener('mousedown', (e) =>
+                    this.startDrag(e, 'label'));
+                document.getElementById('entry-component').addEventListener('mousedown', (e) =>
+                    this.startDrag(e, 'entry'));
+                this.canvas.addEventListener('click', (e) => this.onCanvasClick(e));
+                document.getElementById('x-entry').addEventListener('change', () => this.updatePosition());
+                document.getElementById('y-entry').addEventListener('change', () => this.updatePosition());
+                document.getElementById('width-entry').addEventListener('change', () => this.updateSize());
+                document.getElementById('height-entry').addEventListener('change', () => this.updateSize());
+                document.getElementById('text-entry').addEventListener('change', () => this.updateText());
+                document.getElementById('bg-color-btn').addEventListener('click', () => this.chooseBgColor());
+                document.getElementById('fg-color-btn').addEventListener('click', () => this.chooseFgColor());
+                document.getElementById('font-size').addEventListener('change', () => this.updateFont());
+                document.getElementById('clear-btn').addEventListener('click', () => this.clearSelection());
+                document.getElementById('delete-btn').addEventListener('click', () => this.deleteWidget());
+                document.getElementById('gen-code-btn').addEventListener('click', () => this.generateCode());
+                document.getElementById('copyCodeBtn').addEventListener('click', () => this.copyCode());
+                document.addEventListener('mousemove', (e) => this.onDrag(e));
+                document.addEventListener('mouseup', (e) => this.endDrag(e));
+            }
+
+            startDrag(event, componentType) {
+                event.preventDefault();
+                this.dragging = true;
+                this.dragData.x = event.clientX;
+                this.dragData.y = event.clientY;
+                this.dragData.type = componentType;
+            }
+
+            onDrag(event) {
+                if (!this.dragging) return;
+                if (this.dragData.widget) {
+                    const canvasRect = this.canvas.getBoundingClientRect();
+                    const x = event.clientX - canvasRect.left - this.dragData.offsetX;
+                    const y = event.clientY - canvasRect.top - this.dragData.offsetY;
+                    const limitedX = Math.max(0, Math.min(x, canvasRect.width - this.dragData.widget.offsetWidth));
+                    const limitedY = Math.max(0, Math.min(y, canvasRect.height - this.dragData.widget.offsetHeight));
+
+                    this.propertyHandler.updateWidgetProp(this.dragData.widget, "x", limitedX);
+                    this.propertyHandler.updateWidgetProp(this.dragData.widget, "y", limitedY);
+
+                    if (this.selectedWidget === this.dragData.widget) {
+                        this.updatePropertyPanel();
+                    }
+                }
+            }
+
+            endDrag(event) {
+                if (!this.dragging) return;
+                this.dragging = false;
+                if (this.dragData.type && !this.dragData.widget) {
+                    const canvasRect = this.canvas.getBoundingClientRect();
+                    const isInsideCanvas = event.clientX >= canvasRect.left &&
+                        event.clientX <= canvasRect.right &&
+                        event.clientY >= canvasRect.top &&
+                        event.clientY <= canvasRect.bottom;
+
+                    if (isInsideCanvas) {
+                        const x = event.clientX - canvasRect.left;
+                        const y = event.clientY - canvasRect.top;
+
+                        this.addNewComponent(this.dragData.type, x, y);
+                    }
+                }
+
+                this.dragData = { x: 0, y: 0, widget: null, type: null, offsetX: 0, offsetY: 0 };
+            }
+
+            addNewComponent(componentType, x, y) {
+                if (this.componentRegistry[componentType]) {
+                    const component = new this.componentRegistry[componentType]();
+                    const newWidget = component.createWidget(this.canvas);
+                    const defaultProps = component.getDefaultProps();
+                    this.propertyHandler.updateWidgetProp(newWidget, "x", x);
+                    this.propertyHandler.updateWidgetProp(newWidget, "y", y);
+                    this.propertyHandler.updateWidgetProp(newWidget, "width", defaultProps.width);
+                    this.propertyHandler.updateWidgetProp(newWidget, "height", defaultProps.height);
+                    this.propertyHandler.updateWidgetProp(newWidget, "text", defaultProps.text);
+                    this.propertyHandler.updateWidgetProp(newWidget, "bg", defaultProps.bg);
+                    this.propertyHandler.updateWidgetProp(newWidget, "fg", defaultProps.fg);
+                    this.propertyHandler.updateWidgetProp(newWidget, "font", defaultProps.font);
+                    newWidget.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        this.selectWidget(newWidget);
+                    });
+
+                    newWidget.addEventListener('mousedown', (e) => {
+                        e.stopPropagation();
+                        this.selectWidget(newWidget);
+                        this.startMoveWidget(e, newWidget);
+                    });
+
+
+                    newWidget.componentType = componentType;
+
+                    this.canvas.appendChild(newWidget);
+                    this.canvasWidgets.push(newWidget);
+                    this.selectWidget(newWidget);
+                }
+            }
+
+            startMoveWidget(event, widget) {
+                this.dragging = true;
+                this.dragData.widget = widget;
+                this.dragData.offsetX = event.offsetX;
+                this.dragData.offsetY = event.offsetY;
+            }
+
+            selectWidget(widget) {
+
+                if (this.selectedWidget) {
+                    this.selectedWidget.classList.remove('widget-selected');
+                }
+
+                this.selectedWidget = widget;
+                this.selectedWidget.classList.add('widget-selected');
+                this.updatePropertyPanel();
+            }
+
+            onCanvasClick(event) {
+
+                if (this.selectedWidget) {
+                    this.selectedWidget.classList.remove('widget-selected');
+                    this.selectedWidget = null;
+                    this.clearPropertyPanel();
+                }
+            }
+
+            updatePropertyPanel() {
+                if (this.selectedWidget) {
+                    document.getElementById('x-entry').value = this.propertyHandler.getWidgetProp(this.selectedWidget, "x");
+                    document.getElementById('y-entry').value = this.propertyHandler.getWidgetProp(this.selectedWidget, "y");
+                    document.getElementById('width-entry').value = this.propertyHandler.getWidgetProp(this.selectedWidget, "width");
+                    document.getElementById('height-entry').value = this.propertyHandler.getWidgetProp(this.selectedWidget, "height");
+                    document.getElementById('text-entry').value = this.propertyHandler.getWidgetProp(this.selectedWidget, "text");
+                    document.getElementById('font-size').value = this.propertyHandler.getWidgetProp(this.selectedWidget, "font")[1];
+                }
+            }
+
+            clearPropertyPanel() {
+                document.getElementById('x-entry').value = '';
+                document.getElementById('y-entry').value = '';
+                document.getElementById('width-entry').value = '';
+                document.getElementById('height-entry').value = '';
+                document.getElementById('text-entry').value = '';
+                document.getElementById('font-size').value = '';
+            }
+
+            updatePosition() {
+                if (this.selectedWidget) {
+                    try {
+                        const x = parseInt(document.getElementById('x-entry').value);
+                        const y = parseInt(document.getElementById('y-entry').value);
+
+                        if (!isNaN(x) && !isNaN(y)) {
+                            this.propertyHandler.updateWidgetProp(this.selectedWidget, "x", x);
+                            this.propertyHandler.updateWidgetProp(this.selectedWidget, "y", y);
+                        }
+                    } catch (e) {
+                        alert("请输入有效的数字");
+                    }
+                }
+            }
+
+            updateSize() {
+                if (this.selectedWidget) {
+                    try {
+                        let width = parseInt(document.getElementById('width-entry').value);
+                        let height = parseInt(document.getElementById('height-entry').value);
+
+                        if (!isNaN(width) && !isNaN(height)) {
+                            width = Math.max(10, width);
+                            height = Math.max(10, height);
+                            this.propertyHandler.updateWidgetProp(this.selectedWidget, "width", width);
+                            this.propertyHandler.updateWidgetProp(this.selectedWidget, "height", height);
+                        }
+                    } catch (e) {
+                        alert("请输入有效的数字");
+                    }
+                }
+            }
+
+            updateText() {
+                if (this.selectedWidget) {
+                    const text = document.getElementById('text-entry').value;
+                    this.propertyHandler.updateWidgetProp(this.selectedWidget, "text", text);
+                }
+            }
+
+            chooseBgColor() {
+                if (this.selectedWidget) {
+                    const color = prompt("请输入背景色(如: #ff0000 或 red):",
+                        this.propertyHandler.getWidgetProp(this.selectedWidget, "bg"));
+                    if (color) {
+                        this.propertyHandler.updateWidgetProp(this.selectedWidget, "bg", colorToHex(color));
+                    }
+                }
+            }
+
+            chooseFgColor() {
+                if (this.selectedWidget) {
+                    const color = prompt("请输入前景色(如: #ff0000 或 red):",
+                        this.propertyHandler.getWidgetProp(this.selectedWidget, "fg"));
+                    if (color) {
+                        this.propertyHandler.updateWidgetProp(this.selectedWidget, "fg", colorToHex(color));
+                    }
+                }
+            }
+
+            updateFont() {
+                if (this.selectedWidget) {
+                    try {
+                        let size = parseInt(document.getElementById('font-size').value);
+                        size = Math.max(8, Math.min(72, size));
+
+                        const currentFont = this.propertyHandler.getWidgetProp(this.selectedWidget, "font");
+                        this.propertyHandler.updateWidgetProp(this.selectedWidget, "font", [currentFont[0], size]);
+                    } catch (e) {
+                        alert("请输入有效的字体大小");
+                    }
+                }
+            }
+
+            clearSelection() {
+                if (this.selectedWidget) {
+                    this.selectedWidget.classList.remove('widget-selected');
+                    this.selectedWidget = null;
+                    this.clearPropertyPanel();
+                }
+            }
+
+            deleteWidget() {
+                if (this.selectedWidget) {
+                    const index = this.canvasWidgets.indexOf(this.selectedWidget);
+                    if (index !== -1) {
+                        this.canvasWidgets.splice(index, 1);
+                    }
+                    this.canvas.removeChild(this.selectedWidget);
+                    this.selectedWidget = null;
+                    this.clearPropertyPanel();
+                }
+            }
+
+            generateCode() {
+                if (this.canvasWidgets.length === 0) {
+                    alert("画布中没有组件可生成代码");
+                    return;
+                }
+
+                let code = this.codeGenerator.generateImports();
+                code += this.codeGenerator.generateMainCode();
+
+                this.canvasWidgets.forEach((widget, index) => {
+                    code += this.codeGenerator.generateWidgetCode(widget, index);
+                });
+
+                code += "root->window_loop();";
+
+                document.getElementById('codeContent').textContent = code;
+                const codeModal = new bootstrap.Modal(document.getElementById('codeModal'));
+                codeModal.show();
+            }
+
+            copyCode() {
+                const code = document.getElementById('codeContent').textContent;
+                navigator.clipboard.writeText(code).then(() => {
+                    alert("代码已复制到剪贴板");
+                }).catch(err => {
+                    alert("复制失败: " + err);
+                });
+            }
+        }
+
+
+        window.addEventListener('load', () => {
+            new GUIDesigner();
+        });
+    </script>
+</body>
+
+</html>

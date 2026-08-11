@@ -1,0 +1,12 @@
+EXPORTS
+    fast_pow
+    fast_abs
+    fast_min
+    fast_max
+    fast_is_prime
+    fast_factorial
+    fast_fibonacci
+    fast_gcd
+    fast_lcm
+    fast_power_mod
+    fast_floor_sqrt

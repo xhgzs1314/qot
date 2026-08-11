@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>QOT 打包命令 - 可视化构建</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            font-family: 'Segoe UI', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Roboto', sans-serif;
+            min-height: 100vh;
+            padding: 2rem 1rem;
+            color: #f1f5f9;
+        }
+
+        .container {
+            max-width: 1300px;
+            margin: 0 auto;
+        }
+
+        
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #c084fc, #60a5fa);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            letter-spacing: -0.5px;
+        }
+
+        .header p {
+            color: #94a3b8;
+            margin-top: 0.5rem;
+        }
+
+      
+        .card {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border-radius: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 1.8rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 25px 40px -12px rgba(0, 0, 0, 0.5);
+            transition: all 0.2s ease;
+        }
+
+        .card-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            border-left: 4px solid #8b5cf6;
+            padding-left: 1rem;
+        }
+
+        .card-title i {
+            font-size: 1.4rem;
+        }
+
+       
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        ::-webkit-scrollbar{
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-thumb{
+            background: #64748b;
+            border-radius: 100vw;
+        }
+
+       
+        label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            color: #cbd5e1;
+            font-size: 0.9rem;
+        }
+
+        .required:after {
+            content: "*";
+            color: #f87171;
+            margin-left: 4px;
+        }
+
+        input, select, .file-input-wrapper {
+            width: 100%;
+            padding: 0.8rem 1rem;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 1rem;
+            color: #f1f5f9;
+            font-size: 0.95rem;
+            transition: all 0.2s;
+            outline: none;
+        }
+
+        input:focus, select:focus {
+            border-color: #8b5cf6;
+            box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.4);
+        }
+
+        .path-hint {
+            font-size: 0.7rem;
+            color: #64748b;
+            margin-top: 0.25rem;
+        }
+
+        
+        .extra-files-area {
+            background: #0f172a80;
+            border-radius: 1.2rem;
+            padding: 0.8rem;
+            margin-top: 0.5rem;
+        }
+
+        .file-row {
+            display: flex;
+            gap: 0.8rem;
+            align-items: center;
+            margin-bottom: 0.8rem;
+            background: #1e293b;
+            padding: 0.5rem 0.8rem;
+            border-radius: 1rem;
+        }
+
+        .file-row input {
+            flex: 1;
+            background: #0f172a;
+            margin: 0;
+        }
+
+        .remove-file {
+            background: #dc2626;
+            border: none;
+            width: 32px;
+            height: 32px;
+            border-radius: 12px;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+
+        .remove-file:hover {
+            background: #b91c1c;
+            transform: scale(1.02);
+        }
+
+        .add-file-btn {
+            background: #3b82f6;
+            border: none;
+            padding: 0.5rem 1.2rem;
+            border-radius: 2rem;
+            color: white;
+            font-weight: 500;
+            cursor: pointer;
+            margin-top: 0.8rem;
+            transition: 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .add-file-btn:hover {
+            background: #2563eb;
+            transform: translateY(-1px);
+        }
+
+        .mode-selector {
+            display: flex;
+            gap: 1.2rem;
+            background: #0f172a;
+            padding: 0.5rem;
+            border-radius: 2rem;
+            width: fit-content;
+            flex-wrap: wrap;
+        }
+
+        .mode-option {
+            padding: 0.5rem 1.8rem;
+            border-radius: 2rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+
+        .mode-option.selected {
+            background: #8b5cf6;
+            color: white;
+            box-shadow: 0 2px 6px rgba(139, 92, 246, 0.3);
+        }
+
+    
+        .preview-card {
+            background: #0a0f1c;
+            border-radius: 1.2rem;
+            padding: 1rem;
+            font-family: 'Fira Code', 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            border-left: 4px solid #10b981;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .preview-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            font-size: 0.8rem;
+            color: #9ca3af;
+        }
+
+       
+        .action-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+            margin-top: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 0.7rem 1.5rem;
+            border-radius: 2rem;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+        }
+
+        .btn-primary {
+            background: #8b5cf6;
+            color: white;
+            box-shadow: 0 4px 10px rgba(139, 92, 246, 0.3);
+        }
+
+        .btn-primary:hover {
+            background: #7c3aed;
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: #334155;
+            color: #e2e8f0;
+        }
+
+        .btn-secondary:hover {
+            background: #475569;
+        }
+
+        .btn-v3 {
+            background: #10b981;
+            color: white;
+            box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3);
+        }
+        .btn-v3:hover {
+            background: #059669;
+            transform: translateY(-1px);
+        }
+
+        .log-area {
+            background: #0a0f1c;
+            border-radius: 1.2rem;
+            padding: 1.2rem;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.8rem;
+            max-height: 280px;
+            overflow-y: auto;
+        }
+
+        .log-line {
+            padding: 0.2rem 0;
+            border-bottom: 1px solid #1e293b;
+            color: #94a3b8;
+        }
+
+        .log-line.error {
+            color: #f87171;
+        }
+
+        .log-line.success {
+            color: #4ade80;
+        }
+
+        .log-line.warning {
+            color: #fbbf24;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            background: #1e293b;
+        }
+
+        hr {
+            border-color: #334155;
+            margin: 0.8rem 0;
+        }
+
+        .output-extra {
+            margin-top: 0.8rem;
+            padding-top: 0.5rem;
+            border-top: 1px dashed #334155;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1> QOT 打包-Command (V1/2/3 Ready)</h1>
+        <p> 支持 V1 / V2 / V3 模式 | 集成额外资源文件 (最多15个) | V3支持自定义输出路径</p>
+    </div>
+
+    <div class="card">
+        <div class="card-title">
+            <span>⚙️</span> 构建配置
+        </div>
+   
+        <div class="form-group">
+            <label class="required">📄 入口脚本文件 (.qot / .qtc)</label>
+            <input type="text" id="entryFile" placeholder="例如: D:/myproject/main.qot 或 ./script.qot" value="">
+            <div class="path-hint">支持绝对路径或相对路径 (V2/3模式下如果传入.qtc也能打包)</div>
+        </div>
+
+      
+        <div class="form-group">
+            <label>🖼️ 图标文件路径 (可选, .ico/.png)</label>
+            <input type="text" id="iconFile" placeholder="例如: C:/icons/app.ico" value="">
+            <div class="path-hint">留空则不添加图标 (V1/V2/V3通用)</div>
+        </div>
+
+    
+        <div class="form-group">
+            <label>🎛️ 编译模式 (Mode)</label>
+            <div class="mode-selector" id="modeSelector">
+                <div class="mode-option" data-mode="2">🚀 模式 V2 (推荐)</div>
+                <div class="mode-option" data-mode="1">🔧 模式 V1 (兼容)</div>
+                <div class="mode-option" data-mode="3">✨ 模式 V3 (推荐)</div>
+            </div>
+            <input type="hidden" id="modeValue" value="2">
+        </div>
+
+      
+        <div class="form-group">
+            <label> 额外资源文件 (--exportfile, 最多15个)</label>
+            <div id="extraFilesContainer" class="extra-files-area">
+                <div class="file-row" data-idx="0">
+                    <input type="text" placeholder="文件路径, 例如: ./data/config.json" class="extra-file-input">
+                    <button type="button" class="remove-file" disabled style="opacity:0.5;">Del</button>
+                </div>
+            </div>
+            <button type="button" id="addExtraFileBtn" class="add-file-btn">+ 添加资源文件</button>
+            <div class="path-hint" style="margin-top: 8px;">* 支持任意文件类型，最多15个</div>
+        </div>
+
+      
+        <div class="form-group" id="v3OutputGroup" style="display: none;">
+            <label>📁 V3 输出路径 (可选)</label>
+            <input type="text" id="outputPath" placeholder="例如: ./dist/myapp.exe 或留空自动生成" value="">
+            <div class="path-hint">仅模式V3生效: 指定生成的exe完整路径(包含文件名)，留空则自动生成到 ./build/ 目录</div>
+        </div>
+
+     
+        <div class="form-group">
+            <div class="preview-label">
+                <span>📟 build 命令预览</span>
+                <span class="status-badge">实时更新</span>
+            </div>
+            <div class="preview-card" id="cmdPreview">python index.py build ...</div>
+        </div>
+
+        <div class="action-buttons">
+            <button id="copyCmdBtn" class="btn-secondary">📋 复制命令</button>
+            <button id="clearLogsBtn" class="btn-secondary">🗑️ 清空日志</button>
+        </div>
+    </div>
+
+ 
+    <div class="card">
+        <div class="card-title">
+            <span>📋</span> 执行CallBack
+        </div>
+        <div id="logContainer" class="log-area">
+            <div class="log-line">✨ 就绪，支持V1/2/3</div>
+        </div>
+    </div>
+</div>
+
+<script>
+  
+    const entryInput = document.getElementById('entryFile');
+    const iconInput = document.getElementById('iconFile');
+    const modeValueHidden = document.getElementById('modeValue');
+    const extraContainer = document.getElementById('extraFilesContainer');
+    const addBtn = document.getElementById('addExtraFileBtn');
+    const previewCmdSpan = document.getElementById('cmdPreview');
+    const copyCmdBtn = document.getElementById('copyCmdBtn');
+    const clearLogsBtn = document.getElementById('clearLogsBtn');
+    const logContainer = document.getElementById('logContainer');
+    const modeOptions = document.querySelectorAll('.mode-option');
+    const v3OutputGroup = document.getElementById('v3OutputGroup');
+    const outputPathInput = document.getElementById('outputPath');
+    
+    let currentMode = 2;
+    
+    function addLog(message, type = 'info') {
+        const logDiv = document.createElement('div');
+        logDiv.className = `log-line ${type}`;
+        const timestamp = new Date().toLocaleTimeString();
+        let prefix = '';
+        if(type === 'error') prefix = '❌ ';
+        else if(type === 'success') prefix = '✅ ';
+        else if(type === 'warning') prefix = '⚠️ ';
+        else prefix = 'ℹ️ ';
+        logDiv.innerText = `[${timestamp}] ${prefix}${message}`;
+        logContainer.appendChild(logDiv);
+        logDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function clearLogs() {
+        logContainer.innerHTML = '';
+        addLog('日志已清空', 'info');
+    }
+    
+    function getExtraFiles() {
+        const inputs = document.querySelectorAll('#extraFilesContainer .extra-file-input');
+        const files = [];
+        for(let input of inputs) {
+            let val = input.value.trim();
+            if(val !== "") {
+                files.push(val);
+            }
+        }
+        const unique = [];
+        const set = new Set();
+        for(let f of files) {
+            if(!set.has(f)) {
+                set.add(f);
+                unique.push(f);
+            }
+        }
+        return unique.slice(0, 15);  
+    }
+    
+    
+    function buildCommandString() {
+        let entry = entryInput.value.trim();
+        if(entry === "") {
+            return "qguoat build <未填写入口文件>";
+        }
+        
+        let cmd = `qguoat build "${entry}"`;
+        let mode = currentMode;
+        cmd += ` --mode ${mode}`;
+        
+        const icon = iconInput.value.trim();
+        if(icon !== "") {
+            cmd += ` --icon "${icon}"`;
+        }
+        
+        const extraFiles = getExtraFiles();
+        for(let file of extraFiles) {
+            if(file !== "") {
+                cmd += ` --exportfile "${file}"`;
+            }
+        }
+        
+      
+        if (mode === 3) {
+            const outputVal = outputPathInput.value.trim();
+            if (outputVal !== "") {
+                cmd += ` --output "${outputVal}"`;
+            }
+        }
+        
+        return cmd;
+    }
+
+
+    function updatePreview() {
+        const cmd = buildCommandString();
+        previewCmdSpan.innerText = cmd;
+    }
+
+
+    function bindChangeEvents() {
+        entryInput.addEventListener('input', updatePreview);
+        iconInput.addEventListener('input', updatePreview);
+        if (outputPathInput) {
+            outputPathInput.addEventListener('input', updatePreview);
+        }
+        extraContainer.addEventListener('input', (e) => {
+            if(e.target && e.target.classList.contains('extra-file-input')) {
+                updatePreview();
+            }
+        });
+    }
+
+   
+    function updateRemoveButtons() {
+        const rows = document.querySelectorAll('#extraFilesContainer .file-row');
+        const removeBtns = document.querySelectorAll('#extraFilesContainer .remove-file');
+        if(rows.length === 1) {
+            removeBtns.forEach(btn => {
+                btn.disabled = true;
+                btn.style.opacity = '0.5';
+            });
+        } else {
+            removeBtns.forEach(btn => {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+            });
+        }
+    }
+
+    function addExtraFileRow(value = '') {
+        const rows = document.querySelectorAll('#extraFilesContainer .file-row');
+        if(rows.length >= 15) {
+            addLog("已达到最大额外资源文件数量限制 (15个)", "warning");
+            return;
+        }
+        const newRow = document.createElement('div');
+        newRow.className = 'file-row';
+        const idx = Date.now() + Math.random();
+        newRow.setAttribute('data-idx', idx);
+        newRow.innerHTML = `
+            <input type="text" placeholder="例如: ./resources/settings.json" class="extra-file-input" value="${escapeHtml(value)}">
+            <button type="button" class="remove-file">Del</button>
+        `;
+        extraContainer.appendChild(newRow);
+        const removeBtn = newRow.querySelector('.remove-file');
+        removeBtn.addEventListener('click', () => {
+            if(document.querySelectorAll('#extraFilesContainer .file-row').length > 1) {
+                newRow.remove();
+                updateRemoveButtons();
+                updatePreview();
+                addLog(`已移除资源文件: ${value || '空路径'}`, 'info');
+            } else {
+                addLog("至少需要保留一个资源文件输入框 (可以留空)", "warning");
+            }
+        });
+       
+        const inp = newRow.querySelector('.extra-file-input');
+        inp.addEventListener('input', updatePreview);
+        updateRemoveButtons();
+        updatePreview();
+        if(value) addLog(`添加资源文件: ${value}`, 'info');
+    }
+
+    function initializeExtraFiles() {
+        const rows = document.querySelectorAll('#extraFilesContainer .file-row');
+        for(let i = rows.length-1; i >= 1; i--) {
+            rows[i].remove();
+        }
+        const firstRow = document.querySelector('#extraFilesContainer .file-row');
+        if(firstRow) {
+            const firstInput = firstRow.querySelector('.extra-file-input');
+            if(firstInput) firstInput.value = '';
+            const rmBtn = firstRow.querySelector('.remove-file');
+            if(rmBtn) {
+                rmBtn.disabled = true;
+                rmBtn.style.opacity = '0.5';
+            }
+        }
+        updateRemoveButtons();
+        updatePreview();
+    }
+
+  
+    function escapeHtml(str) {
+        if(!str) return '';
+        return str.replace(/[&<>]/g, function(m) {
+            if(m === '&') return '&amp;';
+            if(m === '<') return '&lt;';
+            if(m === '>') return '&gt;';
+            return m;
+        });
+    }
+
+   
+    function setMode(mode) {
+        currentMode = mode;
+        modeValueHidden.value = mode;
+        modeOptions.forEach(opt => {
+            const optMode = parseInt(opt.getAttribute('data-mode'));
+            if(optMode === mode) {
+                opt.classList.add('selected');
+            } else {
+                opt.classList.remove('selected');
+            }
+        });
+        
+      
+        if (mode === 3) {
+            v3OutputGroup.style.display = 'block';
+            addLog("已切换到 V3 模式，支持--output自定义输出路径", "info");
+        } else {
+            v3OutputGroup.style.display = 'none';
+            if (mode === 1) {
+                addLog("已切换到 V1 模式: 兼容旧版编译", "info");
+            } else if (mode === 2) {
+                addLog("已切换到 V2 模式: 默认高效打包", "info");
+            }
+        }
+        updatePreview();
+    }
+
+  
+    function bindModeEvents() {
+        modeOptions.forEach(opt => {
+            opt.addEventListener('click', (e) => {
+                const modeVal = parseInt(opt.getAttribute('data-mode'));
+                if(!isNaN(modeVal)) {
+                    setMode(modeVal);
+                }
+            });
+        });
+    }
+
+   
+    function copyCommandToClipboard() {
+        const cmd = buildCommandString();
+        navigator.clipboard.writeText(cmd).then(() => {
+            addLog(`命令已复制到剪贴板: ${cmd}`, "success");
+        }).catch(() => {
+            addLog("复制失败，请手动复制", "error");
+        });
+    }
+    
+    
+    function updateAddButtonState() {
+        const rows = document.querySelectorAll('#extraFilesContainer .file-row');
+        if(rows.length >= 15) {
+            addBtn.disabled = true;
+            addBtn.style.opacity = '0.5';
+            addBtn.title = "最多添加15个额外文件";
+        } else {
+            addBtn.disabled = false;
+            addBtn.style.opacity = '1';
+            addBtn.title = "添加资源文件";
+        }
+    }
+    
+    
+    function observeExtraContainer() {
+        const observer = new MutationObserver(() => {
+            updateAddButtonState();
+            updatePreview();
+            updateRemoveButtons();
+        });
+        observer.observe(extraContainer, { childList: true, subtree: false });
+        updateAddButtonState();
+    }
+    
+
+    function setExamplePath() {
+        if (!entryInput.value.trim()) {
+            entryInput.value = "example/main.qot";
+            addLog("💡 提示: 示例路径已填入，请根据实际项目修改入口文件", "info");
+        }
+        if (!iconInput.value.trim()) {
+        
+        }
+    }
+    
+    
+    function simulateV3Hint() {
+        addLog("V3-CheckHint", "warning");
+    }
+
+    function init() {
+        initializeExtraFiles();
+        bindChangeEvents();
+        bindModeEvents();
+        setMode(2);  
+        entryInput.value = "";  
+        iconInput.value = "";
+        if (outputPathInput) outputPathInput.value = "";
+        
+        addBtn.addEventListener('click', () => {
+            if(document.querySelectorAll('#extraFilesContainer .file-row').length >= 15) {
+                addLog("已达到最大资源文件数量(15个)，无法继续添加", "warning");
+                return;
+            }
+            addExtraFileRow('');
+        });
+        copyCmdBtn.addEventListener('click', copyCommandToClipboard);
+        clearLogsBtn.addEventListener('click', clearLogs);
+        observeExtraContainer();
+        updatePreview();
+        
+        extraContainer.addEventListener('click', (e) => {
+            if(e.target.classList && e.target.classList.contains('remove-file')) {
+                const row = e.target.closest('.file-row');
+                if(row && document.querySelectorAll('#extraFilesContainer .file-row').length > 1) {
+                    row.remove();
+                    updatePreview();
+                    addLog("已移除一个资源文件项", "info");
+                } else if(row) {
+                    addLog("至少保留一个文件输入栏，不能删除最后一个", "warning");
+                }
+            }
+        });
+        updateRemoveButtons();
+        const mode3Option = document.querySelector('.mode-option[data-mode="3"]');
+        if (mode3Option) {
+            mode3Option.addEventListener('click', () => {
+                setTimeout(() => {
+                    if (currentMode === 3) {
+                        addLog("V3模式命令生成，支持 --output 指定输出exe路径", "info");
+                    }
+                }, 50);
+            });
+        }
+        
+        addLog("页面加载完成 — 支持 V1/V2/V3 模式 (V3支持自定义输出路径)", "success");
+        setExamplePath();
+        updatePreview();
+    }
+    
+    
+    const originalCopy = copyCommandToClipboard;
+    window.copyCommandToClipboard = function() {
+        if (currentMode === 3 && outputPathInput && !outputPathInput.value.trim()) {
+            addLog("V3模式未指定--output参数，将使用默认输出目录 (./build/同名.exe)", "warning");
+        }
+        originalCopy();
+    };
+    copyCmdBtn.onclick = () => window.copyCommandToClipboard();
+    
+    init();
+</script>
+</body>
+</html>

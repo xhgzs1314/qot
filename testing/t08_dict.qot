@@ -1,0 +1,5 @@
+var p = &< "name": "Alice", "age": 30 >&;
+output(p["name"]);
+output(p["age"]);
+dict_set(p, "city", "BJ");
+output(p["city"]);

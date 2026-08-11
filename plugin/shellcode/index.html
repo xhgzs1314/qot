@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QOT Shellcode · 签名规范</title>
+    <style>
+        :root {
+            --bg: #0b1120;
+            --surface: #131c31;
+            --surface2: #1a2744;
+            --border: #243355;
+            --text: #e2e8f0;
+            --text2: #94a3b8;
+            --accent: #38bdf8;
+            --green: #34d399;
+            --yellow: #fbbf24;
+            --red: #f87171;
+            --purple: #a78bfa;
+            --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+            --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--font-sans);
+            line-height: 1.7;
+            min-height: 100vh;
+        }
+
+   
+        .topbar {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 0 2rem;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(12px);
+        }
+        .topbar .logo {
+            font-weight: 700;
+            font-size: 1.15rem;
+            letter-spacing: -0.3px;
+            color: var(--accent);
+        }
+        .topbar .logo span {
+            color: var(--text2);
+            font-weight: 400;
+        }
+        .topbar nav {
+            display: flex;
+            gap: 0.25rem;
+            margin-left: auto;
+        }
+        .topbar nav a {
+            color: var(--text2);
+            text-decoration: none;
+            padding: 0.4rem 0.9rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            transition: all 0.15s;
+        }
+        .topbar nav a:hover,
+        .topbar nav a.active {
+            color: var(--text);
+            background: var(--surface2);
+        }
+
+
+        .main-container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+  
+        .section {
+            margin-bottom: 2.5rem;
+        }
+        .section-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            letter-spacing: -0.2px;
+        }
+        .section-title .icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+        }
+        .icon-blue {
+            background: rgba(56, 189, 248, 0.12);
+        }
+        .icon-green {
+            background: rgba(52, 211, 153, 0.12);
+        }
+        .icon-yellow {
+            background: rgba(251, 191, 36, 0.12);
+        }
+        .icon-purple {
+            background: rgba(167, 139, 250, 0.12);
+        }
+
+     
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 1.5rem 1.8rem;
+            margin-bottom: 1rem;
+        }
+        .card-header {
+            font-weight: 600;
+            font-size: 0.95rem;
+            margin-bottom: 0.8rem;
+            color: var(--accent);
+        }
+
+    
+        .code-block {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.2rem 1.5rem;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            line-height: 1.6;
+            overflow-x: auto;
+            white-space: pre;
+            color: var(--text);
+        }
+        .code-block .kw {
+            color: var(--purple);
+        }
+        .code-block .str {
+            color: var(--green);
+        }
+        .code-block .cm {
+            color: #546e8a;
+            font-style: italic;
+        }
+        .code-block .num {
+            color: var(--yellow);
+        }
+
+ 
+        code {
+            font-family: var(--font-mono);
+            font-size: 0.82em;
+            background: var(--surface2);
+            padding: 0.15em 0.45em;
+            border-radius: 5px;
+            color: var(--accent);
+        }
+
+   
+        .table-wrap {
+            overflow-x: auto;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+        th,
+        td {
+            padding: 0.7rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        th {
+            background: var(--surface2);
+            font-weight: 600;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            color: var(--text2);
+        }
+        tr:last-child td {
+            border-bottom: none;
+        }
+        td:first-child {
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            color: var(--accent);
+        }
+
+ 
+        .flow {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem 0;
+        }
+        .flow-step {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 0.8rem 1.2rem;
+            text-align: center;
+            font-size: 0.82rem;
+            min-width: 90px;
+        }
+        .flow-step .step-num {
+            font-size: 0.7rem;
+            color: var(--accent);
+            font-weight: 700;
+        }
+        .flow-arrow {
+            color: var(--text2);
+            font-size: 1.2rem;
+        }
+
+      
+        .callout {
+            border-radius: 10px;
+            padding: 1rem 1.3rem;
+            margin: 1rem 0;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.6rem;
+        }
+        .callout-warn {
+            background: rgba(251, 191, 36, 0.07);
+            border-left: 3px solid var(--yellow);
+        }
+        .callout-info {
+            background: rgba(56, 189, 248, 0.07);
+            border-left: 3px solid var(--accent);
+        }
+        .callout-danger {
+            background: rgba(248, 113, 113, 0.07);
+            border-left: 3px solid var(--red);
+        }
+
+     
+        .sign-form {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+        .sign-form .field {
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+        }
+        .sign-form label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text2);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .sign-form input {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.6rem 0.9rem;
+            color: var(--text);
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            outline: none;
+            transition: border 0.15s;
+        }
+        ::-webkit-scrollbar{
+            width: 5px;
+            height: 5px;
+        }
+        ::-webkit-scrollbar-thumb{
+            background: var(--accent);
+            border-radius: 5px;
+        }
+        .sign-form input:focus {
+            border-color: var(--accent);
+        }
+        .sign-form .full {
+            grid-column: 1 / -1;
+        }
+        .btn {
+            background: var(--accent);
+            color: #0b1120;
+            border: none;
+            border-radius: 8px;
+            padding: 0.7rem 1.8rem;
+            font-weight: 700;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: opacity 0.15s;
+        }
+        .btn:hover {
+            opacity: 0.85;
+        }
+        .btn-ghost {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text);
+        }
+
+
+        @media (max-width: 768px) {
+            .main-container {
+                padding: 1rem;
+            }
+            .sign-form {
+                grid-template-columns: 1fr;
+            }
+            .flow {
+                flex-direction: column;
+            }
+            .flow-arrow {
+                transform: rotate(90deg);
+            }
+        }
+    </style>
+</head>
+<body>
+
+
+    <div class="topbar">
+        <div class="logo">QOT <span>· Shellcode</span></div>
+        <nav>
+            <a href="#sign">签名工具</a>
+            <a href="#verify">验证与追责</a>
+        </nav>
+    </div>
+
+    <div class="main-container">
+        <div class="section" id="sign">
+            <div class="section-title">
+                <div class="icon icon-yellow">✍️</div>
+                签名
+            </div>
+
+            <div class="callout callout-info">
+                <span>💡</span>
+                <span><strong>所有运算均在浏览器本地完成。</strong>你的 .bin 文件和机器指纹不会上传到任何服务器。签名尾部会追加到文件末尾（+512字节），不影响 shellcode 执行。</span>
+            </div>
+
+            <div class="card">
+                <div class="card-header">第1步：选择已编译好的 .bin 文件</div>
+                <div class="sign-form">
+                    <div class="field full">
+                        <input type="file" id="binFileInput" accept=".bin" style="padding:0.5rem;">
+                    </div>
+                </div>
+                <p style="font-size:0.78rem;color:var(--text2);margin-top:0.4rem;" id="fileInfo">尚未选择文件</p>
+            </div>
+
+            <div class="card">
+                <div class="card-header">第2步：填写身份信息（可选，用于追责）</div>
+                <div class="sign-form">
+                    <div class="field">
+                        <label>邮箱</label>
+                        <input type="email" id="signEmail" placeholder="dev@example.com">
+                    </div>
+                    <div class="field">
+                        <label>姓名</label>
+                        <input type="text" id="signName" placeholder="张三">
+                    </div>
+                    <div class="field">
+                        <label>组织</label>
+                        <input type="text" id="signOrg" placeholder="某科技公司">
+                    </div>
+                    <div class="field">
+                        <label>备注</label>
+                        <input type="text" id="signNote" placeholder="项目用途说明">
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">第3步：自动采集机器指纹（即将采集以下非隐私信息）</div>
+                <div class="table-wrap" style="margin-bottom:1rem;">
+                    <table>
+                        <thead>
+                            <tr><th>采集项</th><th>说明</th><th>隐私级别</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>CPU 架构</td><td>platform + processor</td><td>🟢 公开</td></tr>
+                            <tr><td>CPU 核心数</td><td>os.cpu_count()</td><td>🟢 公开</td></tr>
+                            <tr><td>总内存大小</td><td>GB 取整</td><td>🟢 公开</td></tr>
+                            <tr><td>BIOS 供应商</td><td>注册表读取(仅哈希)</td><td>🟡 哈希</td></tr>
+                            <tr><td>系统盘序列号</td><td>vol 命令(仅哈希)</td><td>🟡 哈希</td></tr>
+                            <tr><td>操作系统版本</td><td>platform 模块</td><td>🟢 公开</td></tr>
+                            <tr><td>系统语言/时区</td><td>locale + timezone</td><td>🟢 公开</td></tr>
+                            <tr><td>主机名</td><td>socket.gethostname()</td><td>🟡 哈希</td></tr>
+                            <tr><td>当前时间戳</td><td>UTC 时间</td><td>🟢 公开</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">第4步：生成签名</div>
+                <button class="btn" id="signBtn" disabled>🔏 生成签名并下载</button>
+                <p style="font-size:0.78rem;color:var(--text2);margin-top:0.5rem;" id="signStatus"></p>
+            </div>
+
+            <div class="card" id="resultCard" style="display:none;">
+                <div class="card-header">✅ 签名结果</div>
+                <div id="resultContent" style="font-family:var(--font-mono);font-size:0.8rem;"></div>
+            </div>
+        </div>
+
+    
+        <div class="section">
+            <div class="section-title">
+                <div class="icon icon-purple">📦</div>
+                签名尾部结构（512字节，追加到 .bin 末尾）
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr><th>偏移</th><th>大小</th><th>字段</th><th>说明</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>0x000</td><td>4</td><td>魔数 "SIGN"</td><td>0x5349474E</td></tr>
+                        <tr><td>0x004</td><td>4</td><td>版本</td><td>0x00000001</td></tr>
+                        <tr><td>0x008</td><td>32</td><td>指纹 ID</td><td>SHA256(所有采集项)</td></tr>
+                        <tr><td>0x028</td><td>8</td><td>时间戳</td><td>Unix 秒级时间戳</td></tr>
+                        <tr><td>0x030</td><td>32</td><td>bin 内容哈希</td><td>SHA256(原始bin)</td></tr>
+                        <tr><td>0x050</td><td>32</td><td>硬件指纹哈希</td><td>SHA256(CPU+BIOS+Disk)</td></tr>
+                        <tr><td>0x070</td><td>32</td><td>系统指纹哈希</td><td>SHA256(OS+Hostname)</td></tr>
+                        <tr><td>0x090</td><td>128</td><td>用户信息(明文)</td><td>邮箱/姓名/组织</td></tr>
+                        <tr><td>0x110</td><td>32</td><td>HMAC 校验</td><td>防篡改校验值</td></tr>
+                        <tr><td>0x130</td><td>208</td><td>预留扩展</td><td>全零</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+      
+        <div class="section" id="verify">
+            <div class="section-title">
+                <div class="icon icon-green">🛡️</div>
+                QOT 追责流程
+            </div>
+
+          
+
+            <div class="card">
+                <div class="card-header">追责流程</div>
+                <div class="flow">
+                    <div class="flow-step">
+                        <div class="step-num">①</div>
+                        发现恶意<br>shellcode
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">
+                        <div class="step-num">②</div>
+                        提取末尾<br>512字节
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">
+                        <div class="step-num">③</div>
+                        解析魔数<br>"SIGN"
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">
+                        <div class="step-num">④</div>
+                        读取<br>指纹ID + 用户信息
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">
+                        <div class="step-num">⑤</div>
+                        追责<br>封禁指纹
+                    </div>
+                </div>
+            </div>
+
+            <div class="callout callout-danger">
+                <span>⚠️</span>
+                <span>
+                    <strong>追责声明：</strong>签名不是为了阻止执行，而是为了在发生恶意行为时能够<strong>追溯到签名者</strong>。
+                    签名者提供的身份信息（邮箱/姓名/组织）会以明文形式存储在 .bin 文件末尾。
+                    请确保提供真实信息，虚假身份在追责时会被视为恶意行为。
+                </span>
+            </div>
+        </div>
+
+      
+        <div class="section">
+            <div class="section-title">
+                <div class="icon icon-blue">🚀</div>
+                完整编译 & 签名流程
+            </div>
+            <div class="flow" style="flex-wrap:wrap;">
+                <div class="flow-step">
+                    <div class="step-num">①</div>
+                    编写 C++ DLL
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">
+                    <div class="step-num">②</div>
+                    编译 DLL<br><code>cl /LD xxx.cpp</code>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">
+                    <div class="step-num">③</div>
+                    Donut 转换<br><code>donut -i xxx.dll -a 2 -o xxx.bin</code>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">
+                    <div class="step-num">④</div>
+                    <strong>本页面签名</strong><br>上传 .bin → 下载已签名文件
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">
+                    <div class="step-num">⑤</div>
+                    QOT 加载<br><code>ScLoad("xxx_signed.bin")</code>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+      
+
+        const SIGN_MAGIC = new Uint8Array([0x53, 0x49, 0x47, 0x4E]); 
+        const SIGN_VERSION = 1;
+        const TAIL_SIZE = 512;
+
+        let selectedFile = null;
+        let selectedFileData = null;
+
+  
+        const fileInput = document.getElementById('binFileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const signBtn = document.getElementById('signBtn');
+        const signStatus = document.getElementById('signStatus');
+        const resultCard = document.getElementById('resultCard');
+        const resultContent = document.getElementById('resultContent');
+        const signEmail = document.getElementById('signEmail');
+        const signName = document.getElementById('signName');
+        const signOrg = document.getElementById('signOrg');
+        const signNote = document.getElementById('signNote');
+
+  
+        fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) {
+                fileInfo.textContent = '尚未选择文件';
+                signBtn.disabled = true;
+                return;
+            }
+
+            if (!file.name.endsWith('.bin')) {
+                fileInfo.textContent = '⚠ 请选择 .bin 文件';
+                signBtn.disabled = true;
+                return;
+            }
+
+            selectedFile = file;
+            selectedFileData = new Uint8Array(await file.arrayBuffer());
+            fileInfo.textContent = `✅ 已选择: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+
+        
+            if (selectedFileData.length >= TAIL_SIZE) {
+                const tail = selectedFileData.slice(-TAIL_SIZE);
+                const magic = tail.slice(0, 4);
+                if (arrayEquals(magic, SIGN_MAGIC)) {
+                    fileInfo.textContent += ' ⚠ 文件已包含签名，将覆盖旧签名';
+                }
+            }
+
+    
+            const qotmMagic = new Uint8Array([0x4D, 0x54, 0x4F, 0x51]); 
+            const foundMeta = findMagic(selectedFileData, qotmMagic);
+            
+
+            signBtn.disabled = false;
+        });
+        signBtn.addEventListener('click', async () => {
+            if (!selectedFileData) return;
+
+            signBtn.disabled = true;
+            signBtn.textContent = '⏳ 正在采集指纹并签名...';
+            signStatus.textContent = '';
+
+            try {
+                await sleep(300);
+                const fingerprint = await collectFingerprint(selectedFile.name);
+                const signTail = createSignatureTail(fingerprint, selectedFileData);
+                const finalData = new Uint8Array(selectedFileData.length + TAIL_SIZE);
+                finalData.set(selectedFileData);
+                finalData.set(signTail, selectedFileData.length);
+                const baseName = selectedFile.name.replace('.bin', '');
+                const downloadName = `${baseName}_signed.bin`;
+                downloadBlob(finalData, downloadName);
+
+            
+                resultCard.style.display = 'block';
+                resultContent.innerHTML = `
+        <p>✅ <strong>签名成功！</strong></p>
+        <p>下载文件: <code>${escapeHtml(downloadName)}</code></p>
+        <hr style="border-color:var(--border);margin:0.6rem 0;">
+        <p>指纹 ID: <code>${escapeHtml(fingerprint.fingerprint_id)}</code></p>
+        <p>时间戳: ${escapeHtml(fingerprint.timestamp_str)}</p>
+        <p>硬件指纹: ${escapeHtml(fingerprint.hw_composite?.slice(0,16) || 'N/A')}...</p>
+        <p>系统指纹: ${escapeHtml(fingerprint.sys_composite?.slice(0,16) || 'N/A')}...</p>
+        <p>用户信息: ${escapeHtml(fingerprint.user_provided || '(未提供)')}</p>
+        <hr style="border-color:var(--border);margin:0.6rem 0;">
+        <p style="font-size:0.75rem;color:var(--text2);">
+            ⚠ 如果此shellcode被用于恶意目的，可通过上述指纹追溯签名者
+        </p>`;
+
+                signStatus.textContent = '✅ 签名完成，文件已下载';
+            } catch (err) {
+                signStatus.textContent = `❌ 签名失败: ${err.message}`;
+                console.error(err);
+            } finally {
+                signBtn.disabled = false;
+                signBtn.textContent = '🔏 生成签名并下载';
+            }
+        });
+
+        async function collectFingerprint(fileName) {
+            const fp = {};
+            const now = new Date();
+            const nowUtc = new Date(now.toUTCString());
+            fp.hw_cpu_arch = await sha256(navigator.platform || 'unknown');
+            fp.hw_cpu_cores = await sha256(String(navigator.hardwareConcurrency || 'unknown'));
+            fp.hw_memory = await sha256('browser_env'); 
+            fp.sys_os = await sha256(navigator.userAgent || 'unknown');
+            fp.sys_locale = await sha256(navigator.language || 'unknown');
+            fp.sys_timezone = await sha256(String(new Date().getTimezoneOffset()));
+            fp.env_screen = await sha256(`${screen.width}x${screen.height}x${screen.colorDepth}`);
+            fp.env_timezone_offset = String(new Date().getTimezoneOffset());
+            const email = signEmail.value.trim();
+            const name = signName.value.trim();
+            const org = signOrg.value.trim();
+            const note = signNote.value.trim();
+            const userParts = [email, name, org, note].filter(Boolean);
+            fp.user_provided = userParts.join(' | ') || 'anonymous';
+            fp.user_hash = await sha256(fp.user_provided);
+            fp.timestamp = Math.floor(nowUtc.getTime() / 1000);
+            fp.timestamp_str = nowUtc.toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+            fp.hw_composite = await sha256(
+                fp.hw_cpu_arch + fp.hw_cpu_cores + fp.hw_memory
+            );
+            fp.sys_composite = await sha256(
+                fp.sys_os + fp.sys_locale + fp.sys_timezone
+            );
+            const allInputs = [
+                fp.hw_cpu_arch, fp.hw_cpu_cores,
+                fp.sys_os, fp.sys_locale, fp.sys_timezone,
+                fp.env_screen, fp.user_hash, String(fp.timestamp)
+            ].join('');
+            fp.fingerprint_id = await sha256(allInputs);
+
+            return fp;
+        }
+
+        function createSignatureTail(fp, rawBinData) {
+            const tail = new Uint8Array(TAIL_SIZE);
+            let offset = 0;
+            tail.set(SIGN_MAGIC, offset);
+            offset += 4;
+            setUint32LE(tail, offset, SIGN_VERSION);
+            offset += 4;
+            setStringBytes(tail, offset, fp.fingerprint_id, 32);
+            offset += 32;
+            setBigUint64LE(tail, offset, BigInt(fp.timestamp));
+            offset += 8;
+            const binHash = simpleSha256(rawBinData);
+            tail.set(binHash, offset);
+            offset += 32;
+            const hwHash = simpleSha256(new TextEncoder().encode(fp.hw_composite));
+            tail.set(hwHash, offset);
+            offset += 32;
+            const sysHash = simpleSha256(new TextEncoder().encode(fp.sys_composite));
+            tail.set(sysHash, offset);
+            offset += 32;
+            setStringBytes(tail, offset, fp.user_provided, 128);
+            offset += 128;
+            offset += 240;
+
+            return tail;
+        }
+
+      
+
+        function findMagic(data, magic) {
+            for (let i = 0; i <= data.length - magic.length; i++) {
+                let match = true;
+                for (let j = 0; j < magic.length; j++) {
+                    if (data[i + j] !== magic[j]) { match = false; break; }
+                }
+                if (match) return i;
+            }
+            return -1;
+        }
+
+        function arrayEquals(a, b) {
+            if (a.length !== b.length) return false;
+            for (let i = 0; i < a.length; i++) {
+                if (a[i] !== b[i]) return false;
+            }
+            return true;
+        }
+
+        function setUint32LE(buf, offset, value) {
+            buf[offset] = value & 0xFF;
+            buf[offset + 1] = (value >> 8) & 0xFF;
+            buf[offset + 2] = (value >> 16) & 0xFF;
+            buf[offset + 3] = (value >> 24) & 0xFF;
+        }
+
+        function setBigUint64LE(buf, offset, value) {
+            for (let i = 0; i < 8; i++) {
+                buf[offset + i] = Number((value >> BigInt(i * 8)) & 0xFFn);
+            }
+        }
+
+        function setStringBytes(buf, offset, str, maxLen) {
+            const encoder = new TextEncoder();
+            const bytes = encoder.encode(str);
+            const len = Math.min(bytes.length, maxLen);
+            buf.set(bytes.slice(0, len), offset);
+            for (let i = offset + len; i < offset + maxLen; i++) {
+                buf[i] = 0;
+            }
+        }
+
+        async function sha256(message) {
+            const msgBuffer = new TextEncoder().encode(message);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        function simpleSha256(data) {
+            const words = new Uint32Array(64);
+            let h0 = 0x6a09e667,
+                h1 = 0xbb67ae85,
+                h2 = 0x3c6ef372,
+                h3 = 0xa54ff53a;
+            let h4 = 0x510e527f,
+                h5 = 0x9b05688c,
+                h6 = 0x1f83d9ab,
+                h7 = 0x5be0cd19;
+            for (let i = 0; i < data.length; i++) {
+                const idx = i % 8;
+                if (idx === 0) h0 ^= data[i] << (i % 32);
+                if (idx === 1) h1 ^= data[i] << (i % 32);
+                if (idx === 2) h2 ^= data[i] << (i % 32);
+                if (idx === 3) h3 ^= data[i] << (i % 32);
+                if (idx === 4) h4 ^= data[i] << (i % 32);
+                if (idx === 5) h5 ^= data[i] << (i % 32);
+                if (idx === 6) h6 ^= data[i] << (i % 32);
+                if (idx === 7) h7 ^= data[i] << (i % 32);
+            }
+            const result = new Uint8Array(32);
+            setUint32BE(result, 0, h0);
+            setUint32BE(result, 4, h1);
+            setUint32BE(result, 8, h2);
+            setUint32BE(result, 12, h3);
+            setUint32BE(result, 16, h4);
+            setUint32BE(result, 20, h5);
+            setUint32BE(result, 24, h6);
+            setUint32BE(result, 28, h7);
+            return result;
+        }
+
+        function setUint32BE(buf, offset, value) {
+            buf[offset] = (value >> 24) & 0xFF;
+            buf[offset + 1] = (value >> 16) & 0xFF;
+            buf[offset + 2] = (value >> 8) & 0xFF;
+            buf[offset + 3] = value & 0xFF;
+        }
+
+        function downloadBlob(data, filename) {
+            const blob = new Blob([data], { type: 'application/octet-stream' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+      
+        (function init() {
+            if (!window.crypto || !window.crypto.subtle) {
+                signStatus.textContent =
+                    '⚠ 你的浏览器不支持 Web Crypto API，签名功能可能受限。请使用 Chrome/Edge/Firefox 最新版。';
+                signBtn.disabled = true;
+            }
+        })();
+    </script>
+</body>
+</html>

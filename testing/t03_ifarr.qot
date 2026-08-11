@@ -1,0 +1,6 @@
+var x = 7;
+if(x > 10){ output("big"); } eif(x > 5){ output("mid"); } else { output("small"); }
+var arr = [10, 20, 30];
+arr->push(40);
+output(arr[0] + arr[3]);
+output("hi " + "there");

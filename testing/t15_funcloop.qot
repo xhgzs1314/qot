@@ -1,0 +1,23 @@
+number_t func sum_to(n){
+    var t = 0;
+    for(i in n){ t += i; }
+    return t;
+}
+output(sum_to(100));
+
+number_t func twice(x){ return x * 2; }
+var acc = 0;
+for(j in 5){ acc += twice(j); }
+output(acc);
+
+number_t func count_down(n){
+    var c = 0;
+    loop(n > 0){ n -= 1; c += 1; }
+    return c;
+}
+output(count_down(7));
+
+var k = 3;
+var s2 = 0;
+loop(k > 0){ k -= 1; s2 += k; }
+output(s2);

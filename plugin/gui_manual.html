@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QTC GUI · 图形界面开发手册</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Roboto', system-ui, -apple-system, sans-serif;
+            background: #0f0f1a;
+            color: #e2e8f0;
+            line-height: 1.6;
+            padding: 2rem 1rem;
+        }
+
+        .container {
+            max-width: 1300px;
+            margin: 0 auto;
+        }
+
+   
+        .hero {
+            background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%);
+            border-radius: 28px;
+            padding: 2.5rem;
+            margin-bottom: 2rem;
+            border: 1px solid #2d2d44;
+        }
+
+        .hero h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(120deg, #c084fc, #60a5fa);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        .hero .sub {
+            color: #94a3b8;
+            margin-top: 0.5rem;
+            border-left: 3px solid #8b5cf6;
+            padding-left: 1rem;
+        }
+
+        .badge {
+            display: inline-block;
+            background: #8b5cf6;
+            color: white;
+            font-size: 0.7rem;
+            padding: 0.2rem 0.6rem;
+            border-radius: 20px;
+            margin-left: 0.5rem;
+            vertical-align: middle;
+        }
+
+     
+        .quick-start {
+            background: #111827;
+            border-radius: 20px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            border: 1px solid #2d2d44;
+        }
+
+        .quick-start h2 {
+            font-size: 1.3rem;
+            margin-bottom: 1rem;
+            color: #c084fc;
+        }
+
+        .code-block {
+            background: #0a0a14;
+            border-radius: 12px;
+            padding: 1.2rem;
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            border: 1px solid #2d2d44;
+        }
+
+        .code-block pre {
+            margin: 0;
+            color: #e2e8f0;
+        }
+
+        .comment { color: #6b7280; }
+        .keyword { color: #c084fc; }
+        .string { color: #86efac; }
+        .number { color: #fcd34d; }
+        .function { color: #60a5fa; }
+
+        
+        .section-title {
+            font-size: 1.5rem;
+            margin: 2rem 0 1rem 0;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #8b5cf6;
+            display: inline-block;
+        }
+
+        .component-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill);
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .component-card {
+            background: #111827;
+            border-radius: 16px;
+            border: 1px solid #2d2d44;
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }
+
+        .component-card:hover {
+            border-color: #8b5cf6;
+            transform: translateY(-2px);
+        }
+
+        .card-header {
+            background: #1a1a2e;
+            padding: 0.8rem 1.2rem;
+            border-bottom: 1px solid #2d2d44;
+            font-weight: 600;
+            color: #c084fc;
+        }
+
+        .card-body {
+            padding: 1rem 1.2rem;
+        }
+
+        .func-list {
+            list-style: none;
+        }
+
+        .func-list li {
+            padding: 0.4rem 0;
+            border-bottom: 1px solid #25253a;
+            font-size: 0.85rem;
+        }
+
+        .func-list li:last-child {
+            border-bottom: none;
+        }
+
+        .func-name {
+            font-family: monospace;
+            color: #86efac;
+            font-size: 0.8rem;
+        }
+
+        .func-desc {
+            color: #94a3b8;
+            font-size: 0.75rem;
+            margin-left: 0.5rem;
+        }
+
+     
+        .callback-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            background: #111827;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .callback-table th,
+        .callback-table td {
+            padding: 0.8rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid #2d2d44;
+        }
+
+        .callback-table th {
+            background: #1a1a2e;
+            color: #c084fc;
+            font-weight: 600;
+        }
+
+        .callback-table tr:hover td {
+            background: #1e1e32;
+        }
+
+        .callback-signature {
+            font-family: monospace;
+            color: #fcd34d;
+        }
+
+       
+        .color-demo {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin: 1rem 0;
+        }
+
+        .color-box {
+            width: 60px;
+            height: 60px;
+            border-radius: 12px;
+            border: 1px solid #2d2d44;
+        }
+
+        .color-label {
+            font-size: 0.7rem;
+            text-align: center;
+            margin-top: 0.3rem;
+            color: #94a3b8;
+        }
+
+     
+        .lifecycle {
+            background: #111827;
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-around;
+            align-items: center;
+        }
+
+        .lifecycle-step {
+            text-align: center;
+            flex: 1;
+            min-width: 100px;
+        }
+
+        .lifecycle-step .step-num {
+            background: #8b5cf6;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+
+        .lifecycle-step .step-name {
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .lifecycle-step .step-func {
+            font-family: monospace;
+            font-size: 0.7rem;
+            color: #86efac;
+        }
+
+        .arrow {
+            font-size: 1.5rem;
+            color: #6b7280;
+        }
+
+        @media (max-width: 768px) {
+            .lifecycle { flex-direction: column; gap: 1rem; }
+            .arrow { transform: rotate(90deg); }
+        }
+
+        .note {
+            background: #2d1f1f;
+            border-left: 4px solid #ef4444;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            font-size: 0.85rem;
+        }
+
+        .tip {
+            background: #1a2a1f;
+            border-left: 4px solid #86efac;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            font-size: 0.85rem;
+        }
+
+        hr {
+            border: none;
+            border-top: 1px solid #2d2d44;
+            margin: 2rem 0;
+        }
+
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1a1a2e;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #374151;
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #8b5cf6;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+  
+    <div class="hero">
+        <h1> QTC GUI 开发手册</h1>
+        <div class="sub">
+            现代化的 Direct2D 图形界面框架
+            <span class="badge">v1.0</span>
+        </div>
+    </div>
+
+   
+    <div class="note" style="border-left:4px solid #f87171;background:rgba(248,113,113,.10);">
+        <strong>先看这一条：GUI 只在字节码 VM 上有</strong><br>
+        所有 <code>vg_*</code> 函数都实现在 C++ 虚拟机里（<code>ot-asset/c/vmcshit/gui_module.cpp</code>），
+        Python 解释器<strong>一个都没有</strong>。所以下面的代码必须走 VM 这条路：
+        <div class="code-block" style="margin:.6rem 0;">
+            <pre>python index.py bstrust compile app.qot app.qtc
+python index.py bstrust run app.qtc</pre>
+        </div>
+        用 <code>python index.py run app.qot</code>（解释器）跑，会得到
+        「GUI 函数 vg_init() 只在编译执行下可用」这句报错——解释器里注册的只是一批占位存根。
+        解释器自己那套 GUI 是完全不同的 <code>window_*</code> 系列函数（见
+        <a href="function_inside.html">内置函数手册V1</a>），两套不能混用。
+        两个运行时的完整差异见 <a href="doc.html#runtime-diff">语言文档 §21</a>，
+        VM 内置函数总表见 <a href="function_inside2.html">内置函数手册V2</a>。
+    </div>
+
+    <div class="quick-start">
+        <h2>🚀 快速上手</h2>
+        <div class="code-block">
+            <pre><span class="comment">// 1. 初始化GUI框架</span>
+<span class="keyword">vg_init</span>();
+
+<span class="comment">// 2. 创建主窗口</span>
+var window = <span class="keyword">vg_create_window</span>(<span class="string">"我的应用"</span>, <span class="number">800</span>, <span class="number">600</span>);
+
+<span class="comment">// 3. 设置渐变背景（这些窗口函数不传 window ID）</span>
+<span class="keyword">vg_set_window_bg_gradient</span>([<span class="number">0.05</span>, <span class="number">0.05</span>, <span class="number">0.12</span>, <span class="number">1</span>], [<span class="number">0.12</span>, <span class="number">0.08</span>, <span class="number">0.22</span>, <span class="number">1</span>]);
+
+<span class="comment">// 4. 创建按钮</span>
+var btn = <span class="keyword">vg_create_button</span>(<span class="number">300</span>, <span class="number">250</span>, <span class="number">200</span>, <span class="number">50</span>, <span class="string">"点击我"</span>);
+
+<span class="comment">// 5. 定义回调函数</span>
+<span class="keyword">any_t func</span> <span class="function">on_click</span>() {
+    <span class="keyword">output</span>(<span class="string">"按钮被点击了!"</span>);
+    <span class="keyword">vg_button_set_text</span>(btn, <span class="string">"已点击"</span>);
+}
+
+<span class="comment">// 6. 绑定回调</span>
+<span class="keyword">vg_button_on_click</span>(btn, on_click);
+
+<span class="comment">// 7. 显示窗口并运行</span>
+<span class="keyword">vg_show_window</span>();
+<span class="keyword">vg_run</span>();
+
+<span class="comment">// 8. 清理资源</span>
+<span class="keyword">vg_uninit</span>();</pre>
+        </div>
+    </div>
+
+   
+    <h2 class="section-title">📋 GUI 生命周期</h2>
+    <div class="lifecycle">
+        <div class="lifecycle-step">
+            <div class="step-num">1</div>
+            <div class="step-name">初始化</div>
+            <div class="step-func">vg_init()</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="lifecycle-step">
+            <div class="step-num">2</div>
+            <div class="step-name">创建窗口</div>
+            <div class="step-func">vg_create_window()</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="lifecycle-step">
+            <div class="step-num">3</div>
+            <div class="step-name">创建组件</div>
+            <div class="step-func">vg_create_xxx()</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="lifecycle-step">
+            <div class="step-num">4</div>
+            <div class="step-name">绑定事件</div>
+            <div class="step-func">vg_xxx_on_xxx()</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="lifecycle-step">
+            <div class="step-num">5</div>
+            <div class="step-name">运行</div>
+            <div class="step-func">vg_run()</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="lifecycle-step">
+            <div class="step-num">6</div>
+            <div class="step-name">清理</div>
+            <div class="step-func">vg_uninit()</div>
+        </div>
+    </div>
+
+    <div class="tip">
+         <strong>提示</strong>：所有组件创建函数都会返回一个对象 ID（字符串），后续操作都通过这个 ID 引用组件。
+        窗口创建后会自动保存为当前窗口，后续组件会自动添加到该窗口。
+    </div>
+
+    
+    <h2 class="section-title"> 窗口操作</h2>
+    <div class="component-grid">
+        <div class="component-card">
+            <div class="card-header">窗口管理</div>
+            <div class="card-body">
+                <ul class="func-list">
+                    <li><span class="func-name">vg_create_window(title, width, height)</span><span class="func-desc">创建窗口，返回窗口ID</span></li>
+                    <li><span class="func-name">vg_show_window()</span><span class="func-desc">显示当前窗口</span></li>
+                    <li><span class="func-name">vg_run()</span><span class="func-desc">运行消息循环（阻塞到窗口关闭）</span></li>
+                    <li><span class="func-name">vg_close_window()</span><span class="func-desc">关闭并销毁当前窗口</span></li>
+                    <li><span class="func-name">vg_set_window_title(title)</span><span class="func-desc">设置标题</span></li>
+                    <li><span class="func-name">vg_set_window_size(width, height)</span><span class="func-desc">设置大小</span></li>
+                    <li><span class="func-name">vg_set_window_bg_gradient(start_color, end_color)</span><span class="func-desc">设置渐变背景</span></li>
+                </ul>
+            </div>
+        </div>
+        <div class="component-card">
+            <div class="card-header">示例代码</div>
+            <div class="card-body">
+                <div class="code-block" style="padding: 0.8rem;">
+                    <pre><span class="comment">// 创建800x600窗口</span>
+var window = <span class="keyword">vg_create_window</span>(<span class="string">"标题"</span>, <span class="number">800</span>, <span class="number">600</span>);
+
+<span class="comment">// 紫色渐变背景（注意：不传 window！）</span>
+var start = [<span class="number">0.05</span>, <span class="number">0.05</span>, <span class="number">0.15</span>, <span class="number">1</span>];
+var end   = [<span class="number">0.15</span>, <span class="number">0.08</span>, <span class="number">0.25</span>, <span class="number">1</span>];
+<span class="keyword">vg_set_window_bg_gradient</span>(start, end);
+
+<span class="keyword">vg_show_window</span>();
+<span class="keyword">vg_run</span>();</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="note" style="border-left:4px solid #fbbf24;background:rgba(251,191,36,.10);">
+        ⚠️ <strong>除了 <code>vg_create_window</code>，其余窗口函数都不接受窗口 ID。</strong><br>
+        它们内部一律直接操作「当前主窗口」（<code>getMainWindow()</code>），参数是<strong>从第 0 个开始数</strong>的。
+        所以下面这种写法是<strong>错的</strong>——旧版手册里就是这么写的，别再照抄：
+        <div class="code-block" style="margin:.6rem 0;">
+            <pre><span class="comment">// ✗ 错：window 被当成了标题字符串</span>
+<span class="keyword">vg_set_window_title</span>(window, <span class="string">"新标题"</span>);   <span class="comment">// 标题变成了 "obj_3" 这种 ID</span>
+
+<span class="comment">// ✗ 错：window 被当成了起始颜色，end 被完全忽略</span>
+<span class="keyword">vg_set_window_bg_gradient</span>(window, start, end);
+
+<span class="comment">// ✓ 对</span>
+<span class="keyword">vg_set_window_title</span>(<span class="string">"新标题"</span>);
+<span class="keyword">vg_set_window_bg_gradient</span>(start, end);</pre>
+        </div>
+        <code>vg_show_window(window)</code> / <code>vg_close_window(window)</code> 多传一个参数不会出错（参数直接被忽略），
+        但也没必要写。<strong>QOT 不检查实参个数</strong>，多写少写都不报错，写错位置就是静默地干错事——
+        这一条在整个 GUI 模块里都成立。
+    </div>
+
+    <div class="tip">
+        <strong>所有 <code>vg_create_*</code> 的参数都是可选的</strong>，缺省时用内置默认值
+        （位置 50,50；按钮 200×40；文本框/下拉框 200×35；滑块 300×40；进度条 300×20；
+        列表框 200×150；卡片 250×200；标签页 500×400；加载动画 50×50；开关固定 60×30）。
+        所以 <code>vg_create_button()</code> 一个参数不给也能建出一个按钮来，不会报错。
+        <br><strong>但是</strong>：<code>vg_create_window()</code> 之前没调 <code>vg_init()</code>、
+        或者建控件之前没建窗口，函数会打印一行 <code>[Error]</code> 到 stderr 并返回
+        <code>null</code>——后面拿着这个 <code>null</code> 去操作控件，全都是静默失败。
+    </div>
+
+    
+    <h2 class="section-title"> 按钮 (Button)</h2>
+    <div class="component-grid">
+        <div class="component-card">
+            <div class="card-header">按钮方法</div>
+            <div class="card-body">
+                <ul class="func-list">
+                    <li><span class="func-name">vg_create_button(x, y, w, h, text)</span><span class="func-desc">创建按钮</span></li>
+                    <li><span class="func-name">vg_button_set_text(btn_id, text)</span><span class="func-desc">设置文本</span></li>
+                    <li><span class="func-name">vg_button_set_color(btn_id, color)</span><span class="func-desc">设置背景色</span></li>
+                    <li><span class="func-name">vg_button_set_hover_color(btn_id, color)</span><span class="func-desc">设置悬停色</span></li>
+                    <li><span class="func-name">vg_button_set_border_radius(btn_id, radius)</span><span class="func-desc">设置圆角</span></li>
+                    <li><span class="func-name">vg_button_on_click(btn_id, callback)</span><span class="func-desc">绑定点击回调</span></li>
+                    <li><span class="func-name">vg_button_set_position(btn_id, x, y)</span><span class="func-desc">设置位置</span></li>
+                </ul>
+            </div>
+        </div>
+        <div class="component-card">
+            <div class="card-header">示例代码</div>
+            <div class="card-body">
+                <div class="code-block" style="padding: 0.8rem;">
+                    <pre>var btn = <span class="keyword">vg_create_button</span>(<span class="number">300</span>, <span class="number">250</span>, <span class="number">200</span>, <span class="number">50</span>, <span class="string">"点击"</span>);
+
+<span class="comment">// 设置蓝色渐变效果</span>
+<span class="keyword">vg_button_set_color</span>(btn, [<span class="number">0.2</span>, <span class="number">0.6</span>, <span class="number">1.0</span>, <span class="number">1</span>]);
+<span class="keyword">vg_button_set_hover_color</span>(btn, [<span class="number">0.3</span>, <span class="number">0.7</span>, <span class="number">1.0</span>, <span class="number">1</span>]);
+<span class="keyword">vg_button_set_border_radius</span>(btn, <span class="number">25</span>);
+
+<span class="keyword">any_t func</span> <span class="function">on_click</span>() {
+    <span class="keyword">vg_button_set_text</span>(btn, <span class="string">"已点击"</span>);
+}
+<span class="keyword">vg_button_on_click</span>(btn, on_click);</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    
+    <h2 class="section-title"> 复选框 (CheckBox) 与 开关 (Toggle)</h2>
+    <div class="component-grid">
+        <div class="component-card">
+            <div class="card-header">复选框方法</div>
+            <div class="card-body">
+                <ul class="func-list">
+                    <li><span class="func-name">vg_create_checkbox(x, y, w, h, text)</span><span class="func-desc">创建复选框</span></li>
+                    <li><span class="func-name">vg_checkbox_set_checked(cb_id, checked)</span><span class="func-desc">设置选中状态</span></li>
+                    <li><span class="func-name">vg_checkbox_get_checked(cb_id)</span><span class="func-desc">获取选中状态</span></li>
+                    <li><span class="func-name">vg_checkbox_on_changed(cb_id, callback)</span><span class="func-desc">绑定状态改变回调</span></li>
+                </ul>
+            </div>
+        </div>
+        <div class="component-card">
+            <div class="card-header">开关方法</div>
+            <div class="card-body">
+                <ul class="func-list">
+                    <li><span class="func-name">vg_create_toggle(x, y)</span><span class="func-desc">创建开关</span></li>
+                    <li><span class="func-name">vg_toggle_set_checked(toggle_id, checked)</span><span class="func-desc">设置开关状态</span></li>
+                    <li><span class="func-name">vg_toggle_get_checked(toggle_id)</span><span class="func-desc">获取开关状态</span></li>
+                    <li><span class="func-name">vg_toggle_on_changed(toggle_id, callback)</span><span class="func-desc">绑定状态改变回调</span></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+  
+    <h2 class="section-title"> 文本框 (TextBox) 与  滑块 (Slider)</h2>
+    <div class="component-grid">
+        <div class="component-card">
+            <div class="card-header">文本框方法</div>
+            <div class="card-body">
+                <ul class="func-list">
+                    <li><span class="func-name">vg_create_textbox(x, y, w, h, placeholder)</span><span class="func-desc">创建文本框</span></li>
+                    <li><span class="func-name">vg_textbox_set_text(tb_id, text)</span><span class="func-desc">设置内容</span></li>
+                    <li><span class="func-name">vg_textbox_get_text(tb_id)</span><span class="func-desc">获取内容</span></li>
+                    <li><span class="func-name">vg_textbox_set_placeholder(tb_id, text)</span><span class="func-desc">设置占位符</span></li>
+                </ul>
+            </div>
+        </div>
+        <div class="component-card">
+            <div class="card-header">滑块方法</div>
+            <div class="card-body">
+                <ul class="func-list">
+                    <li><span class="func-name">vg_create_slider(x, y, w, h, min, max)</span><span class="func-desc">创建滑块</span></li>
+                    <li><span class="func-name">vg_slider_set_value(slider_id, value)</span><span class="func-desc">设置值</span></li>
+                    <li><span class="func-name">vg_slider_get_value(slider_id)</span><span class="func-desc">获取值</span></li>
+                    <li><span class="func-name">vg_slider_on_changed(slider_id, callback)</span><span class="func-desc">绑定值改变回调</span></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    
+    <h2 class="section-title">📊 进度条 (ProgressBar) 与 🃏 卡片 (Card)</h2>
+    <div class="component-grid">
+        <div class="component-card">
+            <div class="card-header">进度条方法</div>
+            <div class="card-body">
+                <ul class="func-list">
+                    <li><span class="func-name">vg_create_progressbar(x, y, w, h)</span><span class="func-desc">创建进度条</span></li>
+                    <li><span class="func-name">vg_progressbar_set_value(pb_id, value)</span><span class="func-desc">设置进度(0-1)</span></li>
+                    <li><span class="func-name">vg_progressbar_get_value(pb_id)</span><span class="func-desc">获取进度</span></li>
+                    <li><span class="func-name">vg_progressbar_set_color(pb_id, color)</span><span class="func-desc">设置颜色</span></li>
+                </ul>
+            </div>
+        </div>
+        <div class="component-card">
+            <div class="card-header">卡片方法</div>
+            <div class="card-body">
+                <ul class="func-list">
+                    <li><span class="func-name">vg_create_card(x, y, w, h, title, subtitle)</span><span class="func-desc">创建卡片</span></li>
+                    <li><span class="func-name">vg_card_set_title(card_id, title)</span><span class="func-desc">设置标题</span></li>
+                    <li><span class="func-name">vg_card_set_elevation(card_id, elevation)</span><span class="func-desc">设置阴影深度</span></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+   
+    <h2 class="section-title">📋 下拉框 (ComboBox) 与 列表框 (ListBox)</h2>
+    <div class="component-grid">
+        <div class="component-card">
+            <div class="card-header">下拉框方法</div>
+            <div class="card-body">
+                <ul class="func-list">
+                    <li><span class="func-name">vg_create_combobox(x, y, w, h)</span><span class="func-desc">创建下拉框</span></li>
+                    <li><span class="func-name">vg_combobox_add_item(combo_id, item)</span><span class="func-desc">添加选项</span></li>
+                    <li><span class="func-name">vg_combobox_clear(combo_id)</span><span class="func-desc">清空选项</span></li>
+                    <li><span class="func-name">vg_combobox_set_selected(combo_id, index)</span><span class="func-desc">设置选中项</span></li>
+                    <li><span class="func-name">vg_combobox_get_selected(combo_id)</span><span class="func-desc">获取选中索引</span></li>
+                    <li><span class="func-name">vg_combobox_on_selected(combo_id, callback)</span><span class="func-desc">绑定选择回调</span></li>
+                </ul>
+            </div>
+        </div>
+        <div class="component-card">
+            <div class="card-header">列表框方法</div>
+            <div class="card-body">
+                <ul class="func-list">
+                    <li><span class="func-name">vg_create_listbox(x, y, w, h)</span><span class="func-desc">创建列表框</span></li>
+                    <li><span class="func-name">vg_listbox_add_item(list_id, item)</span><span class="func-desc">添加项</span></li>
+                    <li><span class="func-name">vg_listbox_clear(list_id)</span><span class="func-desc">清空项</span></li>
+                    <li><span class="func-name">vg_listbox_set_selected(list_id, index)</span><span class="func-desc">设置选中项</span></li>
+                    <li><span class="func-name">vg_listbox_get_selected(list_id)</span><span class="func-desc">获取选中索引</span></li>
+                    <li><span class="func-name">vg_listbox_on_selected(list_id, callback)</span><span class="func-desc">绑定选择回调</span></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    
+    <h2 class="section-title"> 标签页 (TabControl) 与  加载动画 (Spinner)</h2>
+    <div class="component-grid">
+        <div class="component-card">
+            <div class="card-header">标签页方法</div>
+            <div class="card-body">
+                <ul class="func-list">
+                    <li><span class="func-name">vg_create_tabcontrol(x, y, w, h)</span><span class="func-desc">创建标签页控件</span></li>
+                    <li><span class="func-name">vg_tabcontrol_add_tab(tab_id, title)</span><span class="func-desc">添加标签页</span></li>
+                    <li><span class="func-name">vg_tabcontrol_set_selected(tab_id, index)</span><span class="func-desc">切换标签页</span></li>
+                </ul>
+            </div>
+        </div>
+        <div class="component-card">
+            <div class="card-header">动画方法</div>
+            <div class="card-body">
+                <ul class="func-list">
+                    <li><span class="func-name">vg_create_spinner(x, y, w, h)</span><span class="func-desc">创建加载动画</span></li>
+                    <li><span class="func-name">vg_spinner_start(spinner_id)</span><span class="func-desc">启动动画</span></li>
+                    <li><span class="func-name">vg_spinner_stop(spinner_id)</span><span class="func-desc">停止动画</span></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    
+    <h2 class="section-title">🔧 通用组件操作</h2>
+    <div class="component-grid">
+        <div class="component-card">
+            <div class="card-header">通用方法</div>
+            <div class="card-body">
+                <ul class="func-list">
+                    <li><span class="func-name">vg_set_position(obj_id, x, y)</span><span class="func-desc">设置位置</span></li>
+                    <li><span class="func-name">vg_set_size(obj_id, width, height)</span><span class="func-desc">设置大小</span></li>
+                    <li><span class="func-name">vg_set_visible(obj_id, visible)</span><span class="func-desc">设置可见性</span></li>
+                    <li><span class="func-name">vg_set_enabled(obj_id, enabled)</span><span class="func-desc">设置启用状态</span></li>
+                    <li><span class="func-name">vg_destroy(obj_id)</span><span class="func-desc">销毁组件</span></li>
+                </ul>
+            </div>
+        </div>
+        <div class="component-card">
+            <div class="card-header">示例代码</div>
+            <div class="card-body">
+                <div class="code-block" style="padding: 0.8rem;">
+                    <pre><span class="comment">// 移动按钮到新位置</span>
+<span class="keyword">vg_set_position</span>(btn, <span class="number">100</span>, <span class="number">200</span>);
+
+<span class="comment">// 隐藏组件</span>
+<span class="keyword">vg_set_visible</span>(btn, <span class="keyword">false</span>);
+
+<span class="comment">// 禁用组件（变灰不可点击）</span>
+<span class="keyword">vg_set_enabled</span>(btn, <span class="keyword">false</span>);</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+   
+    <h2 class="section-title"> 回调函数说明</h2>
+
+    <h3>1. 事件自带的参数</h3>
+    <p>每种控件触发时，VM 会自动往回调后面追加固定的几个参数。这一列是<strong>写死在 C++ 里的</strong>，
+       不是你能改的约定：</p>
+    <table class="callback-table">
+        <thead>
+            <tr><th>组件</th><th>绑定函数</th><th>回调函数签名</th><th>事件追加的参数</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>按钮</td><td class="callback-signature">vg_button_on_click</td><td class="callback-signature">any_t func on_click()</td><td>（无）</td></tr>
+            <tr><td>复选框</td><td class="callback-signature">vg_checkbox_on_changed</td><td class="callback-signature">any_t func on_changed(checked)</td><td>checked: bool — 勾选后的新状态</td></tr>
+            <tr><td>开关</td><td class="callback-signature">vg_toggle_on_changed</td><td class="callback-signature">any_t func on_changed(checked)</td><td>checked: bool — 切换后的新状态</td></tr>
+            <tr><td>滑块</td><td class="callback-signature">vg_slider_on_changed</td><td class="callback-signature">any_t func on_changed(value)</td><td>value: number — 当前值</td></tr>
+            <tr><td>下拉框</td><td class="callback-signature">vg_combobox_on_selected</td><td class="callback-signature">any_t func on_selected(index, text)</td><td>index: number（从 0 起）, text: string</td></tr>
+            <tr><td>列表框</td><td class="callback-signature">vg_listbox_on_selected</td><td class="callback-signature">any_t func on_selected(index, text)</td><td>index: number（从 0 起）, text: string</td></tr>
+        </tbody>
+    </table>
+    <div class="note">
+        📌 <strong>只有这 6 个事件。</strong>文本框、进度条、卡片、加载动画、标签页这些控件
+        <strong>没有</strong>任何事件回调——框架里根本没有 <code>vg_textbox_on_*</code> 这种函数。
+        它们的值要在别的回调（比如按钮的 on_click）里用 <code>vg_textbox_get_text()</code>
+        这类函数主动去读。
+    </div>
+
+    <h3>2. 四种绑定写法</h3>
+    <p>绑定函数的第 2 个参数（回调）认下面四种形式，可以混用：</p>
+    <div class="code-block">
+        <pre><span class="comment">// ① 直接给函数值 —— 最常用</span>
+<span class="keyword">vg_button_on_click</span>(btn, on_click);
+
+<span class="comment">// ② 函数 + 预置实参：后面多写的都会在触发时排在事件参数前面</span>
+<span class="keyword">any_t func</span> <span class="function">say</span>(who) { <span class="keyword">output</span>(who); }
+<span class="keyword">vg_button_on_click</span>(btn, say, <span class="string">"你好"</span>);      <span class="comment">// 点一下 → say("你好")</span>
+
+<span class="comment">// ③ 函数引用 &amp;(?)f(...)：编译成 [函数, 参数...] 这样一个数组</span>
+<span class="keyword">vg_button_on_click</span>(btn, &amp;(?)say(<span class="string">"世界"</span>));    <span class="comment">// 点一下 → say("世界")</span>
+
+<span class="comment">// ④ 字符串函数名：触发时再回查函数表</span>
+<span class="keyword">vg_button_on_click</span>(btn, <span class="string">"say"</span>, <span class="string">"字符串写法"</span>);</pre>
+    </div>
+    <div class="tip">
+        <strong>③ 和 ② 可以混着写</strong>：<code>vg_button_on_click(btn, &amp;(?)f(1), 2)</code>
+        触发时是 <code>f(1, 2)</code>——函数引用自带的排在前面，绑定点后面多写的接在它后面。
+    </div>
+
+    <h3>3. 参数顺序：绑定参数在前，事件参数在后</h3>
+    <p>触发的那一刻，VM 拼出来的实参表永远是这个顺序：</p>
+    <div class="code-block">
+        <pre><span class="comment">[ 绑定时预置的参数... ] + [ 事件自带的参数... ]</span>
+
+<span class="comment">// 例：滑块 + 一个预置参数</span>
+<span class="keyword">any_t func</span> <span class="function">on_vol</span>(name, value) {
+    <span class="keyword">output</span>(name);      <span class="comment">// "音量"   ← 绑定时给的</span>
+    <span class="keyword">output</span>(value);     <span class="comment">// 0.7      ← 滑块自己带的</span>
+}
+<span class="keyword">vg_slider_on_changed</span>(sl, on_vol, <span class="string">"音量"</span>);
+
+<span class="comment">// 例：下拉框 + 两个预置参数 → on_pick(a, b, index, text)</span>
+<span class="keyword">vg_combobox_on_selected</span>(cb, on_pick, <span class="string">"A"</span>, <span class="string">"B"</span>);</pre>
+    </div>
+
+    <div class="note" style="border-left:4px solid #fbbf24;background:rgba(251,191,36,.10);">
+        ⚠️ <strong>最容易踩的坑：参数多了是从「前面」丢，不是从后面丢。</strong><br>
+        QOT 的函数调用允许实参比形参多，多出来的会<strong>从头部开始丢弃</strong>，只保留最后 N 个。
+        所以下面这段不会报错，但结果和你想的相反：
+        <div class="code-block" style="margin:.6rem 0;">
+            <pre><span class="keyword">any_t func</span> <span class="function">on_pick</span>(index) { <span class="keyword">output</span>(index); }
+<span class="keyword">vg_combobox_on_selected</span>(cb, on_pick);   <span class="comment">// 实际传入 (index, text)，多了 1 个</span>
+<span class="comment">// → 前面的 index 被丢掉，形参 index 收到的其实是 text！</span></pre>
+        </div>
+        <strong>对策</strong>：形参个数一定要写满（绑定参数 + 事件参数），宁可写一个用不上的形参占位，
+        也不要少写。参见 <a href="doc.html#gui-event">语言文档 §22.2</a>。
+    </div>
+
+    <h3>4. 其它注意事项</h3>
+    <div class="note">
+        ⚠️ <strong>注意</strong>：回调函数是在 GUI 事件循环中被调用的，不要在里面执行耗时操作或阻塞等待，
+        否则会导致界面卡顿。如需执行耗时任务，建议使用异步方式或在回调中只做轻量级操作。
+    </div>
+    <div class="tip">
+        <ul style="margin-left:1.5rem;">
+            <li>绑定存的是<strong>函数值本身</strong>，不是名字。所以同名的嵌套函数不会互相顶掉
+                （写法 ④ 的字符串除外，它是靠名字回查函数表的）。QOT 没有匿名函数，
+                回调必须是一个具名 <code>func</code>。</li>
+            <li>同一个控件<strong>重复绑定会覆盖</strong>，只有最后一次生效，不会累积成多个监听器。</li>
+            <li>要跨回调保存状态，直接用<strong>顶层 <code>var</code> 全局变量</strong>就行——
+                VM 上函数内部对全局变量的赋值是<strong>生效</strong>的（这一点和 Python 解释器相反，
+                见 <a href="doc.html#runtime-diff">语言文档 §21</a>）。</li>
+            <li>回调必须在 <code>vg_run()</code> <strong>之前</strong>绑定好；<code>vg_run()</code>
+                会一直阻塞到窗口关闭。</li>
+        </ul>
+    </div>
+
+
+    <h2 class="section-title">🎨 颜色格式说明</h2>
+    <div class="color-demo">
+        <div><div class="color-box" style="background: rgba(139, 92, 246, 1);"></div><div class="color-label">紫色 [0.55, 0.36, 0.96, 1]</div></div>
+        <div><div class="color-box" style="background: rgba(96, 165, 250, 1);"></div><div class="color-label">蓝色 [0.38, 0.65, 0.98, 1]</div></div>
+        <div><div class="color-box" style="background: rgba(52, 211, 153, 1);"></div><div class="color-label">绿色 [0.2, 0.83, 0.6, 1]</div></div>
+        <div><div class="color-box" style="background: rgba(248, 113, 113, 1);"></div><div class="color-label">红色 [0.97, 0.44, 0.44, 1]</div></div>
+        <div><div class="color-box" style="background: rgba(251, 191, 36, 1);"></div><div class="color-label">黄色 [0.98, 0.75, 0.14, 1]</div></div>
+    </div>
+
+    <div class="code-block" style="margin-bottom: 1rem;">
+        <pre><span class="comment">// 颜色使用数组 [r, g, b, a]，取值范围 0-1</span>
+颜色 = [<span class="number">1.0</span>, <span class="number">0.0</span>, <span class="number">0.0</span>, <span class="number">1.0</span>]      <span class="comment">// 纯红色</span>
+半透明蓝 = [<span class="number">0.2</span>, <span class="number">0.4</span>, <span class="number">0.8</span>, <span class="number">0.5</span>]    <span class="comment">// 半透明蓝色</span>
+主题蓝 = [<span class="number">0.2</span>, <span class="number">0.6</span>, <span class="number">1.0</span>, <span class="number">1.0</span>]       <span class="comment">// QTC 主题蓝色</span></pre>
+    </div>
+
+    <div class="note">
+        ⚠️ <strong>颜色只认数组，不认别的。</strong>
+        <ul style="margin:.5rem 0 0 1.5rem;">
+            <li>传字符串（<code>"#ff0000"</code>、<code>"red"</code>）、数字、<code>null</code>——
+                <strong>一律当成不透明黑色 [0,0,0,1]</strong>，不报错、不警告。</li>
+            <li>数组少于 4 个元素时，缺的 r/g/b 补 <strong>0</strong>，缺的 a 补 <strong>1</strong>。
+                所以 <code>[1, 0, 0]</code> 就是不透明纯红，可以省掉 alpha。</li>
+            <li>取值范围是 <strong>0–1 的小数</strong>，不是 0–255。写 <code>[255, 0, 0, 1]</code>
+                也不会报错，只是被显卡钳到最亮，等价于 <code>[1,0,0,1]</code>。</li>
+        </ul>
+    </div>
+
+    <hr>
+
+    
+    <h2 class="section-title">📦 完整示例：登录界面</h2>
+    <div class="quick-start">
+        <div class="code-block">
+            <pre><span class="comment">// ========== 登录界面示例 ==========</span>
+
+<span class="keyword">vg_init</span>();
+
+var window = <span class="keyword">vg_create_window</span>(<span class="string">"登录"</span>, <span class="number">400</span>, <span class="number">300</span>);
+
+<span class="comment">// 渐变背景（窗口函数不传 window ID）</span>
+var start = [<span class="number">0.08</span>, <span class="number">0.08</span>, <span class="number">0.15</span>, <span class="number">1</span>];
+var end   = [<span class="number">0.12</span>, <span class="number">0.10</span>, <span class="number">0.20</span>, <span class="number">1</span>];
+<span class="keyword">vg_set_window_bg_gradient</span>(start, end);
+
+<span class="comment">// 用户名输入框</span>
+var username = <span class="keyword">vg_create_textbox</span>(<span class="number">100</span>, <span class="number">80</span>, <span class="number">200</span>, <span class="number">35</span>, <span class="string">"用户名"</span>);
+
+<span class="comment">// 密码输入框</span>
+var password = <span class="keyword">vg_create_textbox</span>(<span class="number">100</span>, <span class="number">130</span>, <span class="number">200</span>, <span class="number">35</span>, <span class="string">"密码"</span>);
+
+<span class="comment">// 登录按钮</span>
+var login_btn = <span class="keyword">vg_create_button</span>(<span class="number">100</span>, <span class="number">190</span>, <span class="number">90</span>, <span class="number">35</span>, <span class="string">"登录"</span>);
+var cancel_btn = <span class="keyword">vg_create_button</span>(<span class="number">210</span>, <span class="number">190</span>, <span class="number">90</span>, <span class="number">35</span>, <span class="string">"取消"</span>);
+
+<span class="comment">// 登录逻辑</span>
+<span class="keyword">any_t func</span> <span class="function">do_login</span>() {
+    var user = <span class="keyword">vg_textbox_get_text</span>(username);
+    var pwd  = <span class="keyword">vg_textbox_get_text</span>(password);
+    
+    <span class="keyword">if</span> (user == <span class="string">"admin"</span> &amp;&amp; pwd == <span class="string">"123456"</span>) {
+        <span class="keyword">output</span>(<span class="string">"登录成功！"</span>);
+    } <span class="keyword">else</span> {
+        <span class="keyword">output</span>(<span class="string">"用户名或密码错误"</span>);
+    }
+}
+
+<span class="keyword">any_t func</span> <span class="function">do_cancel</span>() {
+    <span class="keyword">vg_textbox_set_text</span>(username, <span class="string">""</span>);
+    <span class="keyword">vg_textbox_set_text</span>(password, <span class="string">""</span>);
+}
+
+<span class="keyword">vg_button_on_click</span>(login_btn, do_login);
+<span class="keyword">vg_button_on_click</span>(cancel_btn, do_cancel);
+
+<span class="keyword">vg_show_window</span>();
+<span class="keyword">vg_run</span>();
+<span class="keyword">vg_uninit</span>();</pre>
+        </div>
+        <div class="code-block" style="margin-top:.8rem;">
+            <pre><span class="comment">// 把上面的代码存成 login.qot，然后：</span>
+python index.py bstrust compile login.qot login.qtc
+python index.py bstrust run login.qtc</pre>
+        </div>
+    </div>
+
+    <div class="tip">
+         <strong>最佳实践</strong>：
+        <ul style="margin-top: 0.5rem; margin-left: 1.5rem;">
+            <li><code>vg_init()</code> → <code>vg_create_window()</code> → 建控件 → 绑事件 →
+                <code>vg_show_window()</code> → <code>vg_run()</code>，顺序不能乱。
+                窗口没建之前建控件，只会拿到 <code>null</code>，而且不报错。</li>
+            <li>对象 ID 是字符串，一定要用变量接住；<code>vg_create_*</code> 失败时返回的是 <code>null</code>，
+                拿去调后续函数只会静默返回 <code>false</code>。</li>
+            <li>回调形参个数写满（绑定参数 + 事件参数），少写会<strong>从前面丢参数</strong>。</li>
+            <li>回调里可以放心读写顶层 <code>var</code> 全局变量，VM 上是生效的。</li>
+            <li>回调函数尽量简短，避免阻塞界面。</li>
+            <li>颜色值建议定义变量复用，便于统一修改主题。</li>
+            <li>程序退出前记得调用 <code>vg_uninit()</code> 释放资源。</li>
+            <li><code>vg_destroy(obj_id)</code> <strong>只是把 ID 从对象表里摘掉，控件本身还留在窗口上</strong>
+                （C++ 里那段释放逻辑是空的）。要让控件消失，用
+                <code>vg_set_visible(obj_id, false)</code>。</li>
+        </ul>
+    </div>
+    <hr>
+    <div style="text-align: center; padding: 1rem 0; color: #6b7280; font-size: 0.8rem;">
+        QTC GUI-Vgui v1.0 | 基于 Direct2D 的现代图形界面
+    </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FUNC分析 - DLL导出函数分析工具</title>
+    <style>
+        ::-webkit-scrollbar{
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-thumb{
+            background-color: #ccc;
+            border-radius: 8px;
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Microsoft YaHei', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            transition: all 0.3s ease;
+        }
+
+        body {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 0 20px;
+            background: linear-gradient(135deg, #f0f9ff 0%, #e6f7ff 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 8px 30px rgba(100, 160, 255, 0.15);
+            margin-top: 30px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .container::before {
+            content: '';
+            position: absolute;
+            top: -20px;
+            right: -20px;
+            width: 120px;
+            height: 120px;
+            background: rgba(255, 180, 200, 0.1);
+            border-radius: 50%;
+            z-index: 0;
+        }
+
+        .container::after {
+            content: '';
+            position: absolute;
+            bottom: -30px;
+            left: -30px;
+            width: 150px;
+            height: 150px;
+            background: rgba(120, 200, 255, 0.1);
+            border-radius: 50%;
+            z-index: 0;
+        }
+
+        h1 {
+            color: #4a89dc;
+            margin-bottom: 25px;
+            text-align: center;
+            font-size: 28px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            position: relative;
+            z-index: 1;
+        }
+
+        .upload-area {
+            border: 2px dashed #b3d1ff;
+            border-radius: 16px;
+            padding: 50px 20px;
+            text-align: center;
+            margin-bottom: 30px;
+            cursor: pointer;
+            background-color: #f9fbff;
+            position: relative;
+            z-index: 1;
+        }
+
+        .upload-area:hover {
+            border-color: #6ba5ff;
+            background-color: #f0f7ff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(107, 165, 255, 0.1);
+        }
+
+        .upload-area.active {
+            border-color: #8cd58c;
+            background-color: #f6fff6;
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        .upload-text {
+            color: #5d7fa3;
+            font-size: 18px;
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+            color: #6ba5ff;
+        }
+
+        .result-area {
+            margin-top: 30px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #f0f5ff;
+        }
+
+        .result-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #3a6fc9;
+            display: flex;
+            align-items: center;
+        }
+
+        .result-title::before {
+            content: '📊';
+            margin-right: 8px;
+        }
+
+        .export-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .export-table th,
+        .export-table td {
+            border: 1px solid #f0f5ff;
+            padding: 14px 15px;
+            text-align: left;
+        }
+
+        .export-table th {
+            background-color: #f5f8ff;
+            font-weight: 600;
+            color: #4a76a8;
+            position: sticky;
+            top: 0;
+        }
+
+        .export-table tr:hover {
+            background-color: #f9fbff;
+            transform: translateX(3px);
+        }
+
+        .empty-tip {
+            text-align: center;
+            padding: 40px 30px;
+            color: #99b3cc;
+            font-size: 16px;
+        }
+
+        .error-tip {
+            color: #ff6b6b;
+            margin-top: 10px;
+            text-align: center;
+            padding: 10px;
+            border-radius: 8px;
+            background-color: #fff5f5;
+            display: none;
+        }
+
+        .error-tip.show {
+            display: block;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            background-color: #6ba5ff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 15px;
+            display: inline-flex;
+            align-items: center;
+            box-shadow: 0 4px 12px rgba(107, 165, 255, 0.3);
+        }
+
+        .btn:hover {
+            background-color: #5294ff;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(107, 165, 255, 0.4);
+        }
+
+        .btn::before {
+            content: '💾';
+            margin-right: 6px;
+        }
+
+        .file-info {
+            margin-top: 15px;
+            color: #6d8dad;
+            font-size: 14px;
+            padding: 8px 12px;
+            background-color: #f0f7ff;
+            border-radius: 8px;
+            display: inline-block;
+        }
+
+        
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+
+        .floating {
+            animation: float 6s ease-in-out infinite;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            color: #99b3cc;
+            font-size: 14px;
+            position: relative;
+            z-index: 1;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1 class="floating">外部库FUNC文件生成</h1>
+        <div class="upload-area" id="upload-area">
+            <input type="file" id="file-input" accept=".h,.hpp,.cpp,.c" />
+            <div class="upload-icon">📂</div>
+            <div class="upload-text">
+                <p>点击或拖拽文件到此处上传</p>
+                <p style="font-size: 13px; margin-top: 8px;">支持格式：.h</p>
+            </div>
+            <div class="file-info" id="file-info"></div>
+        </div>
+
+        <div class="result-area" id="result-area" style="display: none;">
+            <div class="result-header">
+                <div class="result-title">导出函数分析结果</div>
+                <button class="btn" style="margin-left: 530px;" id="export-btn">导出结果(CSV)</button>
+                <button class="btn" id="export-btn2">导出结果(FUNC)</button>
+            </div>
+            <table class="export-table">
+                <thead>
+                    <tr>
+                        <th>序号</th>
+                        <th>返回类型</th>
+                        <th>函数名</th>
+                        <th>参数列表</th>
+                    </tr>
+                </thead>
+                <tbody id="result-body">
+                </tbody>
+            </table>
+        </div>
+
+        <div class="error-tip" id="error-tip"></div>
+    </div>
+
+   
+
+    <script src="run.js"></script>
+</body>
+
+</html>

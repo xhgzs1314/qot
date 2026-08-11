@@ -1,0 +1,15 @@
+MusicPlayer_Create||ptr
+MusicPlayer_Destroy|ptr|void
+MusicPlayer_Open|ptr,str|int
+MusicPlayer_Close|ptr|void
+MusicPlayer_Play|ptr|void
+MusicPlayer_Pause|ptr|void
+MusicPlayer_Resume|ptr|void
+MusicPlayer_Stop|ptr|void
+MusicPlayer_Seek|ptr,int|void
+MusicPlayer_GetState|ptr|int
+MusicPlayer_GetPosition|ptr|int
+MusicPlayer_GetDuration|ptr|int
+MusicPlayer_IsPlaying|ptr|int
+MusicPlayer_SetVolume|ptr,int|void
+MusicPlayer_GetVolume|ptr|int

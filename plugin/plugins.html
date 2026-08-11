@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>插件列表</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="assets/unified.css">
+    <style>
+        .plugins-container {
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .plugins-title {
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        .plugins-subtitle {
+            color: #64748b;
+            margin-bottom: 2rem;
+        }
+        .plugin-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1.25rem;
+        }
+        .plugin-card {
+            background: white;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            padding: 1.5rem;
+            text-decoration: none;
+            display: block;
+            transition: all 0.2s;
+        }
+        .plugin-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 24px -12px rgba(0,0,0,0.15);
+            border-color: #6366f1;
+        }
+        .plugin-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, #818cf8, #6366f1);
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1rem;
+        }
+        .plugin-icon i {
+            font-size: 1.4rem;
+            color: white;
+        }
+        .plugin-card h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #1e293b;
+        }
+        .plugin-card p {
+            font-size: 0.85rem;
+            color: #64748b;
+            margin-bottom: 1rem;
+        }
+        .plugin-btn {
+            display: inline-block;
+            padding: 0.4rem 1rem;
+            background: #6366f1;
+            color: white;
+            border-radius: 30px;
+            font-size: 0.8rem;
+        }
+    </style>
+</head>
+<body style="background: #f8fafc;">
+    <div class="plugins-container">
+        <h1 class="plugins-title"> 插件列表</h1>
+        <p class="plugins-subtitle">扩展 QOT 功能的工具集合</p>
+        <div class="plugin-cards">
+            <a href="qotcommandbuild/" class="plugin-card">
+                <div class="plugin-icon"><i class="fas fa-hammer"></i></div>
+                <h3>Qot-Building-Command</h3>
+                <p>QOT编译命令构建</p>
+                <span class="plugin-btn">访问 →</span>
+            </a>
+            <a href="pycodetoqotcode/" class="plugin-card">
+                <div class="plugin-icon"><i class="fas fa-code-branch"></i></div>
+                <h3>PyCode-QotCode</h3>
+                <p>Python代码转QOT代码</p>
+                <span class="plugin-btn">访问 →</span>
+            </a>
+            <a href="qtcodeanalysis/" class="plugin-card">
+                <div class="plugin-icon"><i class="fas fa-chart-simple"></i></div>
+                <h3>QTC字节码分析器</h3>
+                <p>QTC字节码分析器</p>
+                <span class="plugin-btn">访问 →</span>
+            </a>
+            <a href="shellcode/" class="plugin-card">
+                <div class="plugin-icon"><i class="fas fa-shield"></i></div>
+                <h3>ShellCode签名</h3>
+                <p>ShellCode签名工具</p>
+                <span class="plugin-btn">访问 →</span>
+            </a>
+            <a href="vsgds/" class="plugin-card">
+                <div class="plugin-icon"><i class="fas fa-palette"></i></div>
+                <h3>GUI-Design</h3>
+                <p>可视化GUI设计</p>
+                <span class="plugin-btn">访问 →</span>
+            </a>
+            <a href="signpack/" class="plugin-card">
+                <div class="plugin-icon"><i class="fas fa-signature"></i></div>
+                <h3>外部库签名工具</h3>
+                <p>外部库签名工具</p>
+                <span class="plugin-btn">访问 →</span>
+            </a>
+            <a href="packfuncauto/" class="plugin-card">
+                <div class="plugin-icon"><i class="fas fa-file-alt"></i></div>
+                <h3>外部库FUNC文件生成</h3>
+                <p>无需手写FUNC配置</p>
+                <span class="plugin-btn">访问 →</span>
+            </a>
+        </div>
+    </div>
+</body>
+</html>

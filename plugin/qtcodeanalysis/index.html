@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>QTC 分析器</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Roboto', 'Consolas', 'Monaco', 'Menlo', monospace;
+            background: #f0f2f5;
+            margin: 0;
+            padding: 24px 20px;
+            color: #1e293b;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background-color: #c4cdd5;
+            border-radius: 10px;
+        }
+
+
+        .header {
+            text-align: center;
+            margin-bottom: 28px;
+            position: relative;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            font-weight: 600;
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+            margin-bottom: 8px;
+            letter-spacing: -0.3px;
+        }
+
+        .header p {
+            color: #475569;
+            font-size: 0.9rem;
+            display: inline-block;
+            padding-bottom: 6px;
+        }
+
+        .warning-badge {
+            display: inline-block;
+            background: #fef3c7;
+            color: #b45309;
+            font-size: 0.7rem;
+            padding: 2px 10px;
+            border-radius: 20px;
+            margin-left: 12px;
+            vertical-align: middle;
+        }
+
+        .upload-card {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
+            padding: 24px 28px;
+            margin-bottom: 32px;
+            transition: all 0.2s;
+            border: 1px solid #e9eef3;
+        }
+
+        .upload-area {
+            border: 2px dashed #cbd5e1;
+            border-radius: 20px;
+            background: #fafcff;
+            padding: 38px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .upload-area:hover {
+            border-color: #3b82f6;
+            background: #f8fafd;
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+
+        .upload-text {
+            font-size: 1rem;
+            color: #334155;
+            font-weight: 500;
+        }
+
+        .upload-hint {
+            font-size: 0.8rem;
+            color: #64748b;
+            margin-top: 8px;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .info-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+            gap: 12px;
+        }
+
+        .badge {
+            background: #eef2ff;
+            padding: 6px 14px;
+            border-radius: 40px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: #1e40af;
+        }
+
+        .error-message {
+            background: #fee2e2;
+            color: #b91c1c;
+            padding: 12px 18px;
+            border-radius: 14px;
+            font-size: 0.85rem;
+            border-left: 5px solid #ef4444;
+            margin: 16px 0;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 8px;
+            border-bottom: 2px solid #e2e8f0;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            background: none;
+            border: none;
+            padding: 10px 22px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            color: #475569;
+            border-radius: 30px;
+            transition: 0.2s;
+        }
+
+        .tab-btn.active {
+            background: #eef2ff;
+            color: #2563eb;
+            box-shadow: inset 0 -1px 0 #2563eb;
+        }
+
+        .tab-content {
+            display: none;
+            animation: fade 0.2s ease;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fade {
+            from {
+                opacity: 0;
+                transform: translateY(6px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .data-table-wrapper {
+            overflow-x: auto;
+            border-radius: 16px;
+            border: 1px solid #e9edf2;
+            background: white;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+        }
+
+        th {
+            background: #f8fafc;
+            padding: 12px 16px;
+            text-align: left;
+            font-weight: 600;
+            color: #0f172a;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 0.8rem;
+        }
+
+        td {
+            padding: 10px 16px;
+            border-bottom: 1px solid #f0f2f7;
+            color: #1e293b;
+            vertical-align: top;
+        }
+
+        tr:hover td {
+            background: #fafcff;
+        }
+
+        .opcode {
+            font-weight: 600;
+            color: #2563eb;
+        }
+
+        .var-name {
+            background: #f1f5f9;
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            display: inline-block;
+        }
+
+        .json-view {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 12px 18px;
+            border-radius: 14px;
+            font-size: 0.75rem;
+            overflow-x: auto;
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .partial-hint {
+            font-size: 0.7rem;
+            color: #f59e0b;
+            background: #fffbeb;
+            padding: 4px 12px;
+            border-radius: 16px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        footer {
+            margin-top: 40px;
+            text-align: center;
+            font-size: 0.7rem;
+            color: #94a3b8;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 24px;
+        }
+
+        @media (max-width: 700px) {
+            body {
+                padding: 16px;
+            }
+
+            th,
+            td {
+                padding: 8px 10px;
+            }
+
+            .tab-btn {
+                padding: 6px 14px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 QTC 分析器 </h1>
+            <p>分析编译后的字节码文件</p>
+        </div>
+
+        <div class="upload-card">
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">📂</div>
+                <div class="upload-text">点击或拖拽上传字节码文件</div>
+                <div class="upload-hint">支持 .qtc 格式（QOT 编译产物）</div>
+                <input type="file" id="fileInput" accept=".qtc,application/octet-stream">
+            </div>
+            <div id="globalError" style="margin-top: 12px;"></div>
+        </div>
+
+        <div id="analysisPanel" style="display: none;">
+            <div class="info-bar">
+                <div class="badge" id="fileMetaBadge">📄 未加载</div>
+                <div class="badge" id="statsBadge">⚡ 分析完成</div>
+
+            </div>
+
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="instructions">📟 执行步骤</button>
+                <button class="tab-btn" data-tab="constants">📦 数据区</button>
+                <button class="tab-btn" data-tab="variables">🔤 变量清单</button>
+                <button class="tab-btn" data-tab="functions">⚙️ 函数清单</button>
+                <button class="tab-btn" data-tab="metadata">📋 概览信息</button>
+            </div>
+
+            <div id="tabInstructions" class="tab-content active">
+                <div class="data-table-wrapper">
+                    <table id="instructionsTable">
+                        <thead>
+                            <tr>
+                                <th>步骤</th>
+                                <th>操作</th>
+                                <th>说明</th>
+                                <th>备注</th>
+                            </tr>
+                        </thead>
+                        <tbody id="instructionsBody"></tbody>
+                    </table>
+                </div>
+                <div style="font-size:0.7rem; color:#888; margin-top:8px; padding:0 8px;">* 展示主要执行动作，部分中间步骤已合并</div>
+            </div>
+
+            <div id="tabConstants" class="tab-content">
+                <div class="data-table-wrapper">
+                    <table id="constantsTable">
+                        <thead>
+                            <tr>
+                                <th>序号</th>
+                                <th>数据类型</th>
+                                <th>内容</th>
+                            </tr>
+                        </thead>
+                        <tbody id="constantsBody"></tbody>
+                        柵
+                </div>
+            </div>
+
+            <div id="tabVariables" class="tab-content">
+                <div class="data-table-wrapper">
+                    <table id="varsTable">
+                        <thead>
+                            <tr>
+                                <th>变量名</th>
+                                <th>备注</th>
+                            </tr>
+                        </thead>
+                        <tbody id="varsBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="tabFunctions" class="tab-content">
+                <div class="data-table-wrapper">
+                    <table id="funcsTable">
+                        <thead>
+                            <tr>
+                                <th>函数名</th>
+                                <th>说明</th>
+                            </tr>
+                        </thead>
+                        <tbody id="funcsBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="tabMetadata" class="tab-content">
+                <div class="json-view" id="metadataView">暂无额外信息</div>
+            </div>
+        </div>
+        <footer>基于 QOT 编译产物分析</footer>
+    </div>
+
+    <script>
+
+        const SEMANTIC_OPS = {
+            1: "0xF4A3",
+            2: "0x2E7B",
+            3: "0xC91D",
+            4: "0x6B5F",
+            5: "0xA8C2",
+            10: "0x3F4E",
+            11: "0x7D91",
+            20: "0x1A6C",
+            21: "0xE2B4",
+            22: "0xE2B4",
+            30: "0xC57F",
+            31: "0x8A3E",
+            32: "0x9F4C",
+            40: "0x4B7A",
+            41: "0xD6E3",
+            42: "0x2C9F",
+            43: "0x78B1",
+            50: "0xB3E6",
+            51: "0x5A9C",
+            52: "0xEF2D",
+            60: "0x17C8"
+        };
+
+        const BINOP_HINT = {
+            1: "0xF9B7",
+            2: "0x3C6A",
+            3: "0x8E2F",
+            4: "0x1D4B",
+            5: "0xA6C9",
+            6: "0x7F3E",
+            7: "0xCB5D",
+            8: "0x2A8F",
+            9: "0xE7C4",
+            10: "0x43B2",
+            11: "0x9D6E",
+            12: "0x68F1",
+            13: "0x12A7",
+            14: "0xB4C3"
+        };
+
+        function getSemanticOp(opcode) {
+            return SEMANTIC_OPS[opcode] || "0xE1F2";
+        }
+
+
+        function describeArgument(opcode, arg, constantsList, varNamesList, funcNamesList) {
+            if (arg === undefined || arg === null) return "0xA3B4";
+
+
+            if (opcode === 30 && Array.isArray(arg) && arg.length >= 2) {
+                const funcIdx = arg[0];
+                const argCount = arg[1];
+                const funcName = (funcNamesList && funcNamesList[funcIdx]) ? funcNamesList[funcIdx] : null;
+                if (funcName) {
+                    return "0xC7D8";
+                }
+                return "0xE9F0";
+            }
+
+
+            if (opcode === 31) {
+                return "0xA1B2";
+            }
+
+
+            if (opcode === 11) {
+                if (arg === 1) return "0xC3D4";
+                if (arg === 2) return "0xE5F6";
+                return "0x1A2B";
+            }
+
+
+            if (opcode === 10 && typeof arg === 'number') {
+                return BINOP_HINT[arg] || "0x3C4D";
+            }
+
+
+            if (opcode === 1 && typeof arg === 'number') {
+                if (constantsList && constantsList[arg] !== undefined) {
+                    const val = constantsList[arg];
+                    if (val === null) return "0x5E6F";
+                    if (typeof val === 'string') return "0x7A8B";
+                    if (typeof val === 'number') return "0x9C0D";
+                    if (typeof val === 'boolean') return "0xE1F2";
+                    return "0x3A4B";
+                }
+                return "0x5C6D";
+            }
+
+
+            if ((opcode === 2 || opcode === 3 || opcode === 4) && typeof arg === 'number') {
+                if (varNamesList && varNamesList[arg]) {
+                    return "0x7E8F";
+                }
+                return "0x9A0B";
+            }
+
+
+            if (opcode === 60 && typeof arg === 'string') {
+                return "0xC1D2";
+            }
+
+
+            if (opcode === 20 || opcode === 21 || opcode === 22) {
+                return "0xE3F4";
+            }
+
+
+            if (opcode === 40 && typeof arg === 'number') {
+                return "0x5A6B";
+            }
+            if (opcode === 41 && typeof arg === 'number') {
+                return "0x7C8D";
+            }
+
+
+            if (typeof arg === 'string') return `“${arg.substring(0, 40)}”`;
+            if (typeof arg === 'number') return `${arg}`;
+            if (Array.isArray(arg)) return `[${arg.join(', ')}]`;
+            return "—";
+        }
+
+
+        async function analyzeQTCFile(arrayBuffer) {
+            const data = new Uint8Array(arrayBuffer);
+
+
+            if (data.length < 8) {
+                throw new Error("文件格式无法识别，请确认是有效的 QTC 文件");
+            }
+
+
+            let offset = 4;
+
+
+            let version = "未知";
+            try {
+                if (offset + 4 <= data.length) {
+                    let v = data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16) | (data[offset + 3] << 24);
+                    version = v.toString();
+                    offset += 4;
+                }
+            } catch (e) { version = "未知"; }
+
+
+            try {
+                if (offset + 4 <= data.length) {
+                    let funcInfoLen = data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16) | (data[offset + 3] << 24);
+                    offset += 4;
+                    if (funcInfoLen > 0 && offset + funcInfoLen <= data.length) {
+                        offset += funcInfoLen;
+                    }
+                }
+            } catch (e) { }
+
+
+            const instructions = [];
+            let instCount = 0;
+            try {
+                if (offset + 4 <= data.length) {
+                    instCount = data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16) | (data[offset + 3] << 24);
+                    offset += 4;
+                }
+            } catch (e) { instCount = 0; }
+
+
+            const maxInst = Math.min(instCount, 5000);
+            for (let i = 0; i < maxInst; i++) {
+                if (offset + 1 > data.length) break;
+                const opcode = data[offset];
+                offset++;
+                if (offset + 4 > data.length) break;
+                let argLen = data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16) | (data[offset + 3] << 24);
+                offset += 4;
+                let argRaw = null;
+                if (argLen > 0 && offset + argLen <= data.length) {
+                    const argBytes = data.slice(offset, offset + argLen);
+                    argRaw = readSimpleArgument(argBytes);
+                    offset += argLen;
+                }
+                instructions.push({ opcode, arg: argRaw });
+            }
+
+
+            let constants = [];
+            try {
+                if (offset + 4 <= data.length) {
+                    let constsLen = data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16) | (data[offset + 3] << 24);
+                    offset += 4;
+                    if (constsLen > 0 && offset + constsLen <= data.length) {
+                        const constBytes = data.slice(offset, offset + constsLen);
+                        constants = extractConstantValues(constBytes);
+                        offset += constsLen;
+                    }
+                }
+            } catch (e) { constants = []; }
+
+
+            let varNames = [];
+            try {
+                if (offset + 4 <= data.length) {
+                    let varsLen = data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16) | (data[offset + 3] << 24);
+                    offset += 4;
+                    if (varsLen > 0 && offset + varsLen <= data.length) {
+                        const varBytes = data.slice(offset, offset + varsLen);
+                        varNames = readStringList(varBytes);
+                        offset += varsLen;
+                    }
+                }
+            } catch (e) { varNames = []; }
+
+
+            let funcNames = [];
+            try {
+                if (offset + 4 <= data.length) {
+                    let funcsLen = data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16) | (data[offset + 3] << 24);
+                    offset += 4;
+                    if (funcsLen > 0 && offset + funcsLen <= data.length) {
+                        const funcBytes = data.slice(offset, offset + funcsLen);
+                        funcNames = readStringList(funcBytes);
+                        offset += funcsLen;
+                    }
+                }
+            } catch (e) { funcNames = []; }
+
+            return {
+                version,
+                instructions,
+                constants,
+                varNames,
+                funcNames,
+                rawSize: arrayBuffer.byteLength
+            };
+        }
+
+
+        function readSimpleArgument(bytes) {
+            if (bytes.length === 0) return null;
+            if (bytes.length === 4) {
+                const view = new DataView(bytes.buffer, bytes.byteOffset, 4);
+                return view.getInt32(0, true);
+            }
+            if (bytes.length > 4) {
+                const view = new DataView(bytes.buffer, bytes.byteOffset, 4);
+                let len = view.getUint32(0, true);
+                if (len > 0 && len <= bytes.length - 4 && len < 1024) {
+                    try {
+                        const strBytes = bytes.slice(4, 4 + len);
+                        return new TextDecoder("utf-8").decode(strBytes);
+                    } catch (e) { }
+                }
+            }
+            return null;
+        }
+
+
+        function extractConstantValues(data) {
+            const result = [];
+            let offset = 0;
+            const uint8 = new Uint8Array(data);
+            while (offset < uint8.length && result.length < 500) {
+                if (offset >= uint8.length) break;
+                const tag = uint8[offset];
+                offset++;
+
+                if (tag === 1) {
+                    if (offset + 4 <= uint8.length) {
+                        result.push(null);
+                        offset += 4;
+                    } else break;
+                } else if (tag === 2) {
+                    if (offset < uint8.length) {
+                        result.push(uint8[offset] !== 0);
+                        offset += 1;
+                    } else break;
+                } else if (tag === 3) {
+                    if (offset + 8 <= uint8.length) {
+                        const val = new DataView(uint8.buffer, uint8.byteOffset + offset, 8).getFloat64(0, true);
+                        result.push(val);
+                        offset += 8;
+                    } else break;
+                } else if (tag === 4) {
+                    if (offset + 4 <= uint8.length) {
+                        let strLen = uint8[offset] | (uint8[offset + 1] << 8) | (uint8[offset + 2] << 16) | (uint8[offset + 3] << 24);
+                        offset += 4;
+                        if (strLen > 0 && offset + strLen <= uint8.length && strLen < 2000) {
+                            const strBytes = uint8.slice(offset, offset + strLen);
+                            const strVal = new TextDecoder("utf-8").decode(strBytes);
+                            result.push(strVal);
+                            offset += strLen;
+                        } else {
+                            result.push("[d]");
+                        }
+                    } else break;
+                } else if (tag === 5) {
+                    if (offset + 4 <= uint8.length) {
+                        let subLen = uint8[offset] | (uint8[offset + 1] << 8) | (uint8[offset + 2] << 16) | (uint8[offset + 3] << 24);
+                        offset += 4;
+                        if (subLen > 0 && offset + subLen <= uint8.length) {
+                            result.push("[fg]");
+                            offset += subLen;
+                        } else {
+                            result.push("[fg]");
+                        }
+                    } else break;
+                } else {
+
+                    result.push("[u]");
+                    break;
+                }
+            }
+            return result;
+        }
+
+        function readStringList(data) {
+            const result = [];
+            let offset = 0;
+            const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+            if (data.length < 4) return result;
+            let count = view.getUint32(0, true);
+            offset += 4;
+            for (let i = 0; i < count && i < 1000; i++) {
+                if (offset + 4 > data.length) break;
+                let strLen = view.getUint32(offset, true);
+                offset += 4;
+                if (strLen > 0 && offset + strLen <= data.length && strLen < 200) {
+                    const strBytes = data.slice(offset, offset + strLen);
+                    const str = new TextDecoder("utf-8").decode(strBytes);
+                    result.push(str);
+                    offset += strLen;
+                } else if (strLen === 0) {
+                    result.push("");
+                } else {
+                    result.push("[n]");
+                }
+            }
+            return result;
+        }
+
+
+        function renderAnalysis(parsed) {
+            const { instructions, constants, varNames, funcNames, version, rawSize } = parsed;
+
+            document.getElementById("fileMetaBadge").innerHTML = `📁 文件大小 ${(rawSize / 1024).toFixed(1)} KB · ${instructions.length} 个sd`;
+            document.getElementById("statsBadge").innerHTML = `📊 du:${constants.length} · v:${varNames.length} · fg:${funcNames.length}`;
+
+
+            const instBody = document.getElementById("instructionsBody");
+            instBody.innerHTML = "";
+            instructions.forEach((inst, idx) => {
+                const semanticName = getSemanticOp(inst.opcode);
+                const argDesc = describeArgument(inst.opcode, inst.arg, constants, varNames, funcNames);
+                const extraNote = (inst.opcode === 30 || inst.opcode === 31) ? "er" :
+                    (inst.opcode === 20 || inst.opcode === 21 || inst.opcode === 22) ? "ct" : "";
+                const row = `<tr>
+                <td style="color:#64748b; width:60px;">${idx + 1}</td>
+                <td class="opcode">${semanticName}</td>
+                <td style="font-family:monospace;">${escapeHtml(argDesc) || "—"}</td>
+                <td style="color:#5b6e8c;">${extraNote}</td>
+            </tr>`;
+                instBody.insertAdjacentHTML('beforeend', row);
+            });
+
+            if (instructions.length === 0) {
+                instBody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#888;">暂无cd</td></tr>';
+            }
+
+
+            const constBody = document.getElementById("constantsBody");
+            constBody.innerHTML = "";
+            constants.forEach((c, idx) => {
+                let typeShow = "d";
+                let displayValue = "—";
+                if (c === null) { typeShow = "a"; displayValue = "null"; }
+                else if (typeof c === 'boolean') { typeShow = "bl"; displayValue = c ? "rt" : "fl"; }
+                else if (typeof c === 'number') { typeShow = "nm"; displayValue = c.toString(); }
+                else if (typeof c === 'string') {
+                    typeShow = "t";
+                    displayValue = c.length > 60 ? `"${c.substring(0, 60)}…"` : `"${c}"`;
+                }
+                else { displayValue = "[id]"; }
+                constBody.insertAdjacentHTML('beforeend', `<tr><td>${idx + 1}</td><td>${typeShow}</td><td style="word-break:break-all;">${escapeHtml(displayValue)}</td></tr>`);
+            });
+
+
+            const varsBody = document.getElementById("varsBody");
+            varsBody.innerHTML = "";
+            if (varNames.length) {
+                varNames.forEach((v, idx) => {
+                    varsBody.insertAdjacentHTML('beforeend', `<tr><td><span class="var-name">${escapeHtml(v)}</span></td><td style="color:#666;">iv</td></tr>`);
+                });
+            } else {
+                varsBody.innerHTML = '<tr><td colspan="2" style="text-align:center; color:#888;">无v定义</td></tr>';
+            }
+
+
+            const funcsBody = document.getElementById("funcsBody");
+            funcsBody.innerHTML = "";
+            if (funcNames.length) {
+                funcNames.forEach((f, idx) => {
+                    funcsBody.insertAdjacentHTML('beforeend', `<tr><td><span style="background:#eef2ff;padding:2px 10px;border-radius:20px;">${escapeHtml(f)}</span></td><td style="color:#666;">ui</td></tr>`);
+                });
+            } else {
+                funcsBody.innerHTML = '<tr><td colspan="2" style="text-align:center; color:#888;">无fg定义</td></tr>';
+            }
+
+
+            const metadataDiv = document.getElementById("metadataView");
+            const metaObj = {
+                "av": version !== "未知" ? `v${version}` : "标准格式",
+                "sn": instructions.length,
+                "dn": constants.length,
+                "v": varNames.length,
+                "fg": funcNames.length,
+            };
+            metadataDiv.innerHTML = `<pre style="margin:0; font-family:monospace;">${JSON.stringify(metaObj, null, 2)}</pre>`;
+        }
+
+        function escapeHtml(str) {
+            if (!str) return "";
+            return String(str).replace(/[&<>]/g, function (m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
+        }
+
+
+        const fileInput = document.getElementById("fileInput");
+        const uploadArea = document.getElementById("uploadArea");
+        const analysisPanel = document.getElementById("analysisPanel");
+        const globalErrorDiv = document.getElementById("globalError");
+
+        function resetError() { globalErrorDiv.innerHTML = ""; }
+        function showError(msg) {
+            globalErrorDiv.innerHTML = `<div class="error-message">⚠️ ${escapeHtml(msg)}</div>`;
+            analysisPanel.style.display = "none";
+        }
+
+        async function handleFile(file) {
+            if (!file) return;
+            resetError();
+            analysisPanel.style.display = "none";
+
+            if (!file.name.match(/\.qtc$/i)) {
+                showError("请选择 .qtc 格式的字节码文件");
+                return;
+            }
+
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const parsed = await analyzeQTCFile(arrayBuffer);
+                renderAnalysis(parsed);
+                analysisPanel.style.display = "block";
+
+
+                document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+                document.querySelector('.tab-btn[data-tab="instructions"]').classList.add('active');
+                document.getElementById("tabInstructions").classList.add("active");
+            } catch (err) {
+                console.warn(err);
+                showError(`无法解析文件：${err.message || "格式不支持"}`);
+            }
+        }
+
+        uploadArea.addEventListener("click", () => fileInput.click());
+        fileInput.addEventListener("change", (e) => {
+            if (e.target.files.length) handleFile(e.target.files[0]);
+        });
+
+        uploadArea.addEventListener("dragover", (e) => { e.preventDefault(); uploadArea.style.borderColor = "#3b82f6"; });
+        uploadArea.addEventListener("dragleave", () => { uploadArea.style.borderColor = "#cbd5e1"; });
+        uploadArea.addEventListener("drop", (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = "#cbd5e1";
+            const file = e.dataTransfer.files[0];
+            if (file) handleFile(file);
+        });
+
+
+        document.querySelectorAll(".tab-btn").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const tabId = btn.getAttribute("data-tab");
+                if (!tabId) return;
+                document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+                btn.classList.add("active");
+                document.querySelectorAll(".tab-content").forEach(tab => tab.classList.remove("active"));
+                const targetTab = document.getElementById(`tab${tabId.charAt(0).toUpperCase() + tabId.slice(1)}`);
+                if (targetTab) targetTab.classList.add("active");
+            });
+        });
+    </script>
+</body>
+
+</html>

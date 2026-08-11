@@ -1,0 +1,8 @@
+// arithmetic + precedence, and a comment with a stray quote " should be ignored
+var a = 2 + 3 * 4;      // 14
+var b = (2 + 3) * 4;    // 20
+var c = 2 ^ 10;         // 1024
+output(a);
+output(b);
+output(c);
+output(17 % 5);

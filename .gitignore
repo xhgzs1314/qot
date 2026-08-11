@@ -1,0 +1,7 @@
+__pycache__/
+.vscode/
+build/
+env/
+.vscode/
+example.qot
+example.qtc

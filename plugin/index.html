@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QOT 文档中心</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="assets/unified.css">
+    <style>
+        .plugins-grid {
+            padding: 2rem;
+            background: var(--ifm-background-color);
+            height: 100%;
+            overflow-y: auto;
+        }
+
+        .plugins-title {
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .plugins-subtitle {
+            color: var(--ifm-font-color-secondary);
+            margin-bottom: 2rem;
+            font-size: 0.9rem;
+        }
+
+        .plugin-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 1.25rem;
+        }
+
+        .plugin-card {
+            background: white;
+            border-radius: 16px;
+            border: 1px solid var(--ifm-border-color);
+            padding: 1.5rem;
+            transition: all 0.25s;
+            text-decoration: none;
+            display: block;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .plugin-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--ifm-color-primary);
+            opacity: 0;
+            transition: opacity 0.25s;
+        }
+
+        .plugin-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 24px -12px rgba(0, 0, 0, 0.15);
+            border-color: var(--ifm-color-primary-light);
+        }
+
+        .plugin-card:hover::before {
+            opacity: 1;
+        }
+
+        .plugin-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--ifm-color-primary-light), var(--ifm-color-primary));
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1rem;
+        }
+
+        .plugin-icon i {
+            font-size: 1.4rem;
+            color: white;
+        }
+
+        .plugin-card h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--ifm-font-color-base);
+        }
+
+        .plugin-card p {
+            font-size: 0.85rem;
+            color: var(--ifm-font-color-secondary);
+            margin-bottom: 1.25rem;
+            line-height: 1.5;
+        }
+
+        .plugin-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.4rem 1rem;
+            background: var(--ifm-color-primary);
+            color: white;
+            border-radius: 30px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+
+        .plugin-btn:hover {
+            background: var(--ifm-color-primary-dark);
+            transform: translateX(2px);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="docusaurus-layout">
+        <aside class="docusaurus-sidebar">
+            <div class="sidebar-header">
+                <h1><i class="fas fa-cube"></i> QOT</h1>
+                <p>文档中心</p>
+            </div>
+            <nav class="docusaurus-menu" id="docMenu">
+                <div class="menu-category">
+                    <div class="menu-category-title">入门指南</div>
+                    <a class="menu-item" data-page="doc.html"><i class="fas fa-file-alt"></i> V1-总述</a>
+                    <a class="menu-item" data-page="application.html"><i class="fas fa-rocket"></i> 实战应用</a>
+                </div>
+                <div class="menu-category">
+                    <div class="menu-category-title">语言基础</div>
+                    <a class="menu-item" data-page="function_inside.html"><i class="fas fa-code"></i> 内置函数表 V1</a>
+                    <a class="menu-item" data-page="function_inside2.html"><i class="fas fa-bolt"></i> 内置函数表 V2</a>
+                    <a class="menu-item" data-page="moudle_inside.html"><i class="fas fa-cubes"></i> 模块表</a>
+                    <a class="menu-item" data-page="demos.html"><i class="fas fa-graduation-cap"></i> 学习例子</a>
+                </div>
+                <div class="menu-category">
+                    <div class="menu-category-title">理论基石</div>
+                    <a class="menu-item" data-page="zdw.html"><i class="fas fa-chart-line"></i> 震荡位框架</a>
+                    <a class="menu-item" data-page="zdw-usage.html"><i class="fas fa-chart-line"></i> 震荡位使用指南</a>
+                     <a class="menu-item" data-page="rokzdwvm.html"><i class="fas fa-chart-line"></i> 基于震荡位的VM优化指南</a>
+                </div>
+                <div class="menu-category">
+                    <div class="menu-category-title">扩展开发</div>
+                    <a class="menu-item" data-page="chinese-dsl-guide.html"><i class="fas fa-language"></i> 中文编程扩展</a>
+                    <a class="menu-item" data-page="vm-extension-guide.html"><i class="fas fa-microchip"></i> VM
+                        扩展开发</a>
+                    <a class="menu-item" data-page="vgui-extension.html"><i class="fas fa-window-maximize"></i> Vgui
+                        扩展开发</a>
+                    <a class="menu-item" data-page="funcdoc.html"><i class="fas fa-plug"></i> FUNC 配置文件</a>
+                    <a class="menu-item" data-page="shellcode.html"><i class="fas fa-shield-alt"></i> ShellCode 扩展</a>
+                </div>
+                <div class="menu-category">
+                    <div class="menu-category-title">GUI 开发</div>
+                    <a class="menu-item" data-page="gui_manual.html"><i class="fas fa-paintbrush"></i> GUI 开发手册</a>
+                </div>
+                <div class="menu-category">
+                    <div class="menu-category-title">维护与日志</div>
+                    <a class="menu-item" data-page="logbuildv1.html"><i class="fas fa-history"></i> V1编译器 维护日志</a>
+                    <a class="menu-item" data-page="vmlogs.html"><i class="fas fa-history"></i> QOT-VM 维护日志</a>
+                </div>
+                <div class="menu-category">
+                    <div class="menu-category-title">插件助手</div>
+                    <a class="menu-item" id="show-plugins"><i class="fas fa-puzzle-piece"></i> 插件列表</a>
+                </div>
+            </nav>
+        </aside>
+
+        <main class="docusaurus-content">
+            <div class="loading-overlay" id="loadingOverlay" style="display: none;">
+                <div class="docusaurus-spinner"></div>
+            </div>
+            <iframe id="contentFrame" class="content-iframe" src="doc.html"></iframe>
+        </main>
+    </div>
+
+    <script>
+        const frame = document.getElementById('contentFrame');
+        const loading = document.getElementById('loadingOverlay');
+        const menuItems = document.querySelectorAll('.menu-item[data-page]');
+        const showPluginsBtn = document.getElementById('show-plugins');
+        function loadPlugins() {
+            frame.src = 'about:blank';
+            setTimeout(() => {
+                frame.src = 'plugins.html';  
+            }, 10);
+        }
+
+        function loadPage(url) {
+            frame.src = url;
+        }
+        menuItems.forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                const page = item.getAttribute('data-page');
+                if (page) {
+                    document.querySelectorAll('.menu-item').forEach(i => i.classList.remove('active'));
+                    item.classList.add('active');
+                    loadPage(page);
+                }
+            });
+        });
+
+        showPluginsBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            document.querySelectorAll('.menu-item').forEach(i => i.classList.remove('active'));
+            showPluginsBtn.classList.add('active');
+            loadPlugins();
+        });
+        if (menuItems.length > 0) {
+            menuItems[0].classList.add('active');
+        }
+    </script>
+</body>
+
+</html>

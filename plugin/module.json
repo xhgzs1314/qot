@@ -1,0 +1,870 @@
+[
+    {
+        "n": "textutils",
+        "d": "文本处理模块，提供MD5、SHA256、HMAC、Base64、URL编码、CRC32校验等功能",
+        "f": [
+            {
+                "n": "tul_md5",
+                "d": "计算字符串的MD5哈希值，返回32位十六进制字符串",
+                "p": "string_t, number_t",
+                "r": "string_t",
+                "de": [
+                    "待计算MD5哈希值的字符串",
+                    "字符串的长度"
+                ]
+            },
+            {
+                "n": "tul_b64enc",
+                "d": "对字符串进行Base64编码",
+                "p": "string_t, number_t",
+                "r": "string_t",
+                "de": [
+                    "待进行Base64编码的字符串",
+                    "字符串的长度"
+                ]
+            },
+            {
+                "n": "tul_b64dec",
+                "d": "对Base64编码的字符串进行解码",
+                "p": "string_t",
+                "r": "string_t",
+                "de": [
+                    "待解码的Base64编码字符串"
+                ]
+            },
+            {
+                "n": "tul_sha256",
+                "d": "计算字符串的SHA256哈希值，返回64位十六进制字符串",
+                "p": "string_t, number_t",
+                "r": "string_t",
+                "de": [
+                    "待计算SHA256哈希值的字符串",
+                    "字符串的长度"
+                ]
+            },
+            {
+                "n": "tul_hmac_md5",
+                "d": "使用密钥计算数据的HMAC-MD5哈希值，返回32位十六进制字符串",
+                "p": "string_t, number_t, string_t, number_t",
+                "r": "string_t",
+                "de": [
+                    "密钥字符串",
+                    "密钥长度",
+                    "待哈希的数据字符串",
+                    "数据长度"
+                ]
+            },
+            {
+                "n": "tul_hmac_sha256",
+                "d": "使用密钥计算数据的HMAC-SHA256哈希值，返回64位十六进制字符串",
+                "p": "string_t, number_t, string_t, number_t",
+                "r": "string_t",
+                "de": [
+                    "密钥字符串",
+                    "密钥长度",
+                    "待哈希的数据字符串",
+                    "数据长度"
+                ]
+            },
+            {
+                "n": "tul_urlencode",
+                "d": "对字符串进行URL编码（百分号编码），特殊字符和中文会被转换",
+                "p": "string_t",
+                "r": "string_t",
+                "de": [
+                    "待进行URL编码的字符串"
+                ]
+            },
+            {
+                "n": "tul_urldecode",
+                "d": "对URL编码的字符串进行解码，还原为原始字符串",
+                "p": "string_t",
+                "r": "string_t",
+                "de": [
+                    "待解码的URL编码字符串"
+                ]
+            },
+            {
+                "n": "tul_crc32",
+                "d": "计算数据的CRC32校验值，返回无符号整数",
+                "p": "string_t, number_t",
+                "r": "number_t",
+                "de": [
+                    "待计算CRC32的数据字符串",
+                    "数据长度"
+                ]
+            }
+        ]
+    },
+    {
+        "n": "mysqli",
+        "d": "提供MySQL数据库操作相关功能",
+        "f": [
+            {
+                "n": "MySQLConnect",
+                "d": "建立与MySQL数据库的连接",
+                "p": "string_t",
+                "r": "number_t",
+                "de": [
+                    "连接数据库的参数字符串，格式通常为\"host=主机名;user=用户名;password=密码;dbname=数据库名\""
+                ]
+            },
+            {
+                "n": "MySQLClose",
+                "d": "关闭MySQL数据库连接",
+                "p": "number_t",
+                "r": "number_t",
+                "de": [
+                    "需要关闭的数据库连接标识（由MySQLConnect返回）"
+                ]
+            },
+            {
+                "n": "MySQLExecute",
+                "d": "执行MySQL语句",
+                "p": "number_t, string_t",
+                "r": "long",
+                "de": [
+                    "数据库连接标识",
+                    "要执行的MySQL语句字符串（如INSERT、UPDATE、DELETE等）"
+                ]
+            },
+            {
+                "n": "MySQLQuery",
+                "d": "执行MySQL查询并返回结果",
+                "p": "number_t, string_t",
+                "r": "string_t",
+                "de": [
+                    "数据库连接标识",
+                    "要执行的MySQL查询语句字符串（如SELECT等）"
+                ]
+            },
+            {
+                "n": "MySQLPrepare",
+                "d": "准备MySQL预处理语句",
+                "p": "number_t, string_t, string_t",
+                "r": "long",
+                "de": [
+                    "数据库连接标识",
+                    "预处理语句模板字符串",
+                    "参数类型字符串，用于指定预处理语句中参数的类型"
+                ]
+            },
+            {
+                "n": "MySQLFreeString",
+                "d": "释放MySQL操作返回的字符串资源",
+                "p": "string_t",
+                "r": "void",
+                "de": [
+                    "需要释放的由MySQL操作返回的字符串资源"
+                ]
+            }
+        ]
+    },
+    {
+        "n": "painting",
+        "d": "提供轻量级海龟绘图功能，支持创建窗口、绘制图形、设置画笔属性等操作",
+        "f": [
+            {
+                "n": "Turtle_Create",
+                "d": "创建海龟绘图窗口实例",
+                "p": "int, int, wca",
+                "r": "void",
+                "de": [
+                    "窗口宽度（像素）",
+                    "窗口高度（像素）",
+                    "窗口标题（宽字符字符串）"
+                ]
+            },
+            {
+                "n": "Turtle_Destroy",
+                "d": "销毁海龟绘图窗口实例，释放资源",
+                "p": "void",
+                "r": "void",
+                "de": [
+                    "需要销毁的海龟实例指针"
+                ]
+            },
+            {
+                "n": "Turtle_Forward",
+                "d": "使海龟向前移动指定距离，带动画效果",
+                "p": "void, float, int",
+                "r": "void",
+                "de": [
+                    "海龟实例指针",
+                    "移动的距离（像素）",
+                    "动画步数（-1使用全局速度，0瞬间移动，>0指定步数）"
+                ]
+            },
+            {
+                "n": "Turtle_Backward",
+                "d": "使海龟向后移动指定距离，带动画效果",
+                "p": "void, float, int",
+                "r": "void",
+                "de": [
+                    "海龟实例指针",
+                    "移动的距离（像素）",
+                    "动画步数"
+                ]
+            },
+            {
+                "n": "Turtle_Left",
+                "d": "使海龟向左旋转指定角度，带动画效果",
+                "p": "void, float, int",
+                "r": "void",
+                "de": [
+                    "海龟实例指针",
+                    "旋转角度（度）",
+                    "动画步数"
+                ]
+            },
+            {
+                "n": "Turtle_Right",
+                "d": "使海龟向右旋转指定角度，带动画效果",
+                "p": "void, float, int",
+                "r": "void",
+                "de": [
+                    "海龟实例指针",
+                    "旋转角度（度）",
+                    "动画步数"
+                ]
+            },
+            {
+                "n": "Turtle_Goto",
+                "d": "将海龟移动到指定坐标位置，带动画效果",
+                "p": "void, float, float, int",
+                "r": "void",
+                "de": [
+                    "海龟实例指针",
+                    "目标X坐标",
+                    "目标Y坐标",
+                    "动画步数"
+                ]
+            },
+            {
+                "n": "Turtle_Setx",
+                "d": "设置海龟的X坐标，带动画效果",
+                "p": "void, float, int",
+                "r": "void",
+                "de": [
+                    "海龟实例指针",
+                    "目标X坐标",
+                    "动画步数"
+                ]
+            },
+            {
+                "n": "Turtle_Sety",
+                "d": "设置海龟的Y坐标，带动画效果",
+                "p": "void, float, int",
+                "r": "void",
+                "de": [
+                    "海龟实例指针",
+                    "目标Y坐标",
+                    "动画步数"
+                ]
+            },
+            {
+                "n": "Turtle_Setheading",
+                "d": "设置海龟的朝向角度（绝对角度），带动画效果",
+                "p": "void, float, int",
+                "r": "void",
+                "de": [
+                    "海龟实例指针",
+                    "目标角度（度，0=向右，90=向上）",
+                    "动画步数"
+                ]
+            },
+            {
+                "n": "Turtle_Home",
+                "d": "将海龟移动到窗口中心并重置朝向为0度",
+                "p": "void, int",
+                "r": "void",
+                "de": [
+                    "海龟实例指针",
+                    "动画步数"
+                ]
+            },
+            {
+                "n": "Turtle_Circle",
+                "d": "绘制圆形或圆弧",
+                "p": "void, float, float, int",
+                "r": "void",
+                "de": [
+                    "海龟实例指针",
+                    "半径（正数向左画，负数向右画）",
+                    "圆弧角度（360为完整圆）",
+                    "动画步数"
+                ]
+            },
+            {
+                "n": "Turtle_Dot",
+                "d": "在当前位置绘制一个圆点",
+                "p": "void, float, byte, byte, byte",
+                "r": "void",
+                "de": [
+                    "海龟实例指针",
+                    "圆点直径（-1使用当前画笔大小的2倍）",
+                    "红色分量（0-255）",
+                    "绿色分量（0-255）",
+                    "蓝色分量（0-255）"
+                ]
+            },
+            {
+                "n": "Turtle_SetSpeed",
+                "d": "设置海龟移动速度",
+                "p": "void, int",
+                "r": "void",
+                "de": [
+                    "海龟实例指针",
+                    "速度（0=最快，1=最慢，10=较快）"
+                ]
+            },
+            {
+                "n": "Turtle_Undo",
+                "d": "撤销上一步操作（清空画布）",
+                "p": "void",
+                "r": "void",
+                "de": [
+                    "海龟实例指针"
+                ]
+            },
+            {
+                "n": "Turtle_PenUp",
+                "d": "抬起画笔，移动时不绘制线条",
+                "p": "void",
+                "r": "void",
+                "de": [
+                    "海龟实例指针"
+                ]
+            },
+            {
+                "n": "Turtle_PenDown",
+                "d": "落下画笔，移动时绘制线条",
+                "p": "void",
+                "r": "void",
+                "de": [
+                    "海龟实例指针"
+                ]
+            },
+            {
+                "n": "Turtle_SetPenWidth",
+                "d": "设置画笔宽度",
+                "p": "void, int",
+                "r": "void",
+                "de": [
+                    "海龟实例指针",
+                    "画笔宽度（像素）"
+                ]
+            },
+            {
+                "n": "Turtle_SetPenColor",
+                "d": "设置画笔颜色",
+                "p": "void, byte, byte, byte",
+                "r": "void",
+                "de": [
+                    "海龟实例指针",
+                    "红色分量（0-255）",
+                    "绿色分量（0-255）",
+                    "蓝色分量（0-255）"
+                ]
+            },
+            {
+                "n": "Turtle_SetPenColorByName",
+                "d": "使用颜色名称设置画笔颜色",
+                "p": "void, str",
+                "r": "void",
+                "de": [
+                    "海龟实例指针",
+                    "颜色名称（如 red, green, blue, yellow 等）"
+                ]
+            },
+            {
+                "n": "Turtle_SetFillColor",
+                "d": "设置填充颜色",
+                "p": "void, byte, byte, byte",
+                "r": "void",
+                "de": [
+                    "海龟实例指针",
+                    "红色分量（0-255）",
+                    "绿色分量（0-255）",
+                    "蓝色分量（0-255）"
+                ]
+            },
+            {
+                "n": "Turtle_BeginFill",
+                "d": "开始填充，记录后续绘制的路径",
+                "p": "void",
+                "r": "void",
+                "de": [
+                    "海龟实例指针"
+                ]
+            },
+            {
+                "n": "Turtle_EndFill",
+                "d": "结束填充，用设置的填充颜色填充路径围成的区域",
+                "p": "void",
+                "r": "void",
+                "de": [
+                    "海龟实例指针"
+                ]
+            },
+            {
+                "n": "Turtle_Clear",
+                "d": "清空画布上的所有内容",
+                "p": "void",
+                "r": "void",
+                "de": [
+                    "海龟实例指针"
+                ]
+            },
+            {
+                "n": "Turtle_Reset",
+                "d": "重置海龟状态并清空画布",
+                "p": "void",
+                "r": "void",
+                "de": [
+                    "海龟实例指针"
+                ]
+            },
+            {
+                "n": "Turtle_ClearScreen",
+                "d": "清空画布并重置海龟状态（同Reset）",
+                "p": "void",
+                "r": "void",
+                "de": [
+                    "海龟实例指针"
+                ]
+            },
+            {
+                "n": "Turtle_SetBgColor",
+                "d": "设置窗口背景颜色",
+                "p": "void, byte, byte, byte",
+                "r": "void",
+                "de": [
+                    "海龟实例指针",
+                    "红色分量（0-255）",
+                    "绿色分量（0-255）",
+                    "蓝色分量（0-255）"
+                ]
+            },
+            {
+                "n": "Turtle_ShowTurtle",
+                "d": "显示海龟光标",
+                "p": "void",
+                "r": "void",
+                "de": [
+                    "海龟实例指针"
+                ]
+            },
+            {
+                "n": "Turtle_HideTurtle",
+                "d": "隐藏海龟光标",
+                "p": "void",
+                "r": "void",
+                "de": [
+                    "海龟实例指针"
+                ]
+            },
+            {
+                "n": "Turtle_IsVisible",
+                "d": "判断海龟光标是否可见",
+                "p": "void",
+                "r": "bool",
+                "de": [
+                    "海龟实例指针"
+                ]
+            },
+            {
+                "n": "Turtle_XCor",
+                "d": "获取海龟当前的X坐标",
+                "p": "void",
+                "r": "float",
+                "de": [
+                    "海龟实例指针"
+                ]
+            },
+            {
+                "n": "Turtle_YCor",
+                "d": "获取海龟当前的Y坐标",
+                "p": "void",
+                "r": "float",
+                "de": [
+                    "海龟实例指针"
+                ]
+            },
+            {
+                "n": "Turtle_Heading",
+                "d": "获取海龟当前的朝向角度",
+                "p": "void",
+                "r": "float",
+                "de": [
+                    "海龟实例指针"
+                ]
+            },
+            {
+                "n": "Turtle_Distance",
+                "d": "计算海龟到指定坐标的距离",
+                "p": "void, float, float",
+                "r": "float",
+                "de": [
+                    "海龟实例指针",
+                    "目标X坐标",
+                    "目标Y坐标"
+                ]
+            },
+            {
+                "n": "Turtle_Towards",
+                "d": "计算海龟朝向指定坐标所需的角度",
+                "p": "void, float, float",
+                "r": "float",
+                "de": [
+                    "海龟实例指针",
+                    "目标X坐标",
+                    "目标Y坐标"
+                ]
+            },
+            {
+                "n": "Turtle_IsDown",
+                "d": "判断画笔是否落下（是否在绘制）",
+                "p": "void",
+                "r": "bool",
+                "de": [
+                    "海龟实例指针"
+                ]
+            },
+            {
+                "n": "Turtle_ScreenSize",
+                "d": "调整窗口大小",
+                "p": "void, int, int",
+                "r": "void",
+                "de": [
+                    "海龟实例指针",
+                    "新的窗口宽度",
+                    "新的窗口高度"
+                ]
+            },
+            {
+                "n": "Turtle_SetTitle",
+                "d": "设置窗口标题",
+                "p": "void, wca",
+                "r": "void",
+                "de": [
+                    "海龟实例指针",
+                    "新的窗口标题（宽字符字符串）"
+                ]
+            },
+            {
+                "n": "Turtle_Delay",
+                "d": "延迟指定的毫秒数",
+                "p": "void, int",
+                "r": "void",
+                "de": [
+                    "海龟实例指针",
+                    "延迟时间（毫秒）"
+                ]
+            },
+            {
+                "n": "Turtle_MainLoop",
+                "d": "进入窗口主消息循环，处理窗口事件",
+                "p": "void",
+                "r": "void",
+                "de": [
+                    "海龟实例指针"
+                ]
+            },
+            {
+                "n": "Turtle_ExitOnClick",
+                "d": "等待用户点击窗口后退出",
+                "p": "void",
+                "r": "void",
+                "de": [
+                    "海龟实例指针"
+                ]
+            },
+            {
+                "n": "Turtle_Done",
+                "d": "同 Turtle_MainLoop，进入主消息循环",
+                "p": "void",
+                "r": "void",
+                "de": [
+                    "海龟实例指针"
+                ]
+            },
+            {
+                "n": "Turtle_Write",
+                "d": "在当前位置绘制文本",
+                "p": "void, str, bool, str, int",
+                "r": "void",
+                "de": [
+                    "海龟实例指针",
+                    "要绘制的文本字符串（UTF-8编码）",
+                    "是否在绘制后移动海龟",
+                    "对齐方式（left/center/right）",
+                    "字体大小"
+                ]
+            },
+            {
+                "n": "Turtle_Save",
+                "d": "保存当前画布为图片文件",
+                "p": "void, str",
+                "r": "void",
+                "de": [
+                    "海龟实例指针",
+                    "保存的文件名"
+                ]
+            },
+            {
+                "n": "Turtle_Beep",
+                "d": "播放蜂鸣声",
+                "p": "void, int, int",
+                "r": "void",
+                "de": [
+                    "海龟实例指针",
+                    "声音频率（Hz）",
+                    "持续时间（毫秒）"
+                ]
+            },
+            {
+                "n": "Turtle_Rectangle",
+                "d": "绘制矩形",
+                "p": "void, float, float",
+                "r": "void",
+                "de": [
+                    "海龟实例指针",
+                    "矩形宽度",
+                    "矩形高度"
+                ]
+            },
+            {
+                "n": "Turtle_Square",
+                "d": "绘制正方形",
+                "p": "void, float",
+                "r": "void",
+                "de": [
+                    "海龟实例指针",
+                    "正方形边长"
+                ]
+            },
+            {
+                "n": "Turtle_Star",
+                "d": "绘制五角星",
+                "p": "void, float",
+                "r": "void",
+                "de": [
+                    "海龟实例指针",
+                    "五角星的大小"
+                ]
+            },
+            {
+                "n": "Turtle_Spiral",
+                "d": "绘制螺旋线",
+                "p": "void, float, float, int",
+                "r": "void",
+                "de": [
+                    "海龟实例指针",
+                    "每次旋转的角度步长",
+                    "每次移动的距离增量",
+                    "螺旋的圈数"
+                ]
+            },
+            {
+                "n": "Turtle_Clone",
+                "d": "克隆当前海龟实例",
+                "p": "void",
+                "r": "void",
+                "de": [
+                    "海龟实例指针"
+                ]
+            }
+        ]
+    },
+    {
+        "n": "miaudio",
+        "d": "音乐播放器模块，支持WAV、MP3等格式的音频播放控制",
+        "f": [
+            {
+                "n": "MusicPlayer_Create",
+                "d": "创建播放器实例，返回句柄",
+                "p": "",
+                "r": "void",
+                "de": []
+            },
+            {
+                "n": "MusicPlayer_Destroy",
+                "d": "销毁播放器实例，释放资源",
+                "p": "void",
+                "r": "void",
+                "de": [
+                    "播放器句柄"
+                ]
+            },
+            {
+                "n": "MusicPlayer_Open",
+                "d": "打开音乐文件（支持WAV、MP3等格式）",
+                "p": "void, str",
+                "r": "int",
+                "de": [
+                    "播放器句柄",
+                    "文件路径（UTF-8编码）"
+                ]
+            },
+            {
+                "n": "MusicPlayer_Close",
+                "d": "关闭当前打开的音乐",
+                "p": "void",
+                "r": "void",
+                "de": [
+                    "播放器句柄"
+                ]
+            },
+            {
+                "n": "MusicPlayer_Play",
+                "d": "播放音乐",
+                "p": "void",
+                "r": "void",
+                "de": [
+                    "播放器句柄"
+                ]
+            },
+            {
+                "n": "MusicPlayer_Pause",
+                "d": "暂停播放",
+                "p": "void",
+                "r": "void",
+                "de": [
+                    "播放器句柄"
+                ]
+            },
+            {
+                "n": "MusicPlayer_Resume",
+                "d": "恢复播放（从暂停位置继续）",
+                "p": "void",
+                "r": "void",
+                "de": [
+                    "播放器句柄"
+                ]
+            },
+            {
+                "n": "MusicPlayer_Stop",
+                "d": "停止播放（位置回到开头）",
+                "p": "void",
+                "r": "void",
+                "de": [
+                    "播放器句柄"
+                ]
+            },
+            {
+                "n": "MusicPlayer_Seek",
+                "d": "跳转到指定位置",
+                "p": "void, int",
+                "r": "void",
+                "de": [
+                    "播放器句柄",
+                    "目标位置（毫秒）"
+                ]
+            },
+            {
+                "n": "MusicPlayer_GetState",
+                "d": "获取当前播放状态，返回0=未知 1=播放中 2=已暂停 3=已停止",
+                "p": "void",
+                "r": "int",
+                "de": [
+                    "播放器句柄"
+                ]
+            },
+            {
+                "n": "MusicPlayer_GetPosition",
+                "d": "获取当前播放位置",
+                "p": "void",
+                "r": "int",
+                "de": [
+                    "播放器句柄"
+                ]
+            },
+            {
+                "n": "MusicPlayer_GetDuration",
+                "d": "获取当前音乐总时长",
+                "p": "void",
+                "r": "int",
+                "de": [
+                    "播放器句柄"
+                ]
+            },
+            {
+                "n": "MusicPlayer_IsPlaying",
+                "d": "判断是否正在播放",
+                "p": "void",
+                "r": "int",
+                "de": [
+                    "播放器句柄"
+                ]
+            },
+            {
+                "n": "MusicPlayer_SetVolume",
+                "d": "设置音量（0-1000）",
+                "p": "void, int",
+                "r": "void",
+                "de": [
+                    "播放器句柄",
+                    "音量值（0=静音，1000=最大）"
+                ]
+            },
+            {
+                "n": "MusicPlayer_GetVolume",
+                "d": "获取当前音量",
+                "p": "void",
+                "r": "int",
+                "de": [
+                    "播放器句柄"
+                ]
+            }
+        ]
+    },
+    {
+    "n": "win32",
+    "d": "Windows API 调用模块，提供对 user32、kernel32、gdi32 等系统 DLL 的访问",
+    "f": [
+        {
+            "n": "get_address",
+            "d": "获取 Windows API 函数地址",
+            "p": "str",
+            "r": "ptr",
+            "de": ["函数名称（如 MessageBoxW、CreateWindowExW）"]
+        },
+        {
+            "n": "get_const",
+            "d": "获取 Windows 常量值（窗口样式、消息框类型、虚拟键码等）",
+            "p": "str",
+            "r": "dword",
+            "de": ["常量名称（如 WS_VISIBLE、MB_OK、VK_RETURN）"]
+        },
+        {
+            "n": "call_address",
+            "d": "调用函数地址（指定参数个数）",
+            "p": "ptr,int",
+            "r": "dword",
+            "de": ["函数地址", "参数个数", "参数列表..."]
+        },
+          {
+            "n": "call_func",
+            "d": "调用函数地址（自动检测参数，参数以 0xFFFFFFFFFFFFFFFF 结尾）",
+            "p": "ptr",
+            "r": "dword",
+            "de": ["函数地址", "参数列表...（以 -1 结尾）"]
+        },
+        {
+            "n": "get_last_error",
+            "d": "获取最后一个错误码",
+            "p": "",
+            "r": "dword",
+            "de": []
+        },
+        {
+            "n": "set_last_error",
+            "d": "设置最后一个错误码",
+            "p": "dword",
+            "r": "void",
+            "de": ["错误码"]
+        }
+    ]
+}
+]

@@ -1,0 +1,203 @@
+
+:root {
+  --ifm-color-primary: #6366f1;
+  --ifm-color-primary-dark: #4f46e5;
+  --ifm-color-primary-darker: #4338ca;
+  --ifm-color-primary-light: #818cf8;
+  --ifm-background-color: #f8fafc;
+  --ifm-navbar-background-color: #ffffff;
+  --ifm-footer-background-color: #f8fafc;
+  --ifm-font-color-base: #1e293b;
+  --ifm-font-color-secondary: #64748b;
+  --ifm-border-color: #e2e8f0;
+  --ifm-code-background: #f1f5f9;
+  --ifm-code-color: #be123c;
+  --ifm-menu-color: #475569;
+  --ifm-menu-color-active: #6366f1;
+  --ifm-menu-color-background-active: #eef2ff;
+  --ifm-toc-border-color: #e2e8f0;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  background: var(--ifm-background-color);
+  color: var(--ifm-font-color-base);
+  line-height: 1.6;
+  height: 100vh;
+  overflow: hidden;
+}
+
+
+.docusaurus-layout {
+  display: flex;
+  height: 100vh;
+  width: 100%;
+}
+
+
+.docusaurus-sidebar {
+  width: 300px;
+  background: var(--ifm-navbar-background-color);
+  border-right: 1px solid var(--ifm-border-color);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.sidebar-header {
+  padding: 1.5rem 1.25rem;
+  border-bottom: 1px solid var(--ifm-border-color);
+  background: var(--ifm-navbar-background-color);
+}
+
+.sidebar-header h1 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  background: linear-gradient(135deg, var(--ifm-color-primary-dark), var(--ifm-color-primary));
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+.sidebar-header p {
+  font-size: 0.75rem;
+  color: var(--ifm-font-color-secondary);
+  margin-top: 0.25rem;
+}
+
+
+.docusaurus-menu {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem 0.75rem;
+}
+
+.menu-category {
+  margin-bottom: 1.5rem;
+}
+
+.menu-category-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ifm-font-color-secondary);
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  color: var(--ifm-menu-color);
+  text-decoration: none;
+  font-size: 0.875rem;
+  transition: all 0.15s;
+  cursor: pointer;
+}
+
+.menu-item i {
+  width: 1.25rem;
+  font-size: 0.875rem;
+  color: var(--ifm-font-color-secondary);
+}
+
+.menu-item:hover {
+  background: var(--ifm-menu-color-background-active);
+  color: var(--ifm-menu-color-active);
+}
+
+.menu-item.active {
+  background: var(--ifm-menu-color-background-active);
+  color: var(--ifm-menu-color-active);
+  font-weight: 500;
+}
+
+.menu-item.active i {
+  color: var(--ifm-menu-color-active);
+}
+
+
+.docusaurus-content {
+  flex: 1;
+  background: var(--ifm-background-color);
+  position: relative;
+  overflow: hidden;
+}
+
+.content-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: white;
+}
+
+
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  transition: opacity 0.2s;
+}
+
+.docusaurus-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--ifm-border-color);
+  border-top-color: var(--ifm-color-primary);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--ifm-border-color);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ifm-color-primary-light);
+}
+
+
+@media (max-width: 768px) {
+  .docusaurus-sidebar {
+    width: 260px;
+  }
+  .menu-item {
+    font-size: 0.8rem;
+    padding: 0.4rem 0.6rem;
+  }
+}

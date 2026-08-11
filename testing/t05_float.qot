@@ -1,0 +1,5 @@
+var a = 3.5 + 2.5;
+var b = 10.0 / 4.0;
+var c = 10 / 3;
+var d = 10 / 0;
+output(a); output(b); output(c); output(d);

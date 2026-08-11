@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Python-QOT 转换</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0f172a;
+            font-family: 'Segoe UI', 'Fira Code', 'Monaco', monospace;
+            padding: 1.5rem;
+            color: #e2e8f0;
+        }
+
+        .converter-container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: #1e293b;
+            border-radius: 28px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid #334155;
+        }
+
+        .header h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            background: linear-gradient(120deg, #7dd3fc, #38bdf8);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+        }
+
+        .header p {
+            color: #94a3b8;
+            margin-top: 0.4rem;
+            font-size: 0.85rem;
+        }
+
+        .badge-row {
+            display: flex;
+            gap: 0.8rem;
+            margin-top: 0.8rem;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            background: #334155;
+            padding: 0.2rem 0.8rem;
+            border-radius: 40px;
+            font-size: 0.7rem;
+            color: #bae6fd;
+        }
+
+        .editor-panel {
+            display: flex;
+            flex-wrap: wrap;
+        }
+
+        .panel {
+            flex: 1;
+            min-width: 300px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-header {
+            background: #0f172a;
+            padding: 0.8rem 1.2rem;
+            font-weight: 600;
+            font-size: 0.85rem;
+            border-bottom: 1px solid #334155;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .copy-btn,
+        .clear-btn,
+        .demo-btn {
+            background: #334155;
+            border: none;
+            padding: 0.2rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            cursor: pointer;
+            color: #e2e8f0;
+            transition: 0.2s;
+        }
+
+        .copy-btn:hover,
+        .clear-btn:hover,
+        .demo-btn:hover {
+            background: #475569;
+        }
+
+        textarea {
+            width: 100%;
+            height: 550px;
+            padding: 1rem;
+            font-family: 'Fira Code', 'Cascadia Code', monospace;
+            font-size: 0.8rem;
+            line-height: 1.5;
+            background: #0f172a;
+            border: none;
+            color: #e2e8f0;
+            resize: vertical;
+            outline: none;
+        }
+
+        .output-area {
+            background: #0f172a;
+            font-family: 'Fira Code', monospace;
+            white-space: pre-wrap;
+            overflow: auto;
+            height: 550px;
+            padding: 1rem;
+            font-size: 0.8rem;
+            line-height: 1.5;
+            border-left: 1px solid #334155;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background-color: #334155;
+            border-radius: 20px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background-color: transparent;
+        }
+
+        .action-bar {
+            background: #0f172a;
+            padding: 1rem 1.5rem;
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            align-items: center;
+            border-top: 1px solid #334155;
+        }
+
+        .convert-btn {
+            background: #3b82f6;
+            border: none;
+            padding: 0.6rem 1.8rem;
+            border-radius: 40px;
+            font-weight: 600;
+            color: white;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .convert-btn:hover {
+            background: #2563eb;
+        }
+
+        .status {
+            font-size: 0.75rem;
+            color: #86efac;
+            background: #1e293b;
+            padding: 0.3rem 1rem;
+            border-radius: 30px;
+        }
+
+        .error-status {
+            color: #fca5a5;
+        }
+
+        @media (max-width: 800px) {
+            body {
+                padding: 0.5rem;
+            }
+
+            .panel {
+                min-width: 100%;
+            }
+
+            .output-area {
+                border-left: none;
+                border-top: 1px solid #334155;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="converter-container">
+        <div class="header">
+            <h1> Python → QOT 转换</h1>
+            <p>Beta v1</p>
+        </div>
+
+        <div class="editor-panel">
+            <div class="panel">
+                <div class="panel-header">
+                    <span> 📄 Python 源码</span>
+                    <div>
+                        <button class="demo-btn" id="demoBtn">📋 加载示例</button>
+                        <button class="clear-btn" id="clearBtn" style="margin-left: 8px;">🗑️ 清空</button>
+                    </div>
+                </div>
+                <textarea id="pythonCode"
+                    placeholder='# 输入 Python 代码...&#10;def fibonacci(n):&#10;    if n <= 1:&#10;        return n&#10;    else:&#10;        return fibonacci(n-1) + fibonacci(n-2)&#10;&#10;result = fibonacci(10)&#10;print("结果:", result)&#10;&#10;names = ["Alice", "Bob", "Charlie"]&#10;for name in names:&#10;    if name == "Alice":&#10;        print(name, "是第一个")&#10;    else:&#10;        print(name, "不是第一个")'></textarea>
+            </div>
+            <div class="panel">
+                <div class="panel-header">
+                    <span> 🧩 QOT 代码</span>
+                    <button class="copy-btn" id="copyBtn">📋 复制代码</button>
+                </div>
+                <div class="output-area" id="qotOutput">// 等待转换...</div>
+            </div>
+        </div>
+
+        <div class="action-bar">
+            <button class="convert-btn" id="convertBtn">⟳ 转换至 QOT</button>
+            <div class="status" id="statusMsg">✨ 就绪</div>
+        </div>
+    </div>
+
+    <script>
+        class QOTTranspiler {
+            constructor() {
+                this.indentSize = 4;
+                this.output = [];
+                this.currentIndent = 0;
+                this.scopeStack = [];
+                this.inFunction = false;
+                this.loopCounter = 0;
+            }
+
+          
+            pushScope() {
+                this.scopeStack.push(new Set());
+            }
+
+          
+            popScope() {
+                this.scopeStack.pop();
+            }
+
+         
+            currentScope() {
+                if (this.scopeStack.length === 0) return new Set();
+                return this.scopeStack[this.scopeStack.length - 1];
+            }
+
+            
+            declareVariable(varName, isLocal = true) {
+                const scope = this.currentScope();
+                if (!scope.has(varName)) {
+                    scope.add(varName);
+                    return true; 
+                }
+                return false;
+            }
+
+            
+            isDeclared(varName) {
+                for (let i = this.scopeStack.length - 1; i >= 0; i--) {
+                    if (this.scopeStack[i].has(varName)) return true;
+                }
+                return false;
+            }
+
+            
+            emitLine(line) {
+                const indentStr = ' '.repeat(this.currentIndent * this.indentSize);
+                this.output.push(line === '' ? '' : indentStr + line);
+            }
+
+            
+            transpile(code) {
+                this.output = [];
+                this.currentIndent = 0;
+                this.scopeStack = [];
+                this.inFunction = false;
+                this.pushScope(); 
+                const rawLines = code.split(/\r?\n/);
+                const lines = [];
+                const indentLevels = [];
+                for (let line of rawLines) {
+                    const leadingSpaces = line.search(/\S/);
+                    const indentLevel = leadingSpaces === -1 ? 0 : Math.floor(leadingSpaces / this.indentSize);
+                    lines.push(line.trim());
+                    indentLevels.push(leadingSpaces === -1 ? 0 : indentLevel);
+                }
+
+                let idx = 0;
+                const n = lines.length;
+                while (idx < n) {
+                    const line = lines[idx];
+                    const indent = indentLevels[idx];
+                    if (line === '' || line.startsWith('#')) {
+                        if (line.startsWith('#')) this.emitLine('//' + line.substring(1));
+                        else this.emitLine('');
+                        idx++;
+                        continue;
+                    }
+              
+                    if (line.match(/^def\s+\w+\s*\(/)) {
+                        idx = this.parseFunction(lines, indentLevels, idx);
+                    } else if (line.match(/^if\s+.*:\s*$/)) {
+                        idx = this.parseIfChain(lines, indentLevels, idx);
+                    } else if (line.match(/^elif\s+.*:\s*$/)) {
+             
+                        console.warn("Unexpected elif", line);
+                        idx++;
+                    } else if (line.match(/^else\s*:\s*$/)) {
+                        console.warn("Unexpected else", line);
+                        idx++;
+                    } else if (line.match(/^for\s+\w+\s+in\s+.*:\s*$/)) {
+                        idx = this.parseForLoop(lines, indentLevels, idx);
+                    } else if (line.match(/^while\s+.*:\s*$/)) {
+                        idx = this.parseWhileLoop(lines, indentLevels, idx);
+                    } else {
+                    
+                        const transformed = this.transformStatement(line);
+                        if (transformed !== null) {
+                            this.emitLine(transformed);
+                        }
+                        idx++;
+                    }
+                }
+
+                return this.output.join('\n');
+            }
+
+            
+            parseFunction(lines, indentLevels, idx) {
+                const line = lines[idx];
+                const match = line.match(/^def\s+(\w+)\s*\(([^)]*)\)\s*:/);
+                if (!match) {
+                    this.emitLine(`// ERROR: 无效函数定义 ${line}`);
+                    return idx + 1;
+                }
+                const funcName = match[1];
+                let paramsStr = match[2].trim();
+                const params = paramsStr ? paramsStr.split(',').map(p => p.trim()).filter(p => p) : [];
+                const qotParams = params.join(', ');
+                this.emitLine(`any_t func ${funcName}(${qotParams}) {`);
+                this.currentIndent++;
+                this.pushScope();
+                const oldInFunction = this.inFunction;
+                this.inFunction = true;
+                
+                for (let p of params) {
+                    this.declareVariable(p);
+                }
+
+                const baseIndent = indentLevels[idx];
+                let i = idx + 1;
+                const n = lines.length;
+                while (i < n) {
+                    const curIndent = indentLevels[i];
+                    if (curIndent <= baseIndent) break;
+                    const lineTrim = lines[i].trim();
+                    if (lineTrim === '') {
+                        this.emitLine('');
+                        i++;
+                        continue;
+                    }
+                    if (lineTrim.startsWith('#')) {
+                        this.emitLine('//' + lineTrim.substring(1));
+                        i++;
+                        continue;
+                    }
+                
+                    if (lineTrim.match(/^if\s+.*:\s*$/)) {
+                        i = this.parseIfChain(lines, indentLevels, i);
+                    } else if (lineTrim.match(/^for\s+\w+\s+in\s+.*:\s*$/)) {
+                        i = this.parseForLoop(lines, indentLevels, i);
+                    } else if (lineTrim.match(/^while\s+.*:\s*$/)) {
+                        i = this.parseWhileLoop(lines, indentLevels, i);
+                    } else {
+                        const trans = this.transformStatement(lineTrim);
+                        if (trans !== null) this.emitLine(trans);
+                        i++;
+                    }
+                }
+
+                this.popScope();
+                this.inFunction = oldInFunction;
+                this.currentIndent--;
+                this.emitLine('}');
+                return i;
+            }
+
+           
+            parseIfChain(lines, indentLevels, startIdx) {
+                const branches = [];
+                let i = startIdx;
+                const baseIndent = indentLevels[startIdx];
+
+                
+                while (i < lines.length) {
+                    const line = lines[i].trim();
+                    const curIndent = indentLevels[i];
+                    if (curIndent < baseIndent) break;
+
+                    if (line.match(/^if\s+.*:\s*$/)) {
+                        const cond = line.match(/^if\s+(.+):\s*$/)[1].trim();
+                        const body = this.extractBlock(lines, indentLevels, i + 1, baseIndent + 1);
+                        branches.push({ type: 'if', condition: cond, bodyLines: body.lines, bodyEndIdx: body.endIdx });
+                        i = body.endIdx;
+                    } else if (line.match(/^elif\s+.*:\s*$/)) {
+                        const cond = line.match(/^elif\s+(.+):\s*$/)[1].trim();
+                        const body = this.extractBlock(lines, indentLevels, i + 1, baseIndent + 1);
+                        branches.push({ type: 'elif', condition: cond, bodyLines: body.lines, bodyEndIdx: body.endIdx });
+                        i = body.endIdx;
+                    } else if (line.match(/^else\s*:\s*$/)) {
+                        const body = this.extractBlock(lines, indentLevels, i + 1, baseIndent + 1);
+                        branches.push({ type: 'else', condition: null, bodyLines: body.lines, bodyEndIdx: body.endIdx });
+                        i = body.endIdx;
+                        break; 
+                    } else {
+                        break;
+                    }
+                }
+
+            
+                for (let b = 0; b < branches.length; b++) {
+                    const branch = branches[b];
+                    if (branch.type === 'if') {
+                        const qotCond = this.transformExpression(branch.condition);
+                        this.emitLine(`if (${qotCond}) {`);
+                    } else if (branch.type === 'elif') {
+                        const qotCond = this.transformExpression(branch.condition);
+                        this.emitLine(`} eif (${qotCond}) {`);
+                    } else if (branch.type === 'else') {
+                        this.emitLine(`} else {`);
+                    }
+                    this.currentIndent++;
+                    
+                    for (let stmt of branch.bodyLines) {
+                        if (stmt.trim() === '') {
+                            this.emitLine('');
+                            continue;
+                        }
+                        if (stmt.trim().startsWith('#')) {
+                            this.emitLine('//' + stmt.substring(1));
+                            continue;
+                        }
+                        const trans = this.transformStatement(stmt);
+                        if (trans !== null) this.emitLine(trans);
+                    }
+                    this.currentIndent--;
+                }
+                
+                if (branches.length > 0) {
+                    this.emitLine('}');
+                }
+                return i;
+            }
+
+           
+            extractBlock(lines, indentLevels, startIdx, requiredIndent) {
+                const blockLines = [];
+                let i = startIdx;
+                const n = lines.length;
+                while (i < n) {
+                    const curIndent = indentLevels[i];
+                    if (curIndent < requiredIndent) break;
+                    blockLines.push(lines[i]);
+                    i++;
+                }
+                return { lines: blockLines, endIdx: i };
+            }
+
+         
+            parseForLoop(lines, indentLevels, idx) {
+                const line = lines[idx].trim();
+                const match = line.match(/^for\s+(\w+)\s+in\s+(.+):\s*$/);
+                if (!match) return idx + 1;
+                const varName = match[1];
+                let iterable = match[2].trim();
+               
+                const rangeMatch = iterable.match(/^range\(([^)]*)\)$/);
+                let loopHeader = '';
+                if (rangeMatch) {
+                    let rangeArg = rangeMatch[1].trim();
+                    if (rangeArg === '') rangeArg = '0';
+                    const expr = this.transformExpression(rangeArg);
+                    loopHeader = `for (${varName} in ${expr}) {`;
+                } else {
+                    const transformedIter = this.transformExpression(iterable);
+                    loopHeader = `for (${varName} in ${transformedIter}) {`;
+                }
+            
+                this.declareVariable(varName);
+                this.emitLine(loopHeader);
+                this.currentIndent++;
+                const baseIndent = indentLevels[idx];
+                let i = idx + 1;
+                const n = lines.length;
+                while (i < n) {
+                    const curIndent = indentLevels[i];
+                    if (curIndent <= baseIndent) break;
+                    const stmt = lines[i].trim();
+                    if (stmt === '') {
+                        this.emitLine('');
+                        i++;
+                        continue;
+                    }
+                    if (stmt.startsWith('#')) {
+                        this.emitLine('//' + stmt.substring(1));
+                        i++;
+                        continue;
+                    }
+                
+                    if (stmt.match(/^if\s+.*:\s*$/)) {
+                        i = this.parseIfChain(lines, indentLevels, i);
+                    } else if (stmt.match(/^for\s+\w+\s+in\s+.*:\s*$/)) {
+                        i = this.parseForLoop(lines, indentLevels, i);
+                    } else if (stmt.match(/^while\s+.*:\s*$/)) {
+                        i = this.parseWhileLoop(lines, indentLevels, i);
+                    } else {
+                        const trans = this.transformStatement(stmt);
+                        if (trans !== null) this.emitLine(trans);
+                        i++;
+                    }
+                }
+                this.currentIndent--;
+                this.emitLine('}');
+                return i;
+            }
+
+         
+            parseWhileLoop(lines, indentLevels, idx) {
+                const line = lines[idx].trim();
+                const match = line.match(/^while\s+(.+):\s*$/);
+                if (!match) return idx + 1;
+                let condition = match[1].trim();
+                const qotCond = this.transformExpression(condition);
+                this.emitLine(`loop (${qotCond}) {`);
+                this.currentIndent++;
+                const baseIndent = indentLevels[idx];
+                let i = idx + 1;
+                const n = lines.length;
+                while (i < n) {
+                    const curIndent = indentLevels[i];
+                    if (curIndent <= baseIndent) break;
+                    const stmt = lines[i].trim();
+                    if (stmt === '') {
+                        this.emitLine('');
+                        i++;
+                        continue;
+                    }
+                    if (stmt.startsWith('#')) {
+                        this.emitLine('//' + stmt.substring(1));
+                        i++;
+                        continue;
+                    }
+                    if (stmt.match(/^if\s+.*:\s*$/)) {
+                        i = this.parseIfChain(lines, indentLevels, i);
+                    } else if (stmt.match(/^for\s+\w+\s+in\s+.*:\s*$/)) {
+                        i = this.parseForLoop(lines, indentLevels, i);
+                    } else if (stmt.match(/^while\s+.*:\s*$/)) {
+                        i = this.parseWhileLoop(lines, indentLevels, i);
+                    } else {
+                        const trans = this.transformStatement(stmt);
+                        if (trans !== null) this.emitLine(trans);
+                        i++;
+                    }
+                }
+                this.currentIndent--;
+                this.emitLine('}');
+                return i;
+            }
+
+       
+            transformStatement(stmt) {
+                if (stmt.startsWith('return ')) {
+                    const rest = stmt.substring(6).trim();
+                    if (rest === '') return 'return;';
+                    return `return ${this.transformExpression(rest)};`;
+                }
+                if (stmt === 'return') return 'return;';
+                const augAssignMatch = stmt.match(/^(\w+)\s*([\+\-\*\/%])=(.+)/);
+                if (augAssignMatch) {
+                    const varName = augAssignMatch[1];
+                    const op = augAssignMatch[2];
+                    const right = augAssignMatch[3].trim();
+                    if (!this.isDeclared(varName)) {
+                        this.declareVariable(varName);
+                        return `var ${varName} = ${varName} ${op} ${this.transformExpression(right)};`;
+                    } else {
+                        return `${varName} = ${varName} ${op} ${this.transformExpression(right)};`;
+                    }
+                }
+
+                
+                const assignMatch = stmt.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.+)$/);
+                if (assignMatch) {
+                    const left = assignMatch[1];
+                    let rightExpr = assignMatch[2].trim();
+                    const transformedRight = this.transformExpression(rightExpr);
+                    if (!this.isDeclared(left)) {
+                        this.declareVariable(left);
+                        return `var ${left} = ${transformedRight};`;
+                    } else {
+                        return `${left} = ${transformedRight};`;
+                    }
+                }
+
+                
+                if (stmt.match(/^\w+\(/)) {
+                    return this.transformExpression(stmt) + ';';
+                }
+
+                
+                if (stmt.length > 0) {
+                    return this.transformExpression(stmt) + ';';
+                }
+                return null;
+            }
+
+        
+            transformExpression(expr) {
+                let result = expr;
+                const funcMap = {
+                    'print': 'output',
+                    'len': 'glen',
+                    'input': 'cinget',
+                    'str': 'strings',
+                    'int': 'ints',
+                    'float': 'floats',
+                    'bool': 'bools',
+                    'list': 'lists',
+                    'type': 'gtypes',
+                    'max': 'max',
+                    'min': 'min',
+                    'pow': 'pow',
+                    'sum': 'sum',
+                    'round': 'round'
+                };
+                for (const [py, qot] of Object.entries(funcMap)) {
+                    const regex = new RegExp(`\\b${py}\\s*\\(`, 'g');
+                    result = result.replace(regex, `${qot}(`);
+                }
+
+                
+                result = result.replace(/\bNone\b/g, 'null');
+                result = result.replace(/\bTrue\b/g, 'true');
+                result = result.replace(/\bFalse\b/g, 'false');
+
+            
+                result = result.replace(/\{([^{}]*)\}/g, (match, inner) => {
+                    if (inner.trim() === '') return '&< >&';
+                    const pairs = this.parseDictPairs(inner);
+                    const qotPairs = pairs.map(pair => {
+                        let key = pair.key;
+                        let val = pair.val;
+                        
+                        const isQuoted = (key.startsWith('"') && key.endsWith('"')) || (key.startsWith("'") && key.endsWith("'"));
+                        let finalKey;
+                        if (isQuoted) {
+                         
+                            let innerKey = key.slice(1, -1);
+                            finalKey = `"${innerKey}"`;
+                        } else if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key)) {
+                            finalKey = key; 
+                        } else {
+                            finalKey = `"${key}"`;
+                        }
+                        const transformedVal = this.transformExpression(val);
+                        return `${finalKey}: ${transformedVal}`;
+                    }).join(', ');
+                    return `&< ${qotPairs} >&`;
+                });
+
+            
+                result = result.replace(/(\w+)\s*\.\s*append\s*\(\s*([^)]+)\s*\)/g, '$1->push($2)');
+                result = result.replace(/(\w+)\s*\.\s*pop\s*\(\s*\)/g, '$1->pop(glen($1)-1)');
+                result = result.replace(/(\w+)\s*\.\s*pop\s*\(\s*(\d+)\s*\)/g, '$1->pop($2)');
+                result = result.replace(/(\w+)\s*\.\s*remove\s*\(\s*([^)]+)\s*\)/g, '$1->remove($2)');
+                result = result.replace(/(\w+)\s*\.\s*index\s*\(\s*([^)]+)\s*\)/g, '$1->get($2)');
+                result = result.replace(/(\w+)\s*\.\s*upper\s*\(\s*\)/g, 'string_upper($1)');
+                result = result.replace(/(\w+)\s*\.\s*lower\s*\(\s*\)/g, 'string_lower($1)');
+                result = result.replace(/\band\b/g, '&&');
+                result = result.replace(/\bor\b/g, '||');
+                result = result.replace(/\bnot\b/g, '!');
+
+                return result;
+            }
+
+            
+            parseDictPairs(inner) {
+                const pairs = [];
+                let depth = 0;
+                let current = '';
+                let inString = false;
+                let stringChar = '';
+                for (let i = 0; i < inner.length; i++) {
+                    const ch = inner[i];
+                    if (!inString && (ch === '"' || ch === "'")) {
+                        inString = true;
+                        stringChar = ch;
+                        current += ch;
+                        continue;
+                    }
+                    if (inString && ch === stringChar && inner[i - 1] !== '\\') {
+                        inString = false;
+                        current += ch;
+                        continue;
+                    }
+                    if (!inString) {
+                        if (ch === '{' || ch === '[') depth++;
+                        if (ch === '}' || ch === ']') depth--;
+                        if (ch === ',' && depth === 0) {
+                            pairs.push(this.parseOnePair(current));
+                            current = '';
+                            continue;
+                        }
+                    }
+                    current += ch;
+                }
+                if (current.trim() !== '') {
+                    pairs.push(this.parseOnePair(current));
+                }
+                return pairs;
+            }
+
+            parseOnePair(pairStr) {
+                const colonIdx = this.findColonOutsideQuotes(pairStr);
+                if (colonIdx === -1) return { key: pairStr.trim(), val: 'null' };
+                const key = pairStr.substring(0, colonIdx).trim();
+                const val = pairStr.substring(colonIdx + 1).trim();
+                return { key, val };
+            }
+
+            findColonOutsideQuotes(str) {
+                let inString = false;
+                let stringChar = '';
+                let depth = 0;
+                for (let i = 0; i < str.length; i++) {
+                    const ch = str[i];
+                    if (!inString && (ch === '"' || ch === "'")) {
+                        inString = true;
+                        stringChar = ch;
+                        continue;
+                    }
+                    if (inString && ch === stringChar && str[i - 1] !== '\\') {
+                        inString = false;
+                        continue;
+                    }
+                    if (!inString) {
+                        if (ch === '{' || ch === '[') depth++;
+                        if (ch === '}' || ch === ']') depth--;
+                        if (ch === ':' && depth === 0) return i;
+                    }
+                }
+                return -1;
+            }
+        }
+        const pythonTextarea = document.getElementById('pythonCode');
+        const qotOutputDiv = document.getElementById('qotOutput');
+        const convertBtn = document.getElementById('convertBtn');
+        const copyBtn = document.getElementById('copyBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const demoBtn = document.getElementById('demoBtn');
+        const statusSpan = document.getElementById('statusMsg');
+
+        function convertPythonToQOT() {
+            const code = pythonTextarea.value;
+            if (!code.trim()) {
+                qotOutputDiv.innerText = '// 没有输入代码，请填写 Python 源码';
+                statusSpan.textContent = '⚠️ 代码为空';
+                statusSpan.classList.add('error-status');
+                return;
+            }
+
+            try {
+                const transpiler = new QOTTranspiler();
+                const qotCode = transpiler.transpile(code);
+                qotOutputDiv.innerText = qotCode;
+                statusSpan.textContent = '✓ 转换成功';
+                statusSpan.classList.remove('error-status');
+            } catch (err) {
+                console.error(err);
+                qotOutputDiv.innerText = `// 转换错误: ${err.message}\n// 请检查 Python 缩进及语法`;
+                statusSpan.textContent = '❌ 转换失败';
+                statusSpan.classList.add('error-status');
+            }
+        }
+
+        function loadDemo() {
+            const demo = `# 斐波那契数列 (递归示例)
+def fibonacci(n):
+    if n <= 1:
+        return n
+    else:
+        return fibonacci(n-1) + fibonacci(n-2)
+num = 10
+print("Fibonacci 0~10:")
+for i in range(num):
+    value = fibonacci(i)
+    print("fib(", i, ") =", value)
+names = ["Alice", "Bob", "Charlie"]
+scores = {"Alice": 95, "Bob": 88, "Charlie": 92}
+
+for name in names:
+    if scores[name] > 90:
+        print(name, "优秀")
+    else:
+        print(name, "良好")
+count = 0
+while count < 3:
+    print("循环次数:", count)
+    count = count + 1
+arr = [1, 2, 3]
+arr.append(4)
+total = arr[0] + arr[3]
+print("总和:", total)`;
+            pythonTextarea.value = demo;
+            convertPythonToQOT();
+        }
+
+        convertBtn.addEventListener('click', convertPythonToQOT);
+        copyBtn.addEventListener('click', () => {
+            const text = qotOutputDiv.innerText;
+            if (text && !text.includes('等待转换') && !text.includes('没有输入')) {
+                navigator.clipboard.writeText(text);
+                statusSpan.textContent = '📋 已复制 QOT 代码';
+                setTimeout(() => {
+                    if (statusSpan.textContent === '📋 已复制 QOT 代码')
+                        statusSpan.textContent = '✨ 就绪';
+                }, 1500);
+            } else if (text.includes('没有输入')) {
+                statusSpan.textContent = '⚠️ 无代码可复制';
+            }
+        });
+        clearBtn.addEventListener('click', () => {
+            pythonTextarea.value = '';
+            qotOutputDiv.innerText = '// 等待转换...';
+            statusSpan.textContent = '🗑️ 已清空编辑器';
+            statusSpan.classList.remove('error-status');
+        });
+        demoBtn.addEventListener('click', loadDemo);
+        loadDemo();
+    </script>
+</body>
+
+</html>

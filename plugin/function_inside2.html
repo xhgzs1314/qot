@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>QTC · 内置函数参考手册</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Roboto', 'Noto Sans', system-ui, -apple-system, 'Helvetica Neue', sans-serif;
+            background: #0f0f1a;
+            color: #e2e8f0;
+            line-height: 1.5;
+            padding: 2rem 1rem;
+        }
+
+        .docs-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: #1a1a2e;
+            border-radius: 28px;
+            box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .docs-header {
+            background: linear-gradient(135deg, #0f0f1a 0%, #16213e 100%);
+            padding: 2rem 2rem 1.5rem 2rem;
+            border-bottom: 1px solid #2d2d44;
+        }
+
+        .docs-header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(120deg, #c084fc, #60a5fa);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        .docs-header .sub {
+            color: #94a3b8;
+            font-size: 0.95rem;
+            margin-top: 0.5rem;
+            border-left: 3px solid #8b5cf6;
+            padding-left: 1rem;
+        }
+
+        .warning-banner {
+            background: #2d1f1f;
+            border-left: 4px solid #ef4444;
+            padding: 1rem 2rem;
+            margin: 0;
+            font-size: 0.9rem;
+            color: #fca5a5;
+        }
+
+        .category-nav {
+            padding: 0.75rem 2rem;
+            background: #111827;
+            border-bottom: 1px solid #2d2d44;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.6rem;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .category-btn {
+            background: #1f2937;
+            border: none;
+            padding: 0.4rem 1rem;
+            border-radius: 40px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: #cbd5e1;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .category-btn:hover {
+            background: #374151;
+            color: white;
+        }
+
+        .category-btn.active {
+            background: #8b5cf6;
+            color: white;
+            box-shadow: 0 2px 6px rgba(139, 92, 246, 0.3);
+        }
+
+        .search-box {
+            margin-left: auto;
+        }
+
+        .search-input {
+            padding: 0.4rem 0.8rem;
+            border-radius: 32px;
+            border: 1px solid #374151;
+            background: #1f2937;
+            color: white;
+            font-size: 0.8rem;
+            width: 200px;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #8b5cf6;
+        }
+
+        .search-input::placeholder {
+            color: #6b7280;
+        }
+
+        .table-wrapper {
+            padding: 1.5rem 2rem 2rem 2rem;
+            overflow-x: auto;
+        }
+
+        .func-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        .func-table th {
+            text-align: left;
+            padding: 1rem 1.2rem;
+            background: #111827;
+            color: #a5b4fc;
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #2d2d44;
+        }
+
+        .func-table td {
+            padding: 1rem 1.2rem;
+            border-bottom: 1px solid #25253a;
+            vertical-align: top;
+        }
+
+        .func-table tr:hover td {
+            background: #1e1e32;
+        }
+
+        .func-name {
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-weight: 600;
+            color: #c084fc;
+            background: #2d2d4a;
+            padding: 0.2rem 0.6rem;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            display: inline-block;
+            white-space: nowrap;
+        }
+
+        .status-badge {
+            display: inline-block;
+            font-size: 0.7rem;
+            padding: 0.15rem 0.5rem;
+            border-radius: 20px;
+            margin-left: 0.6rem;
+            vertical-align: middle;
+        }
+
+        .status-supported {
+            background: #166534;
+            color: #86efac;
+        }
+
+        .status-unsupported {
+            background: #7f1d1d;
+            color: #fca5a5;
+        }
+
+        .status-partial {
+            background: #b45309;
+            color: #fed7aa;
+        }
+
+        .param-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .param-item {
+            background: #111827;
+            border-left: 3px solid #8b5cf6;
+            padding: 0.4rem 0.6rem;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            margin-bottom: 0.4rem;
+            font-family: monospace;
+        }
+
+        .param-name {
+            color: #fcd34d;
+        }
+
+        .param-type {
+            color: #6ee7b7;
+            font-size: 0.7rem;
+            margin-left: 0.3rem;
+        }
+
+        .return-badge {
+            background: #2d2d4a;
+            color: #a78bfa;
+            padding: 0.2rem 0.5rem;
+            border-radius: 16px;
+            font-size: 0.8rem;
+            font-family: monospace;
+            display: inline-block;
+        }
+
+        .diff-note {
+            font-size: 0.75rem;
+            color: #fbbf24;
+            margin-top: 0.3rem;
+            display: block;
+        }
+
+        .no-result {
+            text-align: center;
+            padding: 3rem;
+            color: #6b7280;
+        }
+
+        @media (max-width: 768px) {
+
+            .func-table th,
+            .func-table td {
+                padding: 0.8rem;
+            }
+
+            .func-name {
+                font-size: 0.75rem;
+                white-space: normal;
+            }
+        }
+
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            border-radius: 10px;
+            background-color: #374151;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="docs-container">
+        <div class="docs-header">
+            <h1>⚙️ QTC · 内置函数表</h1>
+            <div class="sub">QTC引擎专用</div>
+        </div>
+        <div class="warning-banner">
+            <strong>⚠ 这一页是「字节码 VM」的函数表——只对 <code>qguoat bstrust run x.qtc</code> 有效。</strong><br>
+            QOT 有两套互相独立的运行时，内置函数表<strong>并不相同</strong>。本页共 109 个函数，其中
+            <strong>7 个 + 62 个 vg_* GUI 函数是 VM 专有</strong>（名字前带 ⭐），在解释器上不存在或只是报错桩。<br>
+            解释器那边的函数表见 <a href="function_inside.html" style="color:inherit;text-decoration:underline"><strong>QOT · 内置函数表</strong></a>，
+            两者的差异对照见主文档 <a href="doc.html#runtime-diff" style="color:inherit;text-decoration:underline">第 21 章</a>。<br>
+            <strong>想让代码在两个运行时上都能跑，就只用不带 ⭐ 的那 38 个。</strong>
+        </div>
+        <div class="category-nav" id="categoryNav"></div>
+        <div class="table-wrapper">
+            <table class="func-table">
+                <thead>
+                    <tr>
+                        <th>函数名</th>
+                        <th>描述</th>
+                        <th>参数</th>
+                        <th>返回值</th>
+                        <th>状态</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const VM_ONLY = new Set([
+            "numbers", "type",
+            "http_clear_headers", "http_get_headers", "http_set_header",
+            "http_set_user_agent", "http_set_verify_ssl"
+        ]);
+        const isVmOnly = (n) => VM_ONLY.has(n) || n.startsWith("vg_");
+
+        const VM_FUNCTIONS_DATA = [
+            { name: "output", desc: "输出内容到控制台", params: [{ name: "value", type: "any", desc: "要输出的数据" }], returns: "null", category: "I/O 操作", status: "supported", note: "" },
+            { name: "cinget", desc: "获取用户控制台输入", params: [{ name: "prompt", type: "string(可选)", desc: "提示信息" }], returns: "string", category: "I/O 操作", status: "supported", note: "" },
+
+
+            // ========== 类型转换 ==========
+            { name: "strings", desc: "转换为字符串", params: [{ name: "value", type: "any" }], returns: "string", category: "类型转换", status: "supported", note: "" },
+            { name: "numbers", desc: "转换为数字", params: [{ name: "value", type: "any" }], returns: "number", category: "类型转换", status: "supported", note: "注意：函数名是 numbers（复数）" },
+            { name: "gtypes", desc: "获取变量类型", params: [{ name: "value", type: "any" }], returns: "string ('null'/'boolean'/'number'/'string'/'array'/'dict'/'function')", category: "类型转换", status: "supported", note: "布尔值返回的是 'boolean'（全拼）。跨运行时通用，优先用这个" },
+            { name: "type", desc: "获取变量类型（VM 专有，与 gtypes 几乎相同）", params: [{ name: "value", type: "any" }], returns: "string ('null'/'bool'/'number'/'string'/'array'/'dict'/'function'/'unknown')", category: "类型转换", status: "supported", note: "⚠ 与 gtypes 的唯一区别：布尔值这里返回 'bool'，gtypes 返回 'boolean'。解释器上没有 type()，写了就编译不成能跑在两边的代码——建议统一用 gtypes" },
+
+            // ========== 数组/字符串操作 ==========
+            { name: "glen", desc: "获取字符串/数组/字典长度", params: [{ name: "obj", type: "string/array/dict" }], returns: "number", category: "数组/字符串", status: "supported", note: "" },
+            { name: "push", desc: "向数组末尾添加元素", params: [{ name: "array", type: "array" }, { name: "element", type: "any" }], returns: "bool", category: "数组/字符串", status: "supported", note: "" },
+            { name: "remove", desc: "从数组中移除指定元素", params: [{ name: "array", type: "array" }, { name: "element", type: "any" }], returns: "bool", category: "数组/字符串", status: "supported", note: "" },
+            { name: "pop", desc: "按索引弹出数组元素", params: [{ name: "array", type: "array" }, { name: "index", type: "number" }], returns: "bool", category: "数组/字符串", status: "supported", note: "" },
+            { name: "get", desc: "获取元素在数组中的索引", params: [{ name: "array", type: "array" }, { name: "element", type: "any" }], returns: "number (-1 if not found)", category: "数组/字符串", status: "supported", note: "" },
+            { name: "strrep", desc: "字符串替换", params: [{ name: "source", type: "string" }, { name: "old", type: "string" }, { name: "new", type: "string" }], returns: "string", category: "数组/字符串", status: "supported", note: "" },
+            { name: "strcase", desc: "大小写转换", params: [{ name: "str", type: "string" }, { name: "mode", type: "number(可选)", desc: "非0=小写，默认大写" }], returns: "string", category: "数组/字符串", status: "supported", note: "" },
+
+            // ========== 文件系统 ==========
+            { name: "fopen", desc: "打开文件", params: [{ name: "path", type: "string" }, { name: "mode", type: "string(可选)", desc: "r/w/a" }, { name: "encoding", type: "string(可选)" }], returns: "file_handle (number)", category: "文件系统", status: "supported", note: "返回数字句柄" },
+            { name: "fread", desc: "读取文件全部内容", params: [{ name: "handle", type: "number" }], returns: "string", category: "文件系统", status: "supported", note: "" },
+            { name: "fclose", desc: "关闭文件", params: [{ name: "handle", type: "number" }], returns: "bool", category: "文件系统", status: "supported", note: "" },
+            { name: "fwrite", desc: "写入文件", params: [{ name: "handle", type: "number" }, { name: "content", type: "string" }], returns: "bool", category: "文件系统", status: "supported", note: "" },
+            { name: "unlink", desc: "删除文件", params: [{ name: "path", type: "string" }], returns: "bool", category: "文件系统", status: "supported", note: "" },
+            { name: "fnew", desc: "创建新文件", params: [{ name: "path", type: "string" }], returns: "bool", category: "文件系统", status: "supported", note: "" },
+            { name: "fsize", desc: "获取文件大小", params: [{ name: "path", type: "string" }, { name: "unit", type: "number(可选)", desc: "0=B,1=KB,2=MB,3=GB" }], returns: "number", category: "文件系统", status: "supported", note: "" },
+            { name: "dict_get", desc: "获取字典中指定键的值", params: [{ name: "dict", type: "dict", desc: "目标字典" }, { name: "key", type: "string", desc: "键名" }, { name: "default", type: "any(可选)", desc: "键不存在时返回的默认值，默认为 null" }], returns: "any (键对应的值或默认值)", category: "字典操作", status: "supported", note: "" },
+            { name: "dict_set", desc: "设置字典中的键值对", params: [{ name: "dict", type: "dict", desc: "目标字典" }, { name: "key", type: "string", desc: "键名" }, { name: "value", type: "any", desc: "要设置的值" }], returns: "bool (成功返回 true)", category: "字典操作", status: "supported", note: "" },
+            { name: "dict_keys", desc: "获取字典的所有键", params: [{ name: "dict", type: "dict", desc: "目标字典" }], returns: "array (键名数组)", category: "字典操作", status: "supported", note: "" },
+            // ========== 数学运算 ==========
+            { name: "sqrt", desc: "N次方根计算", params: [{ name: "x", type: "number" }, { name: "n", type: "number" }], returns: "number", category: "数学运算", status: "supported", note: "" },
+            { name: "pow", desc: "幂运算", params: [{ name: "base", type: "number" }, { name: "exponent", type: "number" }], returns: "number/string", category: "数学运算", status: "supported", note: "超大结果返回科学计数法字符串" },
+            { name: "round", desc: "四舍五入", params: [{ name: "number", type: "number" }, { name: "places", type: "number" }], returns: "number", category: "数学运算", status: "supported", note: "" },
+            { name: "rand", desc: "生成随机数", params: [{ name: "min", type: "number(可选)" }, { name: "max", type: "number(可选)" }, { name: "type", type: "number(可选)", desc: "1=整数(默认), 其他=浮点" }], returns: "number", category: "数学运算", status: "supported", note: "" },
+
+            // ========== 系统工具 ==========
+            { name: "sleep", desc: "休眠（毫秒）", params: [{ name: "ms", type: "number" }], returns: "bool", category: "系统工具", status: "supported", note: "" },
+            { name: "set_env", desc: "设置环境变量", params: [{ name: "key", type: "string" }, { name: "value", type: "string" }], returns: "bool", category: "系统工具", status: "supported", note: "" },
+            { name: "get_env", desc: "获取环境变量", params: [{ name: "key", type: "string" }, { name: "default", type: "any(可选)" }], returns: "string", category: "系统工具", status: "supported", note: "" },
+            { name: "unset_env", desc: "删除环境变量", params: [{ name: "key", type: "string" }], returns: "bool", category: "系统工具", status: "supported", note: "" },
+            { name: "tnow", desc: "获取当前日期时间", params: [], returns: "string (YYYY-MM-DD HH:MM:SS)", category: "系统工具", status: "supported", note: "" },
+            { name: "tstamp", desc: "毫秒级时间戳", params: [], returns: "number", category: "系统工具", status: "supported", note: "" },
+            { name: "cmd_exec", desc: "执行系统命令", params: [{ name: "command", type: "string" }], returns: "number (进程句柄/PID)", category: "系统工具", status: "supported", note: "返回进程句柄" },
+
+            // ========== 网络通信 ==========
+            { name: "http_send", desc: "发送HTTP请求", params: [{ name: "url", type: "string" }, { name: "params", type: "dict/array(可选)" }, { name: "method", type: "string(可选)" }, { name: "timeout", type: "number(可选)" }], returns: "array [statusCode, headers, body]", category: "网络通信", status: "supported", note: "返回值格式：[状态码, 响应头字典, 响应体]" },
+            { name: "http_set_header", desc: "设置HTTP请求头", params: [{ name: "key", type: "string" }, { name: "value", type: "string" }], returns: "bool", category: "网络通信", status: "supported", note: "" },
+            { name: "http_set_user_agent", desc: "设置User-Agent", params: [{ name: "ua", type: "string" }], returns: "bool", category: "网络通信", status: "supported", note: "" },
+            { name: "http_set_verify_ssl", desc: "设置SSL验证", params: [{ name: "verify", type: "bool" }], returns: "bool", category: "网络通信", status: "supported", note: "" },
+            { name: "http_clear_headers", desc: "清空自定义请求头", params: [], returns: "bool", category: "网络通信", status: "supported", note: "" },
+            { name: "http_get_headers", desc: "获取当前请求头", params: [], returns: "dict", category: "网络通信", status: "supported", note: "" },
+
+            // ========== Shellcode 执行 ==========
+            { name: "ScLoad", desc: "加载shellcode文件", params: [{ name: "path", type: "string" }], returns: "number (实例句柄)", category: "安全/执行", status: "supported", note: "返回内存实例指针" },
+            { name: "ScExec", desc: "执行shellcode", params: [{ name: "instance", type: "number" }, { name: "timeout", type: "number(可选)" }, { name: "force", type: "bool(可选)" }, { name: "waitForever", type: "bool(可选)" }], returns: "bool", category: "安全/执行", status: "supported", note: "" },
+            { name: "ScSweep", desc: "清理shellcode实例", params: [{ name: "instance", type: "number" }], returns: "bool", category: "安全/执行", status: "supported", note: "" },
+            //=====================json相关=====================
+            { name: "json_decode", desc: "解析JSON字符串为QOT对象", params: [{ name: "json_string", type: "string", desc: "需要解析的JSON字符串" }], returns: "dict/array/string/number/bool/null", category: "JSON处理", status: "supported", note: "解析失败返回 null" },
+            { name: "json_encode", desc: "将QOT对象转换为JSON字符串", params: [{ name: "value", type: "any", desc: "要转换的值（支持 dict/array/string/number/bool/null）" }], returns: "string", category: "JSON处理", status: "supported", note: "" },
+            // ========== GUI初始化 ==========
+            { name: "vg_init", desc: "初始化GUI系统", params: [], returns: "bool", category: "GUI", status: "supported", note: "使用前必须调用" },
+            { name: "vg_uninit", desc: "关闭GUI系统", params: [], returns: "bool", category: "GUI", status: "supported", note: "释放资源" },
+
+            // ========== GUI窗口操作 ==========
+            { name: "vg_create_window", desc: "创建主窗口", params: [{ name: "title", type: "string", desc: "窗口标题" }, { name: "width", type: "number", desc: "宽度，默认800" }, { name: "height", type: "number", desc: "高度，默认600" }], returns: "string", category: "GUI", status: "supported", note: "返回窗口对象ID" },
+            { name: "vg_show_window", desc: "显示窗口", params: [], returns: "bool", category: "GUI", status: "supported", note: "" },
+            { name: "vg_run", desc: "运行消息循环", params: [], returns: "bool", category: "GUI", status: "supported", note: "阻塞直到窗口关闭" },
+            { name: "vg_close_window", desc: "关闭窗口", params: [], returns: "bool", category: "GUI", status: "supported", note: "" },
+            { name: "vg_set_window_title", desc: "设置窗口标题", params: [{ name: "title", type: "string" }], returns: "bool", category: "GUI", status: "supported", note: "" },
+            { name: "vg_set_window_size", desc: "设置窗口大小", params: [{ name: "width", type: "number" }, { name: "height", type: "number" }], returns: "bool", category: "GUI", status: "supported", note: "" },
+            { name: "vg_set_window_bg_gradient", desc: "设置窗口渐变背景", params: [{ name: "start_color", type: "array", desc: "[r,g,b,a]" }, { name: "end_color", type: "array", desc: "[r,g,b,a]" }], returns: "bool", category: "GUI", status: "supported", note: "颜色值范围 0-1" },
+
+            // ========== GUI按钮 ==========
+            { name: "vg_create_button", desc: "创建按钮", params: [{ name: "x", type: "number" }, { name: "y", type: "number" }, { name: "width", type: "number" }, { name: "height", type: "number" }, { name: "text", type: "string" }], returns: "string", category: "GUI", status: "supported", note: "返回按钮对象ID" },
+            { name: "vg_button_set_text", desc: "设置按钮文本", params: [{ name: "btn_id", type: "string" }, { name: "text", type: "string" }], returns: "bool", category: "GUI", status: "supported", note: "" },
+            { name: "vg_button_set_color", desc: "设置按钮背景色", params: [{ name: "btn_id", type: "string" }, { name: "color", type: "array", desc: "[r,g,b,a]" }], returns: "bool", category: "GUI", status: "supported", note: "" },
+            { name: "vg_button_set_hover_color", desc: "设置按钮悬停色", params: [{ name: "btn_id", type: "string" }, { name: "color", type: "array", desc: "[r,g,b,a]" }], returns: "bool", category: "GUI", status: "supported", note: "" },
+            { name: "vg_button_set_border_radius", desc: "设置按钮圆角", params: [{ name: "btn_id", type: "string" }, { name: "radius", type: "number" }], returns: "bool", category: "GUI", status: "supported", note: "" },
+            { name: "vg_button_on_click", desc: "绑定按钮点击回调", params: [{ name: "btn_id", type: "string" }, { name: "callback", type: "function" }], returns: "bool", category: "GUI", status: "supported", note: "回调函数无参数" },
+            { name: "vg_button_set_position", desc: "设置按钮位置", params: [{ name: "btn_id", type: "string" }, { name: "x", type: "number" }, { name: "y", type: "number" }], returns: "bool", category: "GUI", status: "supported", note: "" },
+
+            // ========== GUI复选框 ==========
+            { name: "vg_create_checkbox", desc: "创建复选框", params: [{ name: "x", type: "number" }, { name: "y", type: "number" }, { name: "width", type: "number" }, { name: "height", type: "number" }, { name: "text", type: "string" }], returns: "string", category: "GUI", status: "supported", note: "返回复选框对象ID" },
+            { name: "vg_checkbox_set_checked", desc: "设置复选框状态", params: [{ name: "cb_id", type: "string" }, { name: "checked", type: "bool" }], returns: "bool", category: "GUI", status: "supported", note: "" },
+            { name: "vg_checkbox_get_checked", desc: "获取复选框状态", params: [{ name: "cb_id", type: "string" }], returns: "bool", category: "GUI", status: "supported", note: "" },
+            { name: "vg_checkbox_on_changed", desc: "绑定复选框状态改变回调", params: [{ name: "cb_id", type: "string" }, { name: "callback", type: "function" }], returns: "bool", category: "GUI", status: "supported", note: "回调参数: checked(bool)" },
+
+            // ========== GUI开关 ==========
+            { name: "vg_create_toggle", desc: "创建开关", params: [{ name: "x", type: "number" }, { name: "y", type: "number" }], returns: "string", category: "GUI", status: "supported", note: "返回开关对象ID" },
+            { name: "vg_toggle_set_checked", desc: "设置开关状态", params: [{ name: "toggle_id", type: "string" }, { name: "checked", type: "bool" }], returns: "bool", category: "GUI", status: "supported", note: "" },
+            { name: "vg_toggle_get_checked", desc: "获取开关状态", params: [{ name: "toggle_id", type: "string" }], returns: "bool", category: "GUI", status: "supported", note: "" },
+            { name: "vg_toggle_on_changed", desc: "绑定开关状态改变回调", params: [{ name: "toggle_id", type: "string" }, { name: "callback", type: "function" }], returns: "bool", category: "GUI", status: "supported", note: "回调参数: checked(bool)" },
+
+            // ========== GUI文本框 ==========
+            { name: "vg_create_textbox", desc: "创建文本框", params: [{ name: "x", type: "number" }, { name: "y", type: "number" }, { name: "width", type: "number" }, { name: "height", type: "number" }, { name: "placeholder", type: "string" }], returns: "string", category: "GUI", status: "supported", note: "返回文本框对象ID" },
+            { name: "vg_textbox_set_text", desc: "设置文本框内容", params: [{ name: "tb_id", type: "string" }, { name: "text", type: "string" }], returns: "bool", category: "GUI", status: "supported", note: "" },
+            { name: "vg_textbox_get_text", desc: "获取文本框内容", params: [{ name: "tb_id", type: "string" }], returns: "string", category: "GUI", status: "supported", note: "" },
+            { name: "vg_textbox_set_placeholder", desc: "设置占位符文本", params: [{ name: "tb_id", type: "string" }, { name: "placeholder", type: "string" }], returns: "bool", category: "GUI", status: "supported", note: "" },
+
+            // ========== GUI滑块 ==========
+            { name: "vg_create_slider", desc: "创建滑块", params: [{ name: "x", type: "number" }, { name: "y", type: "number" }, { name: "width", type: "number" }, { name: "height", type: "number" }, { name: "min", type: "number" }, { name: "max", type: "number" }], returns: "string", category: "GUI", status: "supported", note: "返回滑块对象ID" },
+            { name: "vg_slider_set_value", desc: "设置滑块值", params: [{ name: "slider_id", type: "string" }, { name: "value", type: "number" }], returns: "bool", category: "GUI", status: "supported", note: "" },
+            { name: "vg_slider_get_value", desc: "获取滑块值", params: [{ name: "slider_id", type: "string" }], returns: "number", category: "GUI", status: "supported", note: "" },
+            { name: "vg_slider_on_changed", desc: "绑定滑块值改变回调", params: [{ name: "slider_id", type: "string" }, { name: "callback", type: "function" }], returns: "bool", category: "GUI", status: "supported", note: "回调参数: value(number)" },
+
+            // ========== GUI进度条 ==========
+            { name: "vg_create_progressbar", desc: "创建进度条", params: [{ name: "x", type: "number" }, { name: "y", type: "number" }, { name: "width", type: "number" }, { name: "height", type: "number" }], returns: "string", category: "GUI", status: "supported", note: "返回进度条对象ID" },
+            { name: "vg_progressbar_set_value", desc: "设置进度值", params: [{ name: "pb_id", type: "string" }, { name: "value", type: "number", desc: "0-1之间" }], returns: "bool", category: "GUI", status: "supported", note: "带动画过渡" },
+            { name: "vg_progressbar_get_value", desc: "获取进度值", params: [{ name: "pb_id", type: "string" }], returns: "number", category: "GUI", status: "supported", note: "" },
+            { name: "vg_progressbar_set_color", desc: "设置进度条颜色", params: [{ name: "pb_id", type: "string" }, { name: "color", type: "array", desc: "[r,g,b,a]" }], returns: "bool", category: "GUI", status: "supported", note: "" },
+
+            // ========== GUI卡片 ==========
+            { name: "vg_create_card", desc: "创建卡片容器", params: [{ name: "x", type: "number" }, { name: "y", type: "number" }, { name: "width", type: "number" }, { name: "height", type: "number" }, { name: "title", type: "string" }, { name: "subtitle", type: "string" }], returns: "string", category: "GUI", status: "supported", note: "返回卡片对象ID" },
+            { name: "vg_card_set_title", desc: "设置卡片标题", params: [{ name: "card_id", type: "string" }, { name: "title", type: "string" }], returns: "bool", category: "GUI", status: "supported", note: "" },
+            { name: "vg_card_set_elevation", desc: "设置卡片阴影深度", params: [{ name: "card_id", type: "string" }, { name: "elevation", type: "number" }], returns: "bool", category: "GUI", status: "supported", note: "" },
+
+            // ========== GUI下拉框 ==========
+            { name: "vg_create_combobox", desc: "创建下拉框", params: [{ name: "x", type: "number" }, { name: "y", type: "number" }, { name: "width", type: "number" }, { name: "height", type: "number" }], returns: "string", category: "GUI", status: "supported", note: "返回下拉框对象ID" },
+            { name: "vg_combobox_add_item", desc: "添加下拉选项", params: [{ name: "combo_id", type: "string" }, { name: "item", type: "string" }], returns: "bool", category: "GUI", status: "supported", note: "" },
+            { name: "vg_combobox_clear", desc: "清空所有选项", params: [{ name: "combo_id", type: "string" }], returns: "bool", category: "GUI", status: "supported", note: "" },
+            { name: "vg_combobox_set_selected", desc: "设置选中项", params: [{ name: "combo_id", type: "string" }, { name: "index", type: "number" }], returns: "bool", category: "GUI", status: "supported", note: "" },
+            { name: "vg_combobox_get_selected", desc: "获取选中索引", params: [{ name: "combo_id", type: "string" }], returns: "number", category: "GUI", status: "supported", note: "返回索引，-1表示未选中" },
+            { name: "vg_combobox_on_selected", desc: "绑定选中项改变回调", params: [{ name: "combo_id", type: "string" }, { name: "callback", type: "function" }], returns: "bool", category: "GUI", status: "supported", note: "回调参数: index(number), text(string)" },
+
+            // ========== GUI列表框 ==========
+            { name: "vg_create_listbox", desc: "创建列表框", params: [{ name: "x", type: "number" }, { name: "y", type: "number" }, { name: "width", type: "number" }, { name: "height", type: "number" }], returns: "string", category: "GUI", status: "supported", note: "返回列表框对象ID" },
+            { name: "vg_listbox_add_item", desc: "添加列表项", params: [{ name: "list_id", type: "string" }, { name: "item", type: "string" }], returns: "bool", category: "GUI", status: "supported", note: "" },
+            { name: "vg_listbox_clear", desc: "清空所有项", params: [{ name: "list_id", type: "string" }], returns: "bool", category: "GUI", status: "supported", note: "" },
+            { name: "vg_listbox_set_selected", desc: "设置选中项", params: [{ name: "list_id", type: "string" }, { name: "index", type: "number" }], returns: "bool", category: "GUI", status: "supported", note: "" },
+            { name: "vg_listbox_get_selected", desc: "获取选中索引", params: [{ name: "list_id", type: "string" }], returns: "number", category: "GUI", status: "supported", note: "" },
+            { name: "vg_listbox_on_selected", desc: "绑定选中项改变回调", params: [{ name: "list_id", type: "string" }, { name: "callback", type: "function" }], returns: "bool", category: "GUI", status: "supported", note: "回调参数: index(number), text(string)" },
+
+            // ========== GUI标签页 ==========
+            { name: "vg_create_tabcontrol", desc: "创建标签页控件", params: [{ name: "x", type: "number" }, { name: "y", type: "number" }, { name: "width", type: "number" }, { name: "height", type: "number" }], returns: "string", category: "GUI", status: "supported", note: "返回标签页控件ID" },
+            { name: "vg_tabcontrol_add_tab", desc: "添加标签页", params: [{ name: "tab_id", type: "string" }, { name: "title", type: "string" }], returns: "bool", category: "GUI", status: "supported", note: "" },
+            { name: "vg_tabcontrol_set_selected", desc: "切换标签页", params: [{ name: "tab_id", type: "string" }, { name: "index", type: "number" }], returns: "bool", category: "GUI", status: "supported", note: "" },
+
+            // ========== GUI加载动画 ==========
+            { name: "vg_create_spinner", desc: "创建加载动画", params: [{ name: "x", type: "number" }, { name: "y", type: "number" }, { name: "width", type: "number" }, { name: "height", type: "number" }], returns: "string", category: "GUI", status: "supported", note: "返回动画对象ID" },
+            { name: "vg_spinner_start", desc: "启动动画", params: [{ name: "spinner_id", type: "string" }], returns: "bool", category: "GUI", status: "supported", note: "" },
+            { name: "vg_spinner_stop", desc: "停止动画", params: [{ name: "spinner_id", type: "string" }], returns: "bool", category: "GUI", status: "supported", note: "" },
+
+            // ========== GUI通用操作 ==========
+            { name: "vg_set_position", desc: "设置组件位置", params: [{ name: "obj_id", type: "string" }, { name: "x", type: "number" }, { name: "y", type: "number" }], returns: "bool", category: "GUI", status: "supported", note: "" },
+            { name: "vg_set_size", desc: "设置组件大小", params: [{ name: "obj_id", type: "string" }, { name: "width", type: "number" }, { name: "height", type: "number" }], returns: "bool", category: "GUI", status: "supported", note: "" },
+            { name: "vg_set_visible", desc: "设置组件可见性", params: [{ name: "obj_id", type: "string" }, { name: "visible", type: "bool" }], returns: "bool", category: "GUI", status: "supported", note: "" },
+            { name: "vg_set_enabled", desc: "设置组件启用状态", params: [{ name: "obj_id", type: "string" }, { name: "enabled", type: "bool" }], returns: "bool", category: "GUI", status: "supported", note: "" },
+            { name: "vg_destroy", desc: "销毁组件", params: [{ name: "obj_id", type: "string" }], returns: "bool", category: "GUI", status: "supported", note: "" }
+
+        ];
+
+        const categoriesSet = new Set();
+        VM_FUNCTIONS_DATA.forEach(fn => { if (fn.category) categoriesSet.add(fn.category); });
+        const ALL_CATEGORIES = ["全部", ...Array.from(categoriesSet).sort()];
+        let activeCategory = "全部";
+        let searchKeyword = "";
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>]/g, function (m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
+        }
+
+        function getStatusBadge(status, note) {
+            if (status === 'supported') {
+                return `<span class="status-badge status-supported">✅ 已支持</span>${note ? `<div class="diff-note">${escapeHtml(note)}</div>` : ''}`;
+            } else if (status === 'partial') {
+                return `<span class="status-badge status-partial">⚠️ 部分支持</span>${note ? `<div class="diff-note">${escapeHtml(note)}</div>` : ''}`;
+            } else {
+                return `<span class="status-badge status-unsupported">❌ 未支持</span>${note ? `<div class="diff-note">${escapeHtml(note)}</div>` : ''}`;
+            }
+        }
+
+        function renderParams(params) {
+            if (!params || params.length === 0 || (params.length === 1 && params[0].name === "")) {
+                return '<ul class="param-list"><li class="param-item">无参数</li></ul>';
+            }
+            let html = '<ul class="param-list">';
+            for (let p of params) {
+                let pName = escapeHtml(p.name || '参数');
+                let pType = p.type ? `<span class="param-type">(${escapeHtml(p.type)})</span>` : '';
+                let pDesc = p.desc ? ` — ${escapeHtml(p.desc)}` : '';
+                html += `<li class="param-item"><span class="param-name">${pName}</span> ${pType}${pDesc}</li>`;
+            }
+            html += '</ul>';
+            return html;
+        }
+
+        function getFilteredFunctions() {
+            return VM_FUNCTIONS_DATA.filter(fn => {
+                if (activeCategory !== "全部" && fn.category !== activeCategory) return false;
+                if (searchKeyword !== "") {
+                    const kw = searchKeyword.toLowerCase();
+                    const nameMatch = fn.name.toLowerCase().includes(kw);
+                    const descMatch = fn.desc.toLowerCase().includes(kw);
+                    if (!nameMatch && !descMatch) return false;
+                }
+                return true;
+            });
+        }
+
+        function renderCategoryNav() {
+            const nav = document.getElementById("categoryNav");
+            nav.innerHTML = `
+                <div style="display:flex; flex-wrap:wrap; gap:0.6rem; align-items:center; flex:1;">
+                    ${ALL_CATEGORIES.map(cat => `<button class="category-btn ${activeCategory === cat ? 'active' : ''}" data-cat="${cat}">${cat}</button>`).join('')}
+                </div>
+                <div class="search-box">
+                    <input type="text" class="search-input" id="searchInput" placeholder="🔍 搜索函数..." value="${escapeHtml(searchKeyword)}">
+                </div>
+            `;
+
+            document.querySelectorAll('.category-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    activeCategory = btn.getAttribute('data-cat');
+                    searchKeyword = document.getElementById('searchInput')?.value.trim() || "";
+                    renderTable();
+                    renderCategoryNav();
+                });
+            });
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput) {
+                searchInput.addEventListener('input', (e) => {
+                    searchKeyword = e.target.value.trim();
+                    renderTable();
+                    renderCategoryNav();
+                });
+            }
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById("tableBody");
+            const filtered = getFilteredFunctions();
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="no-result">🔍 没有找到匹配的函数</td></tr>';
+                return;
+            }
+            let rows = '';
+            for (let fn of filtered) {
+                rows += `<tr>
+                    <td data-label="函数名"><span class="func-name">${isVmOnly(fn.name) ? "⭐" : ""}${escapeHtml(fn.name)}</span></td>
+                    <td data-label="描述">${escapeHtml(fn.desc)}</td>
+                    <td data-label="参数">${renderParams(fn.params)}</td>
+                    <td data-label="返回值"><span class="return-badge">${escapeHtml(fn.returns)}</span></td>
+                    <td data-label="状态">${getStatusBadge(fn.status, fn.note)}</td>
+                </tr>`;
+            }
+            tbody.innerHTML = rows;
+        }
+
+        function init() {
+            renderCategoryNav();
+            renderTable();
+        }
+
+        init();
+    </script>
+</body>
+
+</html>

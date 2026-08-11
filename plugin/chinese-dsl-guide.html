@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>中文编程扩展指南</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #f5f7fb;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: #1e293b;
+            padding: 2rem 1rem;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 24px;
+            box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+
+        .doc-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 3rem 3rem;
+            border-bottom: none;
+        }
+
+        .doc-header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            margin-bottom: 0.75rem;
+            background: linear-gradient(135deg, #fff, #e0d4ff);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+        }
+
+        .doc-header .version {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(8px);
+            display: inline-block;
+            padding: 0.25rem 1rem;
+            border-radius: 40px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            margin-top: 0.5rem;
+        }
+
+        .doc-header p {
+            margin-top: 1.25rem;
+            opacity: 0.9;
+            max-width: 75%;
+            font-size: 1.05rem;
+        }
+
+        .doc-body {
+            display: flex;
+            flex-wrap: wrap;
+        }
+
+
+        .sidebar {
+            flex: 1;
+            min-width: 260px;
+            background: #f8fafc;
+            border-right: 1px solid #e9edf2;
+            padding: 2rem 1rem;
+            position: sticky;
+            top: 0;
+            height: fit-content;
+        }
+
+        .sidebar nav ul {
+            list-style: none;
+        }
+
+        .sidebar nav li {
+            margin: 0.25rem 0;
+        }
+
+        .sidebar nav a {
+            text-decoration: none;
+            color: #475569;
+            font-weight: 450;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0.6rem 1rem;
+            border-radius: 12px;
+            font-size: 0.9rem;
+        }
+
+        .sidebar nav a:hover {
+            background: #eef2ff;
+            color: #4f46e5;
+            transform: translateX(4px);
+        }
+
+        .sidebar nav a::before {
+            font-size: 1.1rem;
+        }
+
+
+        .content {
+            flex: 4;
+            padding: 2.5rem 3rem;
+            background: white;
+            max-width: calc(100% - 260px);
+        }
+
+
+        h2 {
+            font-size: 1.8rem;
+            font-weight: 650;
+            margin: 2rem 0 1.25rem 0;
+            padding-bottom: 0.5rem;
+            border-bottom: 3px solid #eef2ff;
+            color: #0f172a;
+            letter-spacing: -0.01em;
+        }
+
+        h3 {
+            font-size: 1.35rem;
+            font-weight: 600;
+            margin: 1.5rem 0 0.75rem 0;
+            color: #1e293b;
+        }
+
+        h4 {
+            font-weight: 600;
+            margin: 1.2rem 0 0.5rem 0;
+            color: #475569;
+            font-size: 1.05rem;
+        }
+
+
+        p {
+            margin-bottom: 1rem;
+            color: #334155;
+        }
+
+
+        code {
+            font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+            background: #f1f5f9;
+            padding: 0.2rem 0.45rem;
+            border-radius: 8px;
+            font-size: 0.85em;
+            color: #be123c;
+            font-weight: 500;
+        }
+
+        pre {
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 1.2rem 1.5rem;
+            border-radius: 16px;
+            overflow-x: auto;
+            margin: 1.25rem 0;
+            font-size: 0.82rem;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            line-height: 1.5;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        pre code {
+            background: transparent;
+            color: inherit;
+            padding: 0;
+            font-weight: normal;
+        }
+
+
+        .note {
+            background: #ecfdf5;
+            border-left: 4px solid #10b981;
+            padding: 1rem 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 12px;
+            color: #065f46;
+        }
+
+        .warning {
+            background: #fffbeb;
+            border-left: 4px solid #f59e0b;
+            padding: 1rem 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 12px;
+            color: #92400e;
+        }
+
+        .tip {
+            background: #eff6ff;
+            border-left: 4px solid #3b82f6;
+            padding: 1rem 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 12px;
+            color: #1e40af;
+        }
+
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        th,
+        td {
+            border: 1px solid #e2e8f0;
+            padding: 0.85rem 1.2rem;
+            text-align: left;
+        }
+
+        th {
+            background: #f8fafc;
+            font-weight: 600;
+            color: #1e293b;
+        }
+
+
+        .badge {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            font-size: 0.7rem;
+            padding: 0.2rem 0.7rem;
+            border-radius: 30px;
+            display: inline-block;
+            margin-right: 0.6rem;
+            font-weight: 500;
+        }
+
+        .file-path {
+            background: #1e293b;
+            color: #cbd5e1;
+            padding: 0.2rem 0.6rem;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.8rem;
+        }
+
+
+        ul,
+        ol {
+            margin: 0.8rem 0 1rem 1.5rem;
+            color: #334155;
+        }
+
+        li {
+            margin: 0.4rem 0;
+        }
+
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+
+        footer {
+            background: #f8fafc;
+            padding: 1.5rem;
+            text-align: center;
+            font-size: 0.8rem;
+            color: #64748b;
+            border-top: 1px solid #e9edf2;
+        }
+
+
+        @media (max-width: 960px) {
+            .sidebar {
+                display: none;
+            }
+
+            .content {
+                max-width: 100%;
+                padding: 1.8rem;
+            }
+
+            .doc-header p {
+                max-width: 100%;
+            }
+
+            .doc-header {
+                padding: 2rem 1.5rem;
+            }
+
+            .doc-header h1 {
+                font-size: 1.8rem;
+            }
+        }
+
+        @media (max-width: 640px) {
+            body {
+                padding: 0.5rem;
+            }
+
+            .content {
+                padding: 1.2rem;
+            }
+
+            pre {
+                padding: 0.8rem 1rem;
+                font-size: 0.7rem;
+            }
+
+            h2 {
+                font-size: 1.4rem;
+            }
+
+            h3 {
+                font-size: 1.15rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="doc-header">
+            <h1>🇨🇳 中文编程扩展指南</h1>
+            <span class="version">基于 QOT v1.0 架构</span>
+            <p>深入 QOT 内核，从词法、语法到 AST 优化，系统性如何将 QOT 扩展为中文编程语言或任意领域特定语言（DSL）。</p>
+        </div>
+        <div class="doc-body">
+            <div class="sidebar">
+                <nav>
+                    <ul>
+                        <li><a href="#overview"> 概述</a></li>
+                        <li><a href="#architecture"> QOT 架构全景</a></li>
+                        <li><a href="#lexer"> 第一层：词法扩展</a></li>
+                        <li><a href="#parser"> 第二层：语法扩展</a></li>
+                        <li><a href="#ast"> 第三层：AST 与优化</a></li>
+                        <li><a href="#bytecode"> 第四层：字节码编译</a></li>
+                        <li><a href="#builtin"> 第五层：内置函数扩展</a></li>
+                        <li><a href="#chinese"> 实战：完整的中文扩展案例</a></li>
+                        <li><a href="#dsl"> 打造 DSL</a></li>
+                        <li><a href="#testing"> 测试与验证</a></li>
+                        <li><a href="#faq"> 常见问题</a></li>
+                    </ul>
+                </nav>
+            </div>
+            <div class="content">
+
+
+                <section id="overview">
+                    <h2> 概述</h2>
+                    <p>QOT 是一个完整的脚本语言实现，包含<strong>词法分析器</strong>、<strong>语法分析器</strong>、<strong>AST
+                            编码器</strong>、<strong>字节码编译器</strong>、<strong>虚拟机</strong>和<strong>内置函数库</strong>。其模块化设计使得扩展为中文编程语言或任意
+                        DSL 变得异常简单。</p>
+                    <div class="note">
+                        <strong> 核心思想：</strong> 你不需要重写整个编译器。只需要在关键扩展点注入你的语法规则和关键字映射。
+                    </div>
+                    <p>本文将逐一分析 QOT 的各个模块，给出具体的扩展方案和代码示例，最终完成一个完整的“中文编程”扩展案例。</p>
+                </section>
+                <section id="architecture">
+                    <h2> QOT 架构全景</h2>
+                    <p>QOT 的编译执行流程如下：</p>
+                    <pre>
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│  源代码     │ -> │ 词法分析    │ -> │ 语法分析    │ -> │ AST 优化    │ -> │ 字节码生成  │
+│  (.qot)     │    │ Lexer       │    │ Parser      │    │ Optimizer   │    │ Compiler    │
+└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
+                                                                                    │
+                                                                                    ▼
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│  执行结果   │ <- │ 虚拟机执行  │ <- │ 字节码加载  │ <- │ 字节码文件  │ <- │ 编码/压缩   │
+│             │    │ VM (C++)    │    │ Loader      │    │ (.qtc)      │    │ Encoder     │
+└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
+                </pre>
+                    <p>扩展为中文编程或 DSL，主要涉及前 4 层（词法、语法、AST、字节码）和内置函数层。</p>
+                    <table>
+                        <tr>
+                            <th>模块</th>
+                            <th>文件</th>
+                            <th>扩展方式</th>
+                        </tr>
+                        <tr>
+                            <td>词法分析器</td>
+                            <td class="file-path">token_char.py</td>
+                            <td>添加中文关键字、运算符、标识符规则</td>
+                        </tr>
+                        <tr>
+                            <td>语法分析器</td>
+                            <td class="file-path">grammar.py</td>
+                            <td>添加/修改产生式规则，映射中文语法</td>
+                        </tr>
+                        <tr>
+                            <td>AST 优化器</td>
+                            <td class="file-path">ast_encoder.py, astcomopt.py</td>
+                            <td>通常无需修改，保持通用性</td>
+                        </tr>
+                        <tr>
+                            <td>字节码编译器</td>
+                            <td class="file-path">bytecode.py</td>
+                            <td>为新的 AST 节点添加编译规则</td>
+                        </tr>
+                        <tr>
+                            <td>内置函数</td>
+                            <td class="file-path">builtin_func.py</td>
+                            <td>注册中文命名的函数</td>
+                        </tr>
+                    </table>
+                </section>
+
+            
+                <section id="lexer">
+                    <h2> 第一层：词法扩展</h2>
+                    <p>词法分析器位于 <code class="file-path">token_char.py</code>，负责将源代码字符串转换为 Token
+                        流。这是扩展中文编程的<strong>第一站</strong>。</p>
+
+                    <h3>1.1 核心机制分析</h3>
+                    <p>词法器使用 <code>ply.lex</code> 实现，通过正则表达式匹配 Token。关键代码片段：</p>
+                    <pre>
+# token_char.py - 标识符匹配规则
+def t_IDENTIFIER(self, t):
+    r'[a-zA-Z_\u4e00-\u9fa5][a-zA-Z0-9_\u4e00-\u9fa5]*'
+    return t
+
+# 关键字集合
+self.keywords = {"if", "else", "eif", "loop", "for", "in", "func", 
+                 "return", "var", "const", "null", "stop", ...}</pre>
+                    <div class="tip">
+                        <strong> 注意：</strong> 标识符正则 <code>[\u4e00-\u9fa5]</code> 已经支持中文字符！中文变量名、函数名开箱即用。
+                    </div>
+
+                    <h3>1.2 扩展中文关键字</h3>
+                    <p>要将英文关键字映射为中文，只需修改 <code>keywords</code> 集合：</p>
+                    <pre>
+# 修改 token_char.py 中的 __init__ 方法
+self.keywords = {
+    # 原有英文保留（兼容）
+    "if", "else", "eif", "loop", "for", "in", 
+    "func", "return", "var", "const", "null", "stop",
+    # 新增中文关键字
+    "如果", "否则", "否则如果", "循环", "对于", "属于",
+    "函数", "返回", "变量", "常量", "空", "停止"
+}</pre>
+
+                    <h3>1.3 添加自定义运算符</h3>
+                    <p>QOT 的运算符在 <code>t_OPERATOR</code> 和 <code>precedence</code> 中定义。添加中文运算符（如“等于”、“大于”）：</p>
+                    <pre>
+# 在 t_OPERATOR 中添加
+def t_OPERATOR(self, t):
+    r'##|\+=|-=|\*=|/=|%=|==|!=|<=|>=|<<|>>|\+\+|--|->|&&|\|\||::|=|<|>|\+|-|\*|/|%|!|&|\||\^|~|\?|@|:|等于|大于|小于'
+    # 映射中文运算符到内部表示
+    if t.value == '等于':
+        t.value = '=='
+    elif t.value == '大于':
+        t.value = '>'
+    elif t.value == '小于':
+        t.value = '<'
+    return t</pre>
+
+                    <div class="note">
+                        <strong> 扩展原则：</strong> 尽量在词法层将中文 Token 映射为英文内部表示，这样可以最小化后续模块的修改。
+                    </div>
+                </section>
+
+              
+                <section id="parser">
+                    <h2> 第二层：语法扩展</h2>
+                    <p>语法分析器位于 <code class="file-path">grammar.py</code>，使用 PLY 的 yacc 模块。这里是定义语言语法的核心位置。</p>
+
+                    <h3>2.1 语法规则结构</h3>
+                    <p>每个产生式对应一个以 <code>p_</code> 开头的函数。例如条件语句：</p>
+                    <pre>
+def p_statement_if(p):
+    '''statement : IF LPAREN expression RPAREN LBRACE statement_list RBRACE 
+                  eif_clause_opt else_clause_opt'''
+    p[0] = ('if_statement', p[3], p[6], p[8], p[9], get_line_number(p))</pre>
+
+                    <h3>2.2 添加中文语法规则</h3>
+                    <p>要支持中文语法，有两种策略：</p>
+                    <ul>
+                        <li><strong>策略A（推荐）：</strong> 新增中文产生式，复用相同的 AST 构建逻辑</li>
+                        <li><strong>策略B：</strong> 直接修改英文产生式（会破坏兼容性）</li>
+                    </ul>
+                    <p>以下是策略A的示例——添加中文条件语句：</p>
+                    <pre>
+def p_statement_if_chinese(p):
+    '''statement : 如果 LPAREN expression RPAREN 开始 statement_list 结束
+                  否则如果_子句_可选 否则_子句_可选'''
+    p[0] = ('if_statement', p[3], p[6], p[8], p[9], get_line_number(p))
+
+def p_eif_clause_chinese(p):
+    '''eif_clause : 否则如果 LPAREN expression RPAREN 开始 statement_list 结束'''
+    p[0] = ('eif_clause', p[3], p[6], get_line_number(p))
+
+def p_else_clause_chinese(p):
+    '''else_clause : 否则 开始 statement_list 结束'''
+    p[0] = ('else_clause', p[3], get_line_number(p))</pre>
+
+                    <h3>2.3 添加循环语句中文支持</h3>
+                    <pre>
+def p_statement_while_chinese(p):
+    '''statement : 循环 LPAREN expression RPAREN 开始 statement_list 结束'''
+    p[0] = ('while_statement', p[3], p[6], get_line_number(p))
+
+def p_statement_for_chinese(p):
+    '''statement : 对于 LPAREN IDENTIFIER 属于 expression RPAREN 开始 statement_list 结束'''
+    p[0] = ('for_statement', p[3], p[5], p[8], get_line_number(p))</pre>
+
+                    <h3>2.4 函数定义的中文化</h3>
+                    <pre>
+def p_statement_func_declaration_chinese(p):
+    '''statement : 函数 IDENTIFIER LPAREN parameter_list_opt RPAREN 开始 statement_list 结束'''
+    # 默认返回类型为 any_t
+    p[0] = ('func_declaration', 'any_t', p[2], p[4], p[7], get_line_number(p))</pre>
+
+                    <div class="warning">
+                        <strong> 注意：</strong> 添加中文语法后，需要同步更新 token 列表，将中文关键字加入 <code>tokens</code> 元组。
+                    </div>
+                </section>
+                <section id="ast">
+                    <h2> 第三层：AST 与优化</h2>
+                    <p>AST
+                        编码器（<code>ast_encoder.py</code>）和优化器（<code>astcomopt.py</code>）通常<strong>无需修改</strong>，因为它们操作的是节点类型（如
+                        <code>'if_statement'</code>），而非具体的关键字。</p>
+
+                    <h3>3.1 AST 节点类型系统</h3>
+                    <p>所有 AST 节点使用元组表示，第一个元素是节点类型：</p>
+                    <pre>
+('if_statement', condition_ast, if_block_ast, eif_blocks, else_block, line)
+('while_statement', condition_ast, body_ast, line)
+('function_call', func_name, args, line)</pre>
+                    <p>无论你用什么中文关键字，最终都映射为这些标准节点类型。</p>
+
+                    <h3>3.2 添加自定义 AST 节点</h3>
+                    <p>如果你的 DSL 需要全新的语法结构（例如管道操作符 <code>|></code> 或模式匹配），需要：</p>
+                    <ol>
+                        <li>在 <code>astcomopt.py</code> 的 <code>NODE_TYPES</code> 中添加新类型</li>
+                        <li>在优化器中添加对应的 <code>_opt_xxx</code> 方法</li>
+                        <li>在字节码编译器中添加编译规则</li>
+                    </ol>
+                    <pre>
+# astcomopt.py - 添加新节点类型
+NODE_TYPES = {
+    # ... 原有类型 ...
+    'pipeline': 'pipeline',  # 管道操作符
+}
+
+# 添加优化方法
+def _opt_pipeline(self, node: Tuple) -> Tuple:
+    _, left, right = node
+    return _make_node('pipeline', self._optimize_node(left), self._optimize_node(right))</pre>
+
+                    <div class="tip">
+                        <strong> 最佳实践：</strong> 优先复用现有 AST 节点类型，仅在必要时添加新类型。
+                    </div>
+                </section>
+
+            
+                <section id="bytecode">
+                    <h2> 第四层：字节码编译</h2>
+                    <p>字节码编译器位于 <code class="file-path">bytecode.py</code>，负责将 AST 转换为虚拟机指令序列。</p>
+
+                    <h3>4.1 核心编译流程</h3>
+                    <p><code>Compiler._compile_node()</code> 是核心方法，根据节点类型分发到不同的处理逻辑：</p>
+                    <pre>
+def _compile_node(self, node, code: VMCode, is_lvalue=False):
+    node_type = node[0]
+    if node_type == 'literal':
+        # 编译字面量
+    elif node_type == 'binary_op':
+        # 编译二元运算
+    elif node_type == 'if_statement':
+        # 编译条件分支
+    # ... 其他类型</pre>
+
+                    <h3>4.2 为新 AST 节点添加编译支持</h3>
+                    <p>假设你添加了管道操作符 <code>pipeline</code> 节点：</p>
+                    <pre>
+elif node_type == 'pipeline':
+    _, left_expr, right_expr = node
+    # 编译左表达式，结果留在栈顶
+    self._compile_node(left_expr, code)
+    # 将栈顶值作为右表达式的隐式参数
+    # 这里假设右表达式是一个函数调用
+    self._compile_node(right_expr, code)</pre>
+
+                    <h3>4.3 VM 指令扩展</h3>
+                    <p>如果新语法需要新的 VM 指令，在 <code>VMInstruction</code> 类中添加：</p>
+                    <pre>
+class VMInstruction:
+    # ... 原有指令 ...
+    PIPELINE = 70      # 管道操作指令
+    PATTERN_MATCH = 71 # 模式匹配指令</pre>
+                    <p>然后在虚拟机实现（C++ 部分，位于 <code>ot-asset/c/vmcshit/</code>）中添加对应指令的处理逻辑。有关 VM 扩展的详细信息，请参考 <a
+                            href="vm-extension-guide.html">VM 扩展开发文档</a>。</p>
+                </section>
+
+             
+                <section id="builtin">
+                    <h2> 第五层：内置函数扩展</h2>
+                    <p><code class="file-path">builtin_func.py</code> 定义了所有内置函数。要为中文编程添加中文命名的函数：</p>
+
+                    <h3>5.1 注册中文函数</h3>
+                    <pre>
+# 在 _register_builtin_functions 方法中添加
+def 输出(*args):
+    formatted = [format_value_for_output(arg) for arg in args]
+    print(' '.join(formatted))
+    return None
+
+def 输入(*args):
+    prompt = ' '.join(map(str, args)) if args else ''
+    return input(prompt)
+
+# 注册到函数表
+self.register_function('输出', 输出, (-1, ['any'], 'unknown'))
+self.register_function('输入', 输入, (-1, ['any'], 'any'))</pre>
+
+                    <h3>5.2 函数重命名（别名）</h3>
+                    <p>更优雅的方式是为现有函数添加中文别名：</p>
+                    <pre>
+# 为 output 添加中文别名
+self.register_function('打印', self.functions['output'], (-1, ['any'], 'unknown'))
+self.register_function('显示', self.functions['output'], (-1, ['any'], 'unknown'))</pre>
+
+                    <h3>5.3 扩展类型系统内置函数</h3>
+                    <p>中文 DSL 可能需要特定的类型转换函数：</p>
+                    <pre>
+def 转为文本(*args):
+    return str(args[0]) if args else ""
+
+def 转为整数(*args):
+    return int(args[0]) if args else 0
+
+self.register_function('转为文本', 转为文本, (1, ['any'], 'string'))
+self.register_function('转为整数', 转为整数, (1, ['any'], 'number'))</pre>
+                </section>
+
+               
+                <section id="chinese">
+                    <h2> 实战：完整的中文扩展案例</h2>
+                    <p>以下是一个完整的“中文编程”扩展示例，展示所有修改点。</p>
+
+                    <h3>6.1 修改 token_char.py</h3>
+                    <pre>
+# 添加中文关键字
+self.keywords.update({
+    "如果", "否则", "否则如果", "循环", "对于", "属于",
+    "函数", "返回", "变量", "常量", "空", "停止", "打印"
+})
+
+# 添加中文运算符映射
+# (在 t_OPERATOR 中处理)</pre>
+
+                    <h3>6.2 修改 grammar.py</h3>
+                    <pre>
+# 添加中文产生式
+def p_statement_print(p):
+    '''statement : 打印 LPAREN expression_list_opt RPAREN SEMICOLON'''
+    p[0] = ('function_call_statement', ('function_call', '打印', p[3], get_line_number(p)), get_line_number(p))
+
+# 其他中文语法规则同上</pre>
+
+                    <h3>6.3 修改 builtin_func.py</h3>
+                    <pre>
+# 注册中文函数
+self.register_function('打印', self.functions['output'], (-1, ['any'], 'unknown'))
+self.register_function('打印行', self.functions['output'], (-1, ['any'], 'unknown'))</pre>
+
+                    <h3>6.4 中文代码示例</h3>
+                    <pre>
+// 中文 QOT 代码
+变量 姓名 = "小明"
+变量 年龄 = 18
+
+函数 问候(名字) {
+    返回 "你好，" + 名字
+}
+
+如果 (年龄 >= 18) {
+    打印("成年人")
+} 否则 {
+    打印("未成年人")
+}
+
+对于 (i 属于 5) {
+    打印("计数: " + i)
+}
+
+循环 (真) {
+    打印("无限循环")
+    停止
+}</pre>
+
+                    <div class="note">
+                        <strong> 扩展成果：</strong> 通过上述修改，QOT 成为一门真正的“中英文双语编程语言”，完全兼容原有英文语法。
+                    </div>
+                </section>
+
+          
+                <section id="dsl">
+                    <h2> 打造 DSL</h2>
+                    <p>基于 QOT 扩展 DSL 的通用方法论：</p>
+
+                    <h3>7.1 DSL 设计步骤</h3>
+                    <ol>
+                        <li><strong>定义语法</strong>：明确 DSL 的关键字、运算符和语法结构</li>
+                        <li><strong>词法扩展</strong>：在 <code>token_char.py</code> 中添加新 Token</li>
+                        <li><strong>语法扩展</strong>：在 <code>grammar.py</code> 中添加产生式</li>
+                        <li><strong>AST 映射</strong>：将 DSL 构造映射到标准 AST 节点</li>
+                        <li><strong>语义分析</strong>：在 <code>grammar.py</code> 的 <code>SemanticAnalyzer</code> 中添加检查</li>
+                        <li><strong>字节码生成</strong>：在 <code>bytecode.py</code> 中添加编译规则</li>
+                        <li><strong>运行时支持</strong>：在 <code>builtin_func.py</code> 中添加 DSL 专用函数</li>
+                    </ol>
+
+                    <h3>7.2 DSL 案例：配置语言</h3>
+                    <p>假设你需要一个描述 UI 布局的 DSL：</p>
+                    <pre>
+// UI 配置 DSL
+页面 "主界面" {
+    按钮 "确定" 位置(100, 200) 大小(80, 30)
+    文本 "欢迎使用" 居中 颜色("#333")
+}</pre>
+                    <p>实现方案：</p>
+                    <ul>
+                        <li>添加 Token：<code>页面</code>, <code>按钮</code>, <code>文本</code>, <code>位置</code>,
+                            <code>大小</code>, <code>居中</code>, <code>颜色</code></li>
+                        <li>添加产生式，构建 AST 节点 <code>('ui_page', ...)</code></li>
+                        <li>在运行时将 AST 转换为实际 UI 组件（通过内置函数）</li>
+                    </ul>
+
+                    <h3>7.3 DSL 案例：数据查询语言</h3>
+                    <pre>
+// 查询 DSL
+从 "users.json" 中
+选取 姓名, 年龄
+满足 年龄 > 18
+排序 年龄 降序
+取前 10 条</pre>
+                    <p>这类 DSL 可以映射为：</p>
+                    <pre>
+# 等价的标准 QOT
+query = load_json("users.json")
+result = query.filter(fn(x) { return x.年龄 > 18 })
+                .select(["姓名", "年龄"])
+                .sort("年龄", desc=True)
+                .limit(10)</pre>
+                </section>
+
+              
+                <section id="testing">
+                    <h2> 测试与验证</h2>
+
+                    <h3>8.1 单元测试</h3>
+                    <p>为你的扩展编写测试用例，验证词法、语法和运行时行为：</p>
+                    <pre>
+# test_chinese.py
+from token_char import Lexer, TokenType
+
+def test_chinese_identifier():
+    lexer = Lexer()
+    lexer.input("变量 名字 = \"小明\"", "test.qot")
+    tokens = []
+    while True:
+        t = lexer.token()
+        if t.type == TokenType.EOF_TOKEN:
+            break
+        tokens.append((t.type, t.value))
+    assert ('IDENTIFIER', '变量') in tokens
+    assert ('IDENTIFIER', '名字') in tokens</pre>
+
+                    <h3>8.2 集成测试</h3>
+                    <p>使用 QOT 执行器运行中文脚本，验证输出：</p>
+                    <pre>
+# 使用 index.py 的 execute_script 函数
+from index import execute_script
+import io
+import sys
+
+def test_chinese_script():
+    # 捕获输出
+    captured = io.StringIO()
+    sys.stdout = captured
+    execute_script("test_chinese.qot")
+    sys.stdout = sys.__stdout__
+    assert "预期输出" in captured.getvalue()</pre>
+
+                    <div class="tip">
+                        <strong> 建议：</strong> 建立扩展后的完整测试套件，确保兼容性和正确性。
+                    </div>
+                </section>
+
+            
+                <section id="faq">
+                    <h2> 常见问题</h2>
+
+                    <h3>Q1: 扩展中文语法后，英文语法还能用吗？</h3>
+                    <p>A: 可以。只要保留原有的产生式，中英文可以共存。这使得 QOT 成为真正的双语语言。</p>
+
+                    <h3>Q2: 如何调试语法错误？</h3>
+                    <p>A: QOT 集成了完整的错误系统（<code>error_system.py</code>）。可以在 <code>grammar.py</code> 的
+                        <code>p_error</code> 函数中添加自定义错误信息。</p>
+
+                    <h3>Q3: 性能会受影响吗？</h3>
+                    <p>A: 词法和语法层的扩展几乎不影响运行时性能。中文标识符在 AST 中仍然是字符串，字节码完全相同。</p>
+
+                    <h3>Q4: 能否在不修改核心代码的情况下扩展？</h3>
+                    <p>A: 可以通过继承机制扩展，但推荐直接修改源码，因为 QOT 是开源项目，你可以维护自己的分支。</p>
+
+                    <h3>Q5: 如何扩展 VM 指令？</h3>
+                    <p>A: 这需要修改 C++ 侧的虚拟机实现。详细内容请参考 <a href="vm-extension-guide.html">VM 扩展开发文档</a>。</p>
+
+                    <h3>Q6: 如何处理中文和英文的混合空格问题？</h3>
+                    <p>A: QOT 的词法器已经正确处理了 Unicode 空白字符，中文和英文之间无需特殊处理。</p>
+                </section>
+
+            
+                <section>
+                    <h2> 总结</h2>
+                    <p>QOT 的模块化设计使其成为<strong>DSL 扩展的理想平台</strong>。通过修改：</p>
+                    <ul>
+                        <li><code>token_char.py</code> —— 添加中文关键字和运算符</li>
+                        <li><code>grammar.py</code> —— 定义中文语法规则</li>
+                        <li><code>builtin_func.py</code> —— 注册中文函数</li>
+                    </ul>
+                    <p>你可以在<strong>数小时内</strong>将 QOT 扩展为一门完整的中文编程语言或特定领域的 DSL。而 AST 优化器、字节码编译器和虚拟机的通用设计，保证了扩展后的性能和兼容性。
+                    </p>
+                    <div class="note">
+                        <strong> 下一步：</strong> 阅读 <a href="vm-extension-guide.html">VM 扩展开发文档</a>，学习如何扩展 QOT
+                        的虚拟机以支持更高级的语言特性。
+                    </div>
+                </section>
+
+            </div>
+        </div>
+        <footer>
+            © QOT 语言 · 开源
+        </footer>
+    </div>
+</body>
+
+</html>
+<script>
+(function() {
+    const sidebar = document.querySelector('.sidebar');
+    if (!sidebar) return;
+
+    const container = document.querySelector('.container');
+    const content = document.querySelector('.content');
+    
+    let initialLeft = null;
+    let initialTop = null;
+    
+    function initPositions() {
+        const sidebarRect = sidebar.getBoundingClientRect();
+        initialLeft = sidebarRect.left;
+        initialTop = sidebarRect.top + window.scrollY;
+    }
+    
+    initPositions();
+    window.addEventListener('resize', initPositions);
+    
+    window.addEventListener('scroll', function() {
+        const scrollY = window.scrollY;
+        
+        if (scrollY + 20 > initialTop) {
+            sidebar.style.position = 'fixed';
+            sidebar.style.top = '20px';
+            sidebar.style.left = initialLeft + 'px';
+            sidebar.style.width = sidebar.offsetWidth + 'px';
+            sidebar.style.zIndex = '100';
+            if (content) {
+                content.style.marginLeft = sidebar.offsetWidth + 20 + 'px';
+            }
+        } else {
+            sidebar.style.position = '';
+            sidebar.style.top = '';
+            sidebar.style.left = '';
+            sidebar.style.width = '';
+            sidebar.style.zIndex = '';
+            if (content) {
+                content.style.marginLeft = '';
+            }
+        }
+    });
+})();
+</script>

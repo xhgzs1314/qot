@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>Qot 脚本运行</title>
+  <style>
+    :root {
+      --bg-primary: #0a0b0f;
+      --bg-secondary: #111318;
+      --bg-card: #161920;
+      --border: #252a35;
+      --text-primary: #b0b8cc;
+      --text-bright: #e0e4f0;
+      --text-dim: #5c6174;
+      --accent: #5b9cf5;
+      --error: #f44b6b;
+      --error-glow: rgba(244, 75, 107, 0.3);
+      --warning: #f0a44c;
+      --warning-glow: rgba(240, 164, 76, 0.3);
+      --success: #3ec28e;
+      --info: #4db8ff;
+      --system-tag: #a78bfa;
+      --script-tag: #5cc8e6;
+      --font-mono: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: var(--font-mono);
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      letter-spacing: 0.02em;
+    }
+
+
+    .toolbar {
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 56px;
+      flex-shrink: 0;
+      user-select: none;
+    }
+
+    .toolbar-title {
+      font-weight: 700;
+      color: var(--text-bright);
+      font-size: 15px;
+      letter-spacing: 1.5px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .toolbar-title span {
+      color: var(--accent);
+      background: rgba(91, 156, 245, 0.12);
+      padding: 3px 10px;
+      border-radius: 6px;
+      font-weight: 800;
+    }
+
+    .toolbar-right {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+    }
+
+    .filter-bar {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.02);
+      padding: 4px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .filter-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      font-family: var(--font-mono);
+    }
+
+    .filter-btn:hover {
+      color: var(--text-bright);
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .filter-btn.active {
+      background: var(--accent);
+      color: #0a0b0f;
+      font-weight: 700;
+      box-shadow: 0 2px 12px rgba(91, 156, 245, 0.5);
+    }
+
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      padding: 5px 16px;
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+    }
+
+    .status-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #f44b6b;
+      box-shadow: 0 0 10px currentColor;
+    }
+
+    .status-dot.connected {
+      background: var(--success);
+      box-shadow: 0 0 14px var(--success);
+    }
+
+    .status-dot.disconnected {
+      background: var(--error);
+      animation: pulse 1.8s infinite;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      50% {
+        opacity: 0.35;
+        transform: scale(0.8);
+      }
+    }
+
+
+    .console-container {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      gap: 10px;
+      padding: 10px;
+      background: var(--bg-primary);
+      overflow: hidden;
+    }
+
+    .quadrant {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transition: border-color 0.25s, box-shadow 0.25s;
+      position: relative;
+    }
+
+    .quadrant:hover {
+      border-color: #353d52;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    }
+
+    .quadrant-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(0, 0, 0, 0.3);
+      font-size: 11.5px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      color: var(--text-bright);
+      text-transform: uppercase;
+    }
+
+    .quadrant-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .quadrant-icon {
+      font-size: 15px;
+    }
+
+    .quadrant-count {
+      background: rgba(255, 255, 255, 0.06);
+      padding: 3px 12px;
+      border-radius: 20px;
+      font-size: 11px;
+      color: var(--text-dim);
+      font-weight: 600;
+    }
+
+    .quadrant-badge {
+      margin-left: 6px;
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 700;
+    }
+
+
+    .quadrant-system .quadrant-header {
+      border-bottom-color: #7c6bc033;
+    }
+
+    .quadrant-script .quadrant-header {
+      border-bottom-color: #4da8cc33;
+    }
+
+    .quadrant-error .quadrant-header {
+      border-bottom-color: #f44b6b33;
+    }
+
+    .quadrant-warn .quadrant-header {
+      border-bottom-color: #f0a44c33;
+    }
+
+
+    .output {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 8px 10px;
+      font-size: 12.5px;
+      line-height: 1.65;
+      scroll-behavior: smooth;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+
+    .gutter {
+      display: none;
+    }
+
+
+    .log-entry {
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+      padding: 8px 10px;
+      border-radius: 8px;
+      transition: all 0.2s;
+      background: rgba(255, 255, 255, 0.015);
+      border-left: 3px solid transparent;
+      position: relative;
+      cursor: default;
+    }
+
+    .log-entry:hover {
+      background: rgba(255, 255, 255, 0.04);
+      transform: translateX(2px);
+    }
+
+    .log-time {
+      color: var(--text-dim);
+      font-size: 10px;
+      min-width: 62px;
+      flex-shrink: 0;
+      user-select: none;
+      margin-top: 1px;
+      opacity: 0.7;
+    }
+
+    .log-tag {
+      font-size: 9px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      min-width: 42px;
+      text-align: center;
+      flex-shrink: 0;
+      height: fit-content;
+      margin-top: 1px;
+    }
+
+    .log-content {
+      color: var(--text-primary);
+      flex: 1;
+      line-height: 1.6;
+      word-break: break-word;
+    }
+
+
+    .quadrant-system .log-entry {
+      border-left-color: #a78bfa60;
+      background: linear-gradient(90deg, rgba(167, 139, 250, 0.04) 0%, transparent 100%);
+    }
+
+    .quadrant-system .log-tag.system {
+      background: rgba(167, 139, 250, 0.2);
+      color: #d4cbff;
+    }
+
+    .quadrant-system .log-content {
+      color: #cfc8f0;
+    }
+
+    .log-content .hl-path {
+      color: #7dcfff;
+      background: rgba(125, 207, 255, 0.1);
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-weight: 600;
+    }
+
+    .log-content .hl-status {
+      color: #3ec28e;
+      font-weight: 700;
+      background: rgba(62, 194, 142, 0.1);
+      padding: 1px 5px;
+      border-radius: 3px;
+    }
+
+    .log-content .hl-key {
+      color: #f0a44c;
+      font-weight: 600;
+    }
+
+
+    .quadrant-script .log-entry {
+      border-left: 3px solid #3e9ed6;
+      background: rgba(62, 158, 214, 0.04);
+      font-family: var(--font-mono);
+    }
+
+    .quadrant-script .log-tag.script {
+      background: #1a4058;
+      color: #7ad0ff;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+    }
+
+    .quadrant-script .log-content {
+      color: #d4e9ff;
+      font-weight: 500;
+    }
+
+    .log-content .hl-number {
+      color: #f0a44c;
+      font-weight: 700;
+    }
+
+    .log-content .hl-string {
+      color: #9ece6a;
+    }
+
+    .log-content .hl-bool {
+      color: #bb9af7;
+      font-weight: 700;
+    }
+
+    .log-content .hl-url {
+      color: #7dcfff;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      cursor: pointer;
+    }
+
+    .log-content .hl-table-key {
+      display: inline-block;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 1px 6px;
+      border-radius: 4px;
+      margin: 0 2px;
+      font-size: 11px;
+    }
+
+
+    .quadrant-error .log-entry {
+      border-left: 3px solid #f44b6b;
+      background: rgba(244, 75, 107, 0.06);
+      animation: errorGlow 3s ease-in-out infinite;
+    }
+
+    @keyframes errorGlow {
+
+      0%,
+      100% {
+        box-shadow: inset 0 0 0px rgba(244, 75, 107, 0);
+      }
+
+      50% {
+        box-shadow: inset 0 0 8px rgba(244, 75, 107, 0.08);
+      }
+    }
+
+    .quadrant-error .log-tag.error {
+      background: #b22a41;
+      color: #ffcfd9;
+      font-weight: 800;
+      animation: tagPulse 2s infinite;
+    }
+
+    @keyframes tagPulse {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.8;
+      }
+    }
+
+    .quadrant-error .log-content {
+      color: #ffb3bf;
+      font-weight: 500;
+    }
+
+    .log-content .hl-error-code {
+      background: #f44b6b;
+      color: #fff;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-weight: 800;
+      font-size: 11px;
+    }
+
+    .log-content .hl-stack {
+      display: block;
+      margin-top: 4px;
+      padding: 6px 10px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 6px;
+      font-size: 11px;
+      color: #ff9eaf;
+      border-left: 2px solid #f44b6b;
+      max-height: 60px;
+      overflow-y: auto;
+      cursor: pointer;
+      transition: max-height 0.3s;
+    }
+
+    .log-content .hl-stack.expanded {
+      max-height: 300px;
+    }
+
+
+    .quadrant-warn .log-entry {
+      border-left: 3px solid #f0a44c;
+      background: rgba(240, 164, 76, 0.05);
+    }
+
+    .quadrant-warn .log-tag.warn {
+      background: #b15e1c;
+      color: #ffe0b5;
+    }
+
+    .quadrant-warn .log-content {
+      color: #fcd9a7;
+    }
+
+    .log-content .hl-warn-icon {
+      display: inline-block;
+      margin-right: 4px;
+    }
+
+
+    .welcome-message {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      opacity: 0.35;
+      gap: 8px;
+      color: var(--text-dim);
+      font-size: 12px;
+      text-align: center;
+    }
+
+    .welcome-message .icon {
+      font-size: 36px;
+      opacity: 0.6;
+    }
+
+
+    .output::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .output::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .output::-webkit-scrollbar-thumb {
+      background: #252a35;
+      border-radius: 8px;
+    }
+
+    @media (max-width: 800px) {
+      .console-container {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto;
+      }
+
+      .toolbar {
+        flex-wrap: wrap;
+        height: auto;
+        padding: 10px;
+        gap: 10px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="toolbar">
+    <div class="toolbar-title">
+      ⚡ <span>QOT</span> 脚本运行平台
+    </div>
+    <div class="toolbar-right">
+      <div class="filter-bar" id="filterBar">
+        <button class="filter-btn active" data-filter="all">全部</button>
+        <button class="filter-btn" data-filter="script">脚本</button>
+        <button class="filter-btn" data-filter="system">系统</button>
+        <button class="filter-btn" data-filter="error">错误</button>
+        <button class="filter-btn" data-filter="warn">警告</button>
+      </div>
+      <div class="status-indicator" id="statusIndicator">
+        <div class="status-dot disconnected" id="statusDot"></div>
+        <span id="statusText">等待连接</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="console-container" id="consoleContainer">
+
+    <div class="quadrant quadrant-system" id="quadrantSystem">
+      <div class="quadrant-header">
+        <div class="quadrant-title"><span class="quadrant-icon">🖥️</span> 系统消息</div>
+        <span class="quadrant-count" id="systemCount">0</span>
+      </div>
+      <div class="output" id="outputSystem">
+        <div class="welcome-message">
+          <div class="icon">📡</div>
+          <div>系统日志将在此结构化展示</div>
+        </div>
+      </div>
+    </div>
+
+
+    <div class="quadrant quadrant-script" id="quadrantScript">
+      <div class="quadrant-header">
+        <div class="quadrant-title"><span class="quadrant-icon">📜</span> 脚本输出</div>
+        <span class="quadrant-count" id="scriptCount">0</span>
+      </div>
+      <div class="output" id="outputScript">
+        <div class="welcome-message">
+          <div class="icon">⚙️</div>
+          <div>脚本执行输出（自动高亮数字/URL）</div>
+        </div>
+      </div>
+    </div>
+
+
+    <div class="quadrant quadrant-error" id="quadrantError">
+      <div class="quadrant-header">
+        <div class="quadrant-title"><span class="quadrant-icon">❌</span> 错误</div>
+        <span class="quadrant-count" id="errorCount">0</span>
+      </div>
+      <div class="output" id="outputError">
+        <div class="welcome-message">
+          <div class="icon">💥</div>
+          <div>错误信息（支持堆栈展开）</div>
+        </div>
+      </div>
+    </div>
+
+
+    <div class="quadrant quadrant-warn" id="quadrantWarn">
+      <div class="quadrant-header">
+        <div class="quadrant-title"><span class="quadrant-icon">⚠️</span> 警告</div>
+        <span class="quadrant-count" id="warnCount">0</span>
+      </div>
+      <div class="output" id="outputWarn">
+        <div class="welcome-message">
+          <div class="icon">🔔</div>
+          <div>警告信息</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      class ConsoleApp {
+        constructor() {
+          this.ws = null;
+          this.lineCount = 0;
+          this.currentFilter = 'all';
+          this.allEntries = [];
+
+          this.outputSystem = document.getElementById('outputSystem');
+          this.outputScript = document.getElementById('outputScript');
+          this.outputError = document.getElementById('outputError');
+          this.outputWarn = document.getElementById('outputWarn');
+
+          this.systemCountSpan = document.getElementById('systemCount');
+          this.scriptCountSpan = document.getElementById('scriptCount');
+          this.errorCountSpan = document.getElementById('errorCount');
+          this.warnCountSpan = document.getElementById('warnCount');
+
+          this.statusDot = document.getElementById('statusDot');
+          this.statusText = document.getElementById('statusText');
+          this.filterBar = document.getElementById('filterBar');
+
+          this.categoryCounts = { system: 0, script: 0, error: 0, warn: 0 };
+
+          this.initWebSocket();
+          this.initFilters();
+        }
+
+        initWebSocket() {
+          const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+          const wsUrl = `${protocol}//${window.location.host}/ws`;
+          this.connect(wsUrl);
+          setInterval(() => {
+            if (!this.ws || this.ws.readyState === WebSocket.CLOSED) {
+              this.connect(wsUrl);
+            }
+          }, 3000);
+        }
+
+        connect(url) {
+          if (this.ws && this.ws.readyState === WebSocket.OPEN) return;
+          this.ws = new WebSocket(url);
+          this.ws.onopen = () => {
+            this.updateStatus(true);
+            this.addSystemMessage('info', '已连接到脚本运行服务器');
+          };
+          this.ws.onmessage = (event) => {
+            try {
+              const msg = JSON.parse(event.data);
+              this.addLogEntry(msg);
+            } catch (e) {
+              this.addLogEntry({
+                type: 'output',
+                data: event.data,
+                timestamp: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
+                level: 'info',
+                source: 'script'
+              });
+            }
+          };
+          this.ws.onclose = () => {
+            this.updateStatus(false);
+            this.addSystemMessage('info', '与服务器的连接已断开');
+          };
+          this.ws.onerror = () => {
+            this.addSystemMessage('error', 'WebSocket 连接错误');
+          };
+        }
+
+        addSystemMessage(level, message) {
+          this.addLogEntry({
+            type: 'output',
+            data: message,
+            timestamp: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
+            level: level,
+            source: 'system'
+          });
+        }
+        enrichContent(rawData, category) {
+          if (!rawData) return '';
+          let text = this.escapeHtml(String(rawData));
+          const replacements = [];
+          text = text.replace(/(https?:\/\/[^\s<>"']+)/g, (match, offset) => {
+            const id = replacements.length;
+            replacements.push(`<span class="hl-url" title="点击打开" onclick="event.stopPropagation(); window.open('${match}','_blank')">${match}</span>`);
+            return `\x00${id}\x00`;
+          });
+
+          if (category === 'system') {
+
+            text = text.replace(/([\/\\][\w\-\.\/\\]+)/g, (match, offset) => {
+              const id = replacements.length;
+              replacements.push(`<span class="hl-path">${match}</span>`);
+              return `\x00${id}\x00`;
+            });
+
+            text = text.replace(/\b(connected|disconnected|success|failed|started|stopped|listening|ready)\b/gi, (match) => {
+              const id = replacements.length;
+              replacements.push(`<span class="hl-status">${match}</span>`);
+              return `\x00${id}\x00`;
+            });
+
+            text = text.replace(/\b(port|host|pid|thread|memory)\b/gi, (match) => {
+              const id = replacements.length;
+              replacements.push(`<span class="hl-key">${match}</span>`);
+              return `\x00${id}\x00`;
+            });
+          }
+
+          if (category === 'script') {
+
+            text = text.replace(/(["'`])([^"'`]*?)\1/g, (match) => {
+              const id = replacements.length;
+              replacements.push(`<span class="hl-string">${match}</span>`);
+              return `\x00${id}\x00`;
+            });
+
+
+            text = text.replace(/\b(true|false|null|undefined)\b/gi, (match) => {
+              const id = replacements.length;
+              replacements.push(`<span class="hl-bool">${match}</span>`);
+              return `\x00${id}\x00`;
+            });
+
+
+            text = text.replace(/(?<![a-zA-Z0-9_])(-?\d+\.?\d*)(?![a-zA-Z0-9_])/g, (match) => {
+              const id = replacements.length;
+              replacements.push(`<span class="hl-number">${match}</span>`);
+              return `\x00${id}\x00`;
+            });
+
+
+            text = text.replace(/(^|\s)(\w+)\s*[:=]\s*/gm, (match, space, key) => {
+              const id = replacements.length;
+              replacements.push(`${space}<span class="hl-table-key">${key}</span> : `);
+              return `\x00${id}\x00`;
+            });
+          }
+
+          if (category === 'error') {
+            text = text.replace(/\b(E[A-Z]+|ERR_\w+|Error\s*#?\d+)\b/g, (match) => {
+              const id = replacements.length;
+              replacements.push(`<span class="hl-error-code">${match}</span>`);
+              return `\x00${id}\x00`;
+            });
+            if (text.includes('at ') && text.includes('\n')) {
+              const newlineIdx = text.indexOf('\n');
+              const mainMsg = text.substring(0, newlineIdx);
+              const stackLines = text.substring(newlineIdx + 1);
+              const id = replacements.length;
+              replacements.push(
+                `<span class="hl-stack" title="点击展开/折叠堆栈" onclick="this.classList.toggle('expanded'); event.stopPropagation();">${stackLines}</span>`
+              );
+              text = mainMsg + `\x00${id}\x00`;
+            }
+          }
+
+          if (category === 'warn') {
+            if (!text.trim().startsWith('⚠')) {
+              text = '<span class="hl-warn-icon">⚠️</span> ' + text;
+            }
+          }
+          replacements.forEach((html, index) => {
+            text = text.replace(`\x00${index}\x00`, html);
+          });
+
+          return text;
+        }
+
+        escapeHtml(text) {
+          const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+          return text.replace(/[&<>"']/g, m => map[m]);
+        }
+
+        addLogEntry(msg) {
+          const entry = {
+            ...msg,
+            id: ++this.lineCount,
+            timestamp: msg.timestamp || new Date().toLocaleTimeString('zh-CN', { hour12: false }),
+            level: msg.level || 'info',
+            source: msg.source || 'script',
+            data: msg.data || ''
+          };
+
+          this.allEntries.push(entry);
+
+          const level = entry.level;
+          const source = entry.source;
+          let category = 'script';
+          if (source === 'system') category = 'system';
+          else if (level === 'error') category = 'error';
+          else if (level === 'warn') category = 'warn';
+          else if (source === 'script') category = 'script';
+
+          this.categoryCounts[category] = (this.categoryCounts[category] || 0) + 1;
+          this.updateCountDisplay();
+
+          if (this.currentFilter !== 'all') {
+            if (this.currentFilter === 'error' && entry.level !== 'error') return;
+            if (this.currentFilter === 'warn' && entry.level !== 'warn') return;
+            if (this.currentFilter === 'script' && entry.source !== 'script') return;
+            if (this.currentFilter === 'system' && entry.source !== 'system') return;
+          }
+
+          this.renderToQuadrant(entry, category);
+        }
+
+        renderToQuadrant(entry, category) {
+          let targetOutput;
+          switch (category) {
+            case 'system': targetOutput = this.outputSystem; break;
+            case 'script': targetOutput = this.outputScript; break;
+            case 'error': targetOutput = this.outputError; break;
+            case 'warn': targetOutput = this.outputWarn; break;
+            default: targetOutput = this.outputScript;
+          }
+
+          if (targetOutput.querySelector('.welcome-message')) {
+            targetOutput.innerHTML = '';
+          }
+
+          const entryDiv = document.createElement('div');
+          entryDiv.className = `log-entry ${entry.level === 'error' ? 'error' : entry.level === 'warn' ? 'warn' : ''}`;
+
+          const timeSpan = document.createElement('span');
+          timeSpan.className = 'log-time';
+          timeSpan.textContent = entry.timestamp;
+
+          const tagSpan = document.createElement('span');
+          const displaySource = (entry.level === 'error' || entry.level === 'warn') ? entry.level : entry.source;
+          tagSpan.className = `log-tag ${displaySource}`;
+          tagSpan.textContent = displaySource;
+
+          const contentDiv = document.createElement('div');
+          contentDiv.className = 'log-content';
+          contentDiv.innerHTML = this.enrichContent(entry.data, category);
+
+          entryDiv.appendChild(timeSpan);
+          entryDiv.appendChild(tagSpan);
+          entryDiv.appendChild(contentDiv);
+
+          targetOutput.appendChild(entryDiv);
+          entryDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        updateCountDisplay() {
+          if (this.systemCountSpan) this.systemCountSpan.textContent = this.categoryCounts.system || 0;
+          if (this.scriptCountSpan) this.scriptCountSpan.textContent = this.categoryCounts.script || 0;
+          if (this.errorCountSpan) this.errorCountSpan.textContent = this.categoryCounts.error || 0;
+          if (this.warnCountSpan) this.warnCountSpan.textContent = this.categoryCounts.warn || 0;
+        }
+
+        initFilters() {
+          this.filterBar.addEventListener('click', (e) => {
+            if (e.target.classList.contains('filter-btn')) {
+              document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+              e.target.classList.add('active');
+              this.currentFilter = e.target.dataset.filter;
+              this.refreshOutput();
+            }
+          });
+        }
+
+        refreshOutput() {
+          [this.outputSystem, this.outputScript, this.outputError, this.outputWarn].forEach(out => {
+            if (out) out.innerHTML = '';
+          });
+          this.categoryCounts = { system: 0, script: 0, error: 0, warn: 0 };
+
+          this.allEntries.forEach(entry => {
+            const level = entry.level;
+            const source = entry.source;
+            let category = 'script';
+            if (source === 'system') category = 'system';
+            else if (level === 'error') category = 'error';
+            else if (level === 'warn') category = 'warn';
+            else if (source === 'script') category = 'script';
+
+            if (this.currentFilter !== 'all') {
+              if (this.currentFilter === 'error' && entry.level !== 'error') return;
+              if (this.currentFilter === 'warn' && entry.level !== 'warn') return;
+              if (this.currentFilter === 'script' && entry.source !== 'script') return;
+              if (this.currentFilter === 'system' && entry.source !== 'system') return;
+            }
+
+            this.categoryCounts[category] = (this.categoryCounts[category] || 0) + 1;
+            this.renderToQuadrant(entry, category);
+          });
+
+          this.updateCountDisplay();
+
+          if (!this.outputSystem.hasChildNodes()) this.outputSystem.innerHTML = '<div class="welcome-message"><div class="icon">📡</div><div>暂无系统消息</div></div>';
+          if (!this.outputScript.hasChildNodes()) this.outputScript.innerHTML = '<div class="welcome-message"><div class="icon">⚙️</div><div>暂无脚本输出</div></div>';
+          if (!this.outputError.hasChildNodes()) this.outputError.innerHTML = '<div class="welcome-message"><div class="icon">💥</div><div>暂无错误</div></div>';
+          if (!this.outputWarn.hasChildNodes()) this.outputWarn.innerHTML = '<div class="welcome-message"><div class="icon">🔔</div><div>暂无警告</div></div>';
+        }
+
+        updateStatus(connected) {
+          if (connected) {
+            this.statusDot.className = 'status-dot connected';
+            this.statusText.textContent = '已连接';
+          } else {
+            this.statusDot.className = 'status-dot disconnected';
+            this.statusText.textContent = '未连接';
+          }
+        }
+      }
+
+      document.addEventListener('DOMContentLoaded', () => new ConsoleApp());
+    })();
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QOT语言 · Shellcode扩展</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, 'Segoe UI', 'Roboto', system-ui, sans-serif;
+            background: #f8fafc;
+            color: #1e293b;
+            line-height: 1.5;
+            padding: 2rem 1rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+
+        .warning-banner {
+            background: #fffbeb;
+            border-left: 4px solid #f59e0b;
+            border-radius: 16px;
+            padding: 1.5rem 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        .warning-banner h2 {
+            color: #b45309;
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .warning-banner p {
+            color: #78350f;
+            font-size: 0.9rem;
+            opacity: 0.85;
+        }
+
+
+        .section {
+            background: #ffffff;
+            border-radius: 20px;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03), 0 4px 12px rgba(0, 0, 0, 0.03);
+            overflow: hidden;
+            border: 1px solid #eef2f6;
+            transition: all 0.2s ease;
+        }
+
+        .section:hover {
+            box-shadow: 0 8px 20px -8px rgba(0, 0, 0, 0.08);
+        }
+
+        .section-header {
+            padding: 1rem 1.8rem;
+            background: #ffffff;
+            cursor: pointer;
+            user-select: none;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #f0f2f5;
+        }
+
+        .section-header h2 {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #0f172a;
+            letter-spacing: -0.2px;
+        }
+
+        .section-header .toggle-icon {
+            font-size: 1.2rem;
+            color: #94a3b8;
+            transition: transform 0.2s;
+        }
+
+        .section.collapsed .section-header .toggle-icon {
+            transform: rotate(-90deg);
+        }
+
+        .section-content {
+            padding: 1.5rem 1.8rem;
+            background: #ffffff;
+            display: block;
+        }
+
+        .section.collapsed .section-content {
+            display: none;
+        }
+
+
+        .api-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #ffffff;
+            border-radius: 16px;
+            overflow: hidden;
+        }
+
+        .api-table th {
+            background: #f8fafc;
+            padding: 0.9rem 1.2rem;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            color: #475569;
+            border-bottom: 1px solid #e9edf2;
+        }
+
+        .api-table td {
+            padding: 1rem 1.2rem;
+            border-bottom: 1px solid #f0f2f5;
+            vertical-align: top;
+            font-size: 0.9rem;
+        }
+
+        .api-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .func-name {
+            font-family: 'SF Mono', 'JetBrains Mono', 'Fira Code', monospace;
+            background: #f1f5f9;
+            padding: 0.2rem 0.7rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: #2563eb;
+            display: inline-block;
+        }
+
+        .param-item {
+            background: #fafcff;
+            padding: 0.35rem 0.7rem;
+            border-radius: 12px;
+            margin-bottom: 0.4rem;
+            font-family: 'SF Mono', monospace;
+            font-size: 0.8rem;
+            border-left: 2px solid #818cf8;
+            color: #334155;
+        }
+
+        .code-block {
+            background: #f1f5f9;
+            padding: 1rem 1.3rem;
+            border-radius: 14px;
+            overflow-x: auto;
+            font-family: 'SF Mono', 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 0.8rem;
+            line-height: 1.5;
+            color: #0f172a;
+            border: 1px solid #e2e8f0;
+            margin: 1rem 0;
+        }
+
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.2rem;
+            margin-top: 1rem;
+        }
+
+        .comparison-card {
+            background: #fefefe;
+            border-radius: 18px;
+            padding: 1.3rem 1.5rem;
+            border: 1px solid #eef2f6;
+            transition: all 0.2s;
+        }
+
+        .comparison-card:hover {
+            border-color: #cbd5e1;
+        }
+
+        .comparison-card h3 {
+            color: #0f172a;
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .comparison-card ul {
+            margin-left: 1.2rem;
+            color: #334155;
+            font-size: 0.85rem;
+            list-style-type: circle;
+        }
+
+        .comparison-card li {
+            margin: 0.5rem 0;
+        }
+
+        .badge {
+            display: inline-block;
+            background: #eef2ff;
+            padding: 0.15rem 0.5rem;
+            border-radius: 20px;
+            font-size: 0.65rem;
+            font-weight: 500;
+            color: #4f46e5;
+            margin-left: 0.5rem;
+        }
+
+        hr {
+            border: none;
+            border-top: 1px solid #e9edf2;
+            margin: 1.2rem 0;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 8px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e0;
+            border-radius: 8px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        .footnote {
+            background: #fafcff;
+            padding: 1rem 1.8rem;
+            border-radius: 16px;
+            text-align: center;
+            font-size: 0.8rem;
+            color: #64748b;
+            margin-top: 2rem;
+            border: 1px solid #eef2f6;
+        }
+
+
+        @media (max-width: 760px) {
+            body {
+                padding: 1rem;
+            }
+
+            .comparison-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .section-content {
+                padding: 1rem;
+            }
+
+            .section-header {
+                padding: 0.8rem 1.2rem;
+            }
+
+            .api-table th,
+            .api-table td {
+                padding: 0.7rem;
+            }
+
+
+            .code-block {
+                font-size: 0.7rem;
+                padding: 0.8rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+
+        <div class="warning-banner">
+            <h2>⚠️ 安全警告 · 使用Shellcode前必读</h2>
+            <p><strong>Shellcode 与 DLL 一样拥有完整的系统权限</strong> —— 它可以读写文件、访问网络、修改内存、甚至格式化硬盘。<br>
+                加载不可信的 .bin 文件等同于执行未知原生程序<br>
+                仅当您完全理解风险且代码来源可信时，再使用此特性</p>
+        </div>
+
+
+        <div class="section" id="introSection">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h2>🔬 什么是Shellcode？ 用途 & 风险</h2>
+                <span class="toggle-icon">▼</span>
+            </div>
+            <div class="section-content">
+                <p><strong>Shellcode</strong> 本质上是 <strong>一段可直接执行的机器码</strong>（raw binary），无PE结构、不依赖特定加载器。<br>
+                    在QOT环境中，Shellcode通过 <code>ScLoad</code> 映射到可执行内存页，然后由 <code>ScExec</code> 直接运行。</p>
+                <ul style="margin: 1rem 0 1rem 2rem; list-style-type: square;">
+                    <li><strong>用途</strong>：极速算法（加密/排序/图像处理）、无文件攻击(渗透)、动态代码生成、底层硬件访问、绕过常规API钩子。</li>
+                    <li><strong>文件格式</strong>：<code>.bin</code> 原始二进制流，无任何头结构。<br>推荐使用 <strong>Donut</strong> 将 DLL/EXE
+                        转换为位置无关的shellcode。</li>
+                    <li><strong>潜在危害</strong>：<br>
+                        &nbsp;&nbsp;• 勒索/破坏：删除文件、加密用户数据。<br>
+                        &nbsp;&nbsp;• 木马后门：反向Shell、键盘记录、隐私窃取。<br>
+                        &nbsp;&nbsp;• 穿透沙盒：由于直接执行系统调用，可能绕过部分安全软件。<br>
+                        &nbsp;&nbsp;• 稳定性：错误的shellcode会导致宿主进程崩溃。
+                    </li>
+                </ul>
+                <div class="code-block">
+                    ⚠️ 特别提示：.bin 文件可以被静态扫描，但高级shellcode会做多态/加密。即使扫描通过也不能保证绝对安全。<br>
+                    ✅ 最佳实践：仅在自己编译的shellcode上使用；生产环境优先选择DLL或纯QOT脚本。
+                </div>
+            </div>
+        </div>
+
+
+        <div class="section" id="apiSection">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h2>⚙️ QOT内置函数：ScLoad / ScExec / ScSweep</h2>
+                <span class="toggle-icon">▼</span>
+            </div>
+            <div class="section-content">
+                <table class="api-table">
+                    <thead>
+                        <tr>
+                            <th width="18%">函数</th>
+                            <th width="32%">说明</th>
+                            <th width="25%">参数</th>
+                            <th>返回值</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="func-name">ScLoad</span></td>
+                            <td>读取 .bin 文件，分配<strong>可读可写可执行</strong>内存，返回Shellcode实例对象。</td>
+                            <td>
+                                <div class="param-item">path : string — shellcode文件路径</div>
+                            </td>
+                            <td>ShellcodeInstance 对象 <span class="badge">包含address,size,path</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="func-name">ScExec</span></td>
+                            <td>在<strong>新线程</strong>中执行shellcode，支持超时控制（毫秒）。</td>
+                            <td>
+                                <div class="param-item">instance : ShellcodeInstance — ScLoad返回的对象</div>
+                                <div class="param-item">timeout_ms : int (可选) — 默认5000ms，超过则强制终止线程</div>
+                            </td>
+                            <td>true (执行完成/正常返回) <br> false (超时或异常)</td>
+                        </tr>
+                        <tr>
+                            <td><span class="func-name">ScSweep</span></td>
+                            <td>释放shellcode占用的内存（VirtualFree），清理资源。</td>
+                            <td>
+                                <div class="param-item">instance : ShellcodeInstance — 待销毁的实例</div>
+                            </td>
+                            <td>true (释放成功) / 失败抛出异常</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="code-block">
+                    📘 示例：<br>
+                    var sc = ScLoad("calc.bin"); // 加载<br>
+                    ScExec(sc, 3000); // 等待最多3秒<br>
+                    ScSweep(sc); // 释放内存
+                </div>
+                <p style="margin-top: 1rem;">💡 注意：<code>ScExec</code> 不会等待shellcode内部创建的其它子线程，仅等待主入口线程返回。<br>
+                    如果shellcode进入无限循环，超时后会强制终止线程，但可能遗留资源泄漏。</p>
+            </div>
+        </div>
+
+
+        <div class="section" id="donutSection">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h2>🍩 将C++ DLL (DllMain) 编译为 Shellcode · Donut 实战</h2>
+                <span class="toggle-icon">▼</span>
+            </div>
+            <div class="section-content">
+                <h3 style="color:#facc15;">1️⃣ 编写一个标准DLL（用于转换）</h3>
+                <div class="code-block">
+                    // demo.cpp<br>
+                    #include &lt;windows.h&gt;<br>
+                    <br>
+                    extern "C" __declspec(dllexport) int Add(int a, int b) {<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;return a + b;<br>
+                    }<br>
+                    <br>
+                    BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved) {<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;if(ul_reason_for_call == DLL_PROCESS_ATTACH) {<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// 初始化/入口代码 — Donut会保留此逻辑<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;}<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;return TRUE;<br>
+                    }
+                </div>
+                <p>编译指令（MSVC）：<br>
+                    <code>cl /LD demo.cpp /Fe:demo.dll</code>
+                </p>
+
+                <h3 style="color:#facc15; margin-top:1.5rem;">2️⃣ 下载Donut</h3>
+                <p>访问 <a href="https://github.com/TheWover/donut" target="_blank"
+                        style="color:#60a5fa;">https://github.com/TheWover/donut</a> 下载最新版 donut.exe。</p>
+
+                <h3 style="color:#facc15; margin-top:1.5rem;">3️⃣ 转换为Shellcode (.bin)</h3>
+                <div class="code-block">
+                    # 最简单用法 (加载DLL并执行 DllMain + 导出函数表)<br>
+                    donut.exe -i demo.dll -a 2 -o payload.bin<br>
+                    <br>
+                    # 参数说明：<br>
+                    # -f : 输入文件 (DLL/EXE)<br>
+                    # -a : 架构 1=x86 2=amd64<br>
+                    # -o : 输出 .bin 文件<br>
+                    # -e : 指定入口点 (默认调用DllMain)<br>
+                    # -p : 传递给shellcode的参数 (字符串)<br>
+                </div>
+                <p>生成 <code>payload.bin</code> 后即可用 QOT 加载：</p>
+                <div class="code-block">
+                    var shell = ScLoad("payload.bin");<br>
+                    ScExec(shell, 5000); // 执行 DllMain 中的逻辑<br>
+                    ScSweep(shell);
+                </div>
+                <p>⚠️ Donut 默认会将DLL的 <strong>所有导出函数</strong> 打包进shellcode，并在执行时通过哈希调用。也可以通过 <code>-e</code> 指定具体函数。</p>
+            </div>
+        </div>
+
+        <div class="section" id="signatureSection">
+    <div class="section-header" onclick="toggleSection(this)">
+        <h2>🔏 Shellcode 签名机制 · 追责溯源</h2>
+        <span class="toggle-icon">▼</span>
+    </div>
+    <div class="section-content">
+        <p><strong>设计理念</strong>：签名不是为了"阻止"恶意代码执行，而是为了在发生恶意行为时<strong>能够追溯到签名者</strong>。</p>
+        <p>QOT 采用<strong>尾部签名</strong>方案 —— 签名信息追加在 .bin 文件末尾 512 字节，不影响 shellcode 本身执行。</p>
+
+        <div class="warning-banner" style="background: #f0f9ff; border-left-color: #3b82f6; margin-top: 1rem;">
+            <h2 style="color:#1e40af;">📌 执行规则</h2>
+            <p>
+                <strong>未签名</strong> → <code>ScExec(instance)</code> 拒绝执行，提示风险<br>
+                <strong>未签名但强制执行</strong> → <code>ScExec(instance, timeout, true)</code> 第三个参数为 true 即可执行<br>
+                <strong>已签名</strong> → <code>ScExec(instance)</code> 正常执行<br>
+            </p>
+        </div>
+
+        <hr>
+
+        <h3 style="margin-top: 1.5rem;">📦 签名尾部结构（512字节）</h3>
+        <table class="api-table">
+            <thead>
+                <tr><th>偏移</th><th>大小</th><th>字段</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><code>0x000</code></td><td>4</td><td>魔数</td><td><code>SIGN</code> = 0x5349474E</td></tr>
+                <tr><td><code>0x004</code></td><td>4</td><td>版本</td><td>当前为 1</td></tr>
+                <tr><td><code>0x008</code></td><td>32</td><td>指纹 ID</td><td>SHA256(所有采集项) 的前32字符</td></tr>
+                <tr><td><code>0x028</code></td><td>8</td><td>时间戳</td><td>Unix 秒级时间戳（UTC）</td></tr>
+                <tr><td><code>0x030</code></td><td>32</td><td>bin 哈希</td><td>对原始 .bin 内容的 SHA256</td></tr>
+                <tr><td><code>0x050</code></td><td>32</td><td>硬件指纹</td><td>SHA256(CPU架构+核心数+内存)</td></tr>
+                <tr><td><code>0x070</code></td><td>32</td><td>系统指纹</td><td>SHA256(OS版本+语言+时区)</td></tr>
+                <tr><td><code>0x090</code></td><td>128</td><td>用户信息</td><td>明文：邮箱/姓名/组织/备注（用 | 分隔）</td></tr>
+                <tr><td><code>0x110</code></td><td>32</td><td>HMAC 校验</td><td>防篡改校验值</td></tr>
+                <tr><td><code>0x130</code></td><td>208</td><td>预留</td><td>全零</td></tr>
+            </tbody>
+        </table>
+
+        <hr>
+
+        <h3 style="margin-top: 1.5rem;">🔍 指纹采集项（签名时自动采集）</h3>
+        <table class="api-table">
+            <thead>
+                <tr><th>采集项</th><th>说明</th><th>隐私级别</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>CPU 架构</td><td>navigator.platform</td><td>🟢 公开</td></tr>
+                <tr><td>CPU 核心数</td><td>navigator.hardwareConcurrency</td><td>🟢 公开</td></tr>
+                <tr><td>总内存</td><td>浏览器环境标记</td><td>🟢 公开</td></tr>
+                <tr><td>操作系统</td><td>navigator.userAgent 哈希</td><td>🟢 公开</td></tr>
+                <tr><td>系统语言</td><td>navigator.language</td><td>🟢 公开</td></tr>
+                <tr><td>时区偏移</td><td>new Date().getTimezoneOffset()</td><td>🟢 公开</td></tr>
+                <tr><td>屏幕信息</td><td>分辨率 + 色深</td><td>🟢 公开</td></tr>
+                <tr><td>时间戳</td><td>签名时的 UTC 时间</td><td>🟢 公开</td></tr>
+                <tr><td>用户信息</td><td>邮箱/姓名/组织（自愿填写）</td><td>🟡 用户自选</td></tr>
+            </tbody>
+        </table>
+
+        <hr>
+
+        <h3 style="margin-top: 1.5rem;">🛡️ 追责流程</h3>
+        <div style="display: flex; gap: 0.8rem; flex-wrap: wrap; align-items: center; justify-content: center; padding: 1rem 0;">
+            <div style="background: #f1f5f9; border-radius: 10px; padding: 0.7rem 1rem; text-align: center; font-size: 0.82rem; min-width: 80px;">
+                <span style="color:#2563eb;font-weight:700;font-size:0.7rem;">①</span><br>发现恶意<br>shellcode
+            </div>
+            <span style="color:#94a3b8;">→</span>
+            <div style="background: #f1f5f9; border-radius: 10px; padding: 0.7rem 1rem; text-align: center; font-size: 0.82rem; min-width: 80px;">
+                <span style="color:#2563eb;font-weight:700;font-size:0.7rem;">②</span><br>提取末尾<br>512字节
+            </div>
+            <span style="color:#94a3b8;">→</span>
+            <div style="background: #f1f5f9; border-radius: 10px; padding: 0.7rem 1rem; text-align: center; font-size: 0.82rem; min-width: 80px;">
+                <span style="color:#2563eb;font-weight:700;font-size:0.7rem;">③</span><br>解析魔数<br>"SIGN"
+            </div>
+            <span style="color:#94a3b8;">→</span>
+            <div style="background: #f1f5f9; border-radius: 10px; padding: 0.7rem 1rem; text-align: center; font-size: 0.82rem; min-width: 80px;">
+                <span style="color:#2563eb;font-weight:700;font-size:0.7rem;">④</span><br>读取指纹ID<br>+ 用户信息
+            </div>
+            <span style="color:#94a3b8;">→</span>
+            <div style="background: #f1f5f9; border-radius: 10px; padding: 0.7rem 1rem; text-align: center; font-size: 0.82rem; min-width: 80px;">
+                <span style="color:#2563eb;font-weight:700;font-size:0.7rem;">⑤</span><br>追责<br>封禁指纹
+            </div>
+        </div>
+
+        <hr>
+
+        <h3 style="margin-top: 1.5rem;">🌐 签名工具</h3>
+        <p>
+            访问 <a href="shellcode/index.html" target="_blank" style="color:#60a5fa;">签名工具页面</a>，上传编译好的 .bin 文件，填写身份信息（可选），
+            工具会自动采集机器指纹并生成签名尾部，下载已签名的文件。<br>
+            <strong>所有运算均在浏览器本地完成，文件不会上传到任何服务器。</strong>
+        </p>
+
+        <div class="code-block" style="margin-top: 1rem;">
+            📘 完整编译 & 签名流程：<br>
+            <br>
+            <span style="color:#64748b;">// 步骤1：编写 C++ DLL</span><br>
+            <span style="color:#64748b;">// 步骤2：编译</span><br>
+            cl /LD mycode.cpp /Fe:mycode.dll<br>
+            <br>
+            <span style="color:#64748b;">// 步骤3：Donut 转换</span><br>
+            donut.exe -i mycode.dll -a 2 -o mycode.bin<br>
+            <br>
+            <span style="color:#64748b;">// 步骤4：打开签名工具页面，上传 mycode.bin，下载 mycode_signed.bin</span><br>
+            <br>
+            <span style="color:#64748b;">// 步骤5：QOT 加载</span><br>
+            var sc = ScLoad("mycode_signed.bin");<br>
+            ScExec(sc, 5000);<br>
+            ScSweep(sc);
+        </div>
+
+        <hr>
+
+        <h3 style="margin-top: 1.5rem;">💻 QOT 使用示例</h3>
+        <div class="code-block">
+            <span style="color:#64748b;">// === 已签名的 shellcode ===</span><br>
+            var sc = ScLoad("signed.bin");<br>
+            ScExec(sc, 5000);  <span style="color:#64748b;">// 正常执行</span><br>
+            ScSweep(sc);<br>
+            <br>
+            <span style="color:#64748b;">// === 未签名的 shellcode ===</span><br>
+            var sc2 = ScLoad("unsigned.bin");<br>
+            ScExec(sc2, 5000);       <span style="color:#64748b;">// ❌ 拒绝执行，输出: [执行拒绝] 未签名的 shellcode文件</span><br>
+            ScExec(sc2, 5000, true); <span style="color:#64748b;">// ✅ 强制执行（第三个参数为 true）</span><br>
+            ScSweep(sc2);<br>
+            <br>
+            <span style="color:#64748b;">// === 环境变量通信 + 签名 shellcode ===</span><br>
+            set_env("SCC_ENV_FUNC_CODE", "3");<br>
+            var sc3 = ScLoad("SystemControl_signed.bin");<br>
+            ScExec(sc3, 5000);  <span style="color:#64748b;">// 打开计算器</span><br>
+            ScSweep(sc3);
+        </div>
+
+        <div class="warning-banner" style="margin-top: 1rem; background: #fef2e8; border-left-color: #f97316;">
+            <h2 style="color:#c2410c;">⚠️ 追责声明</h2>
+            <p>
+                签名者提供的身份信息（邮箱/姓名/组织）会以<strong>明文形式</strong>存储在 .bin 文件末尾 512 字节中。<br>
+                如果此 shellcode 被用于恶意目的，可通过提取签名尾部信息追溯到签名者。<br>
+                请确保提供真实信息；虚假身份在追责时会被视为恶意行为。<br>
+                <strong>签名 = 身份承诺 = 可追溯 = 可追责</strong>
+            </p>
+        </div>
+    </div>
+</div>
+        <div class="section" id="compareSection">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h2>🔄 如何选择：DLL 还是 Shellcode？</h2>
+                <span class="toggle-icon">▼</span>
+            </div>
+            <div class="section-content">
+                <div class="comparison-grid">
+                    <div class="comparison-card">
+                        <h3>📦 传统 DLL 方式 <span class="badge">推荐 90% 场景</span></h3>
+                        <ul style="margin-left: 1.2rem;">
+                            <li>✅ 加载简单：<code>load("xxx.dll"); obj->func()</code></li>
+                            <li>✅ 支持导出函数，可直接调用特定API</li>
+                            <li>✅ 调试方便 (WinDbg / x64dbg 可直接分析)</li>
+                            <li>✅ 支持依赖其他DLL (VC运行时等)</li>
+                            <li>✅ QOT 自动管理加载/卸载 (无需手动释放)</li>
+                            <li>❌ 文件落地，易被静态扫描</li>
+                            <li>❌ 加载速度略慢于shellcode</li>
+                        </ul>
+                    </div>
+                    <div class="comparison-card">
+                        <h3>⚡ Shellcode 方式 <span class="badge">特殊场景</span></h3>
+                        <ul style="margin-left: 1.2rem;">
+                            <li>✅ 无文件执行：纯内存，过AV监控</li>
+                            <li>✅ 极低加载开销（直接 mmap/VirtualAlloc）</li>
+                            <li>✅ 完全位置无关，适合注入/内存执行</li>
+                            <li>✅ 可结合 Donut 将任意PE转为shellcode</li>
+                            <li>❌ 无导出函数名，只能整体执行入口点</li>
+                            <li>❌ 必须手动调用 ScSweep 释放内存</li>
+                            <li>❌ 调试困难 (没有符号/没有模块加载)</li>
+                            <li>❌ 不支持 TLS / 异常处理完全位置无关</li>
+                        </ul>
+                    </div>
+                </div>
+                <hr>
+                <h3 style="margin: 1rem 0 0.5rem 0;">📌 决策指南</h3>
+                <div class="code-block">
+                    ┌────────────────────────────────────────────────────────┐<br>
+                    │ 需要导出多个函数 / 长期复用 / 调试友好 → 选择 DLL │<br>
+                    │ 红队/渗透测试 / 注入第三方进程 → 选择 Shellcode │<br>
+                    │ 算法加速想要最小开销 → Shellcode (无导出表调用) │<br>
+                    │ 常规文件读写、GUI、网络请求 → DLL (配合内置函数更稳) │<br>
+                    │ 代码包含 .tls .ctors 复杂段 → 必须用DLL │<br>
+                    │ 需要传递结构体指针/回调 → DLL + export.func 更简单 │<br>
+                    └────────────────────────────────────────────────────────┘
+                </div>
+                <p><strong>性能差异</strong>：函数调用开销上，DLL 会多几次类型检查；Shellcode 几乎等于直接 call，但实际差距通常小于微秒级。<br>
+                    对绝大多数业务来说，<strong>优先选择DLL</strong>；仅当您确实需要“不落地”或“规避安全监测”时才使用shellcode。</p>
+            </div>
+        </div>
+
+
+        <div class="section" id="exampleSection">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h2>🧪 完整示例：调用 C++ Shellcode 做整数加法</h2>
+                <span class="toggle-icon">▼</span>
+            </div>
+            <div class="section-content">
+                <p><strong>步骤1</strong> 编写 C++ 文件 <code>math.cpp</code></p>
+                <div class="code-block">
+                    extern "C" __declspec(dllexport) int add(int a, int b) {<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;return a + b;<br>
+                    }<br>
+                    <br>
+                    BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;// Donut 转换后仍会调用此入口 (可选)<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;return TRUE;<br>
+                    }
+                </div>
+                <p><strong>步骤2</strong> 编译DLL + Donut转shellcode</p>
+                <div class="code-block">
+                    cl /LD math.cpp /Fe:math.dll<br>
+                    donut.exe -i math.dll -a 2 -o math.bin
+                </div>
+                <p><strong>步骤3</strong> QOT脚本调用</p>
+                <div class="code-block">
+                    // 注意：shellcode 整体执行，并没有名为"add"的导出函数。<br>
+                    // 如果想调用特定函数，需在 DllMain 中解析自身导出表或者使用 Donut 的 -e 参数。<br>
+                    <br>
+                    var sc = ScLoad("math.bin");<br>
+                    output("shellcode 已加载，地址: " + strings(sc.address));<br>
+                    var ret = ScExec(sc, 3000);<br>
+                    if(ret) {<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;output("shellcode 执行完毕 (DllMain 逻辑)");<br>
+                    } else {<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;output("执行超时或异常");<br>
+                    }<br>
+                    ScSweep(sc);
+                </div>
+                <p style="margin-top: 1rem;">🔔 <strong>核心提醒</strong>：shellcode 执行的是 DLL 的完整逻辑（DllMain +
+                    可能的线程入口）。若想交互参数/返回值，需在C++内部实现进程间通信（如管道、共享内存），或使用导出函数 + 手动解析。<br>
+                    大部分场景下，直接使用 DLL 方式可避免这种复杂度。</p>
+            </div>
+        </div>
+
+
+        <div class="section" id="paramSection">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h2>📨 Shellcode 参数传递实战 · 环境变量通信法</h2>
+                <span class="toggle-icon">▼</span>
+            </div>
+            <div class="section-content">
+                <p><strong>场景需求</strong>：Shellcode 没有导出函数，无法像 DLL 那样直接 <code>obj-&gt;func(123)</code>。<br>
+                    但可通过 <strong>环境变量</strong>、<strong>共享内存</strong> 或 <strong>管道</strong> 等进程内/进程间通信传递参数。<br>
+                    以下展示 <strong>环境变量通信法</strong> —— 轻量、原生、无需额外库。</p>
+
+                <div class="comparison-grid" style="margin-top: 1rem;">
+                    <div class="comparison-card">
+                        <h3>🟢 QOT</h3>
+                        <div class="code-block">
+                            var file_shellcode = "SystemTest.bin";<br>
+                            set_env("SCC_ENV_FUNC_CODE", "3"); // 传递参数「打开计算器」<br>
+                            var shellins = ScLoad(file_shellcode);<br>
+                            var ok = ScExec(shellins, 5000);<br>
+                            if(ok) output("shellcode 执行完成");<br>
+                            else output("执行超时或失败");<br>
+                            ScSweep(shellins);
+                        </div>
+                        <ul>
+                            <li>✅ <code>set_env(key, value)</code> 设置进程环境变量</li>
+                            <li>✅ Shellcode 内通过 <code>GetEnvironmentVariable</code> 读取</li>
+                            <li>⚠️ 仅传递整数/短字符串，复杂数据建议用共享内存</li>
+                        </ul>
+                    </div>
+                    <div class="comparison-card">
+                        <h3>🔧 C++ DLL (将被Donut转shellcode)</h3>
+                        <div class="code-block">
+                            BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID lpReserved) {<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;if (reason == DLL_PROCESS_ATTACH) {<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;char buf[8] = {0};<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;GetEnvironmentVariableA("SCC_ENV_FUNC_CODE",
+                            buf, 8);<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;int code = atoi(buf);<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;switch(code) {<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case 0:
+                            ShutdownSystem(); break;<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case 1:
+                            RebootSystem(); break;<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case 2:
+                            HibernateSystem(); break;<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case 3:
+                            OpenCalculator(); break;<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;}<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;return TRUE;<br>
+                            }
+                        </div>
+                        <ul>
+                            <li>🔧 完全位置无关代码 (PIC)，适合 Donut 转换</li>
+                            <li>📌 环境变量继承自 QOT 进程，shellcode 可直接读取</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <hr>
+
+                <h3 style="margin-top: 0.5rem;">📦 其他参数传递方式对比</h3>
+                <table class="api-table" style="margin-top: 0.5rem;">
+                    <thead>
+                        <tr>
+                            <th>方法</th>
+                            <th>复杂度</th>
+                            <th>数据大小</th>
+                            <th>适用场景</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="func-name">环境变量</span></td>
+                            <td>⭐ 低</td>
+                            <td>~32KB</td>
+                            <td>整数/短字符串、控制码</td>
+                        </tr>
+                        <tr>
+                            <td><span class="func-name">共享内存 (CreateFileMapping)</span></td>
+                            <td>⭐⭐⭐ 中</td>
+                            <td>数MB</td>
+                            <td>传递大量数据、图像、结构体数组</td>
+                        </tr>
+                        <tr>
+                            <td><span class="func-name">命令行参数伪造</span></td>
+                            <td>⭐⭐ 中</td>
+                            <td>有限</td>
+                            <td>模拟 exe 启动参数</td>
+                        </tr>
+                        <tr>
+                            <td><span class="func-name">DLL 导出函数 + Donut -e</span></td>
+                            <td>⭐⭐ 中</td>
+                            <td>灵活</td>
+                            <td>需要直接传参并获取返回值</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="code-block" style="background: #fef2e8; border-left: 4px solid #f97316;">
+                    💡 <strong>实战建议</strong>：<br>
+                    • 对于“控制系统行为”（关机/弹计算器/网络请求），环境变量法最简洁。<br>
+                    • 若需要 shellcode <strong>返回结果</strong>（如计算值），可让 shellcode 写回另一个环境变量，QOT 用 <code>get_env()</code>
+                    读取。<br>
+                    • Donut 转换命令：<code>donut.exe -i SystemTest.dll -a 2 -o SystemTest.bin</code>
+                </div>
+
+                <div class="warning-banner" style="margin-top: 1rem; background: #f0f9ff; border-left-color: #3b82f6;">
+                    <h2 style="color:#1e40af;">🔁 完整闭环示例：参数 + 返回值</h2>
+                    <div class="code-block" style="margin-top: 0.5rem;">
+                        <strong>QOT </strong><br>
+                        set_env("INPUT_NUM", "42");<br>
+                        ScExec(shell, 2000);<br>
+                        output("结果是: " + get_env("RESULT_NUM"));<br>
+                        <br>
+                        <strong>C++  (DllMain)</strong><br>
+                        char in[16]; GetEnvironmentVariableA("INPUT_NUM", in, 16);<br>
+                        int val = atoi(in) * 2;<br>
+                        char out[16]; sprintf_s(out, "%d", val);<br>
+                        SetEnvironmentVariableA("RESULT_NUM", out);
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+    </div>
+
+    <script>
+        function toggleSection(headerElem) {
+            const section = headerElem.closest('.section');
+            if (section) {
+                section.classList.toggle('collapsed');
+            }
+        }
+
+        document.querySelectorAll('.section').forEach(sec => {
+            sec.classList.remove('collapsed');
+        });
+    </script>
+</body>
+
+</html>

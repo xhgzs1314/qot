@@ -1,0 +1,5 @@
+var x = 5;
+var y = -x;
+output(y);
+output(-3 + 10);
+output(-(2 + 3));

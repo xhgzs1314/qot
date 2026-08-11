@@ -1,0 +1,16 @@
+var a = [10, 20, 30];
+var t = 0;
+for(v in a){ t += v; }
+output(t);
+
+var n = 4;
+var s = 0;
+for(i in n){ s += i; }
+output(s);
+
+var b = [[1, 2], [3, 4]];
+var u = 0;
+for(row in b){
+    for(x in row){ u += x; }
+}
+output(u);
