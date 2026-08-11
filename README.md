@@ -2762,4 +2762,4 @@ vg_uninit();
 
 # 许可证
 
-查看 [LICENSE](LICENSE\) 文件了解详细许可信息
+查看 [LICENSE](./LICENSE) 文件了解详细许可信息
