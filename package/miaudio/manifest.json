@@ -1,0 +1,147 @@
+{
+    "author": "MOK-XI",
+    "gp": "https://github.com/MOK-XI/qot-plugins",
+    "ct": "mokxi@example.com",
+    "m": {
+        "n": "miaudio",
+        "d": "音乐播放器模块，支持WAV、MP3等格式的音频播放控制",
+        "f": [
+            {
+                "n": "MusicPlayer_Create",
+                "d": "创建播放器实例，返回句柄",
+                "p": "",
+                "r": "void",
+                "de": []
+            },
+            {
+                "n": "MusicPlayer_Destroy",
+                "d": "销毁播放器实例，释放资源",
+                "p": "void",
+                "r": "void",
+                "de": [
+                    "播放器句柄"
+                ]
+            },
+            {
+                "n": "MusicPlayer_Open",
+                "d": "打开音乐文件（支持WAV、MP3等格式）",
+                "p": "void, str",
+                "r": "int",
+                "de": [
+                    "播放器句柄",
+                    "文件路径（UTF-8编码）"
+                ]
+            },
+            {
+                "n": "MusicPlayer_Close",
+                "d": "关闭当前打开的音乐",
+                "p": "void",
+                "r": "void",
+                "de": [
+                    "播放器句柄"
+                ]
+            },
+            {
+                "n": "MusicPlayer_Play",
+                "d": "播放音乐",
+                "p": "void",
+                "r": "void",
+                "de": [
+                    "播放器句柄"
+                ]
+            },
+            {
+                "n": "MusicPlayer_Pause",
+                "d": "暂停播放",
+                "p": "void",
+                "r": "void",
+                "de": [
+                    "播放器句柄"
+                ]
+            },
+            {
+                "n": "MusicPlayer_Resume",
+                "d": "恢复播放（从暂停位置继续）",
+                "p": "void",
+                "r": "void",
+                "de": [
+                    "播放器句柄"
+                ]
+            },
+            {
+                "n": "MusicPlayer_Stop",
+                "d": "停止播放（位置回到开头）",
+                "p": "void",
+                "r": "void",
+                "de": [
+                    "播放器句柄"
+                ]
+            },
+            {
+                "n": "MusicPlayer_Seek",
+                "d": "跳转到指定位置",
+                "p": "void, int",
+                "r": "void",
+                "de": [
+                    "播放器句柄",
+                    "目标位置（毫秒）"
+                ]
+            },
+            {
+                "n": "MusicPlayer_GetState",
+                "d": "获取当前播放状态，返回0=未知 1=播放中 2=已暂停 3=已停止",
+                "p": "void",
+                "r": "int",
+                "de": [
+                    "播放器句柄"
+                ]
+            },
+            {
+                "n": "MusicPlayer_GetPosition",
+                "d": "获取当前播放位置",
+                "p": "void",
+                "r": "int",
+                "de": [
+                    "播放器句柄"
+                ]
+            },
+            {
+                "n": "MusicPlayer_GetDuration",
+                "d": "获取当前音乐总时长",
+                "p": "void",
+                "r": "int",
+                "de": [
+                    "播放器句柄"
+                ]
+            },
+            {
+                "n": "MusicPlayer_IsPlaying",
+                "d": "判断是否正在播放",
+                "p": "void",
+                "r": "int",
+                "de": [
+                    "播放器句柄"
+                ]
+            },
+            {
+                "n": "MusicPlayer_SetVolume",
+                "d": "设置音量（0-1000）",
+                "p": "void, int",
+                "r": "void",
+                "de": [
+                    "播放器句柄",
+                    "音量值（0=静音，1000=最大）"
+                ]
+            },
+            {
+                "n": "MusicPlayer_GetVolume",
+                "d": "获取当前音量",
+                "p": "void",
+                "r": "int",
+                "de": [
+                    "播放器句柄"
+                ]
+            }
+        ]
+    }
+}

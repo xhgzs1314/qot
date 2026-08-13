@@ -9,7 +9,6 @@ import threading
 from typing import Optional, Callable, List
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
-
 class PrintCapture:
     def __init__(
         self,

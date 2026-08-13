@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QOT 模块导入</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Microsoft YaHei', sans-serif;
+            background: #f0f4f8;
+            color: #1e2a3e;
+            padding: 2rem 1.5rem;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .card {
+            max-width: 1100px;
+            width: 100%;
+            background: #fff;
+            border-radius: 1.75rem;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+        }
+
+        .header {
+            background: #1a4a5f;
+            padding: 1.5rem 2.2rem;
+            color: #fff;
+        }
+
+        .header h1 {
+            font-weight: 600;
+            font-size: 1.6rem;
+        }
+
+        .header p {
+            opacity: 0.8;
+            font-size: 0.95rem;
+            margin-top: 0.2rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1.2fr;
+            gap: 0;
+        }
+
+        @media (max-width: 800px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .intro {
+            background: #fff;
+            padding: 2rem 2rem 2rem 2.2rem;
+            border-right: 1px solid #e9edf2;
+        }
+
+        .intro h2 {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #1a4a5f;
+            border-left: 4px solid #2c9b8e;
+            padding-left: 0.8rem;
+            margin-bottom: 1.2rem;
+        }
+
+        .intro-box {
+            background: #f8fafc;
+            border-radius: 1rem;
+            padding: 1rem 1.2rem;
+            margin-bottom: 1.2rem;
+            border-left: 3px solid #8bc6c1;
+        }
+
+        .file-list {
+            background: #f3f6f9;
+            border-radius: 0.75rem;
+            padding: 0.8rem 1.2rem;
+            font-size: 0.9rem;
+            list-style: none;
+            margin: 0.5rem 0 0.2rem;
+        }
+
+        .file-list li {
+            padding: 0.2rem 0;
+            font-family: monospace;
+            font-size: 0.85rem;
+        }
+
+        .file-list li span {
+            background: #e6edf2;
+            padding: 0.1rem 0.5rem;
+            border-radius: 16px;
+            font-size: 0.7rem;
+            margin-left: 0.4rem;
+        }
+
+        .badge {
+            display: inline-block;
+            background: #e6f4f0;
+            border-radius: 20px;
+            padding: 0.2rem 0.8rem;
+            font-size: 0.75rem;
+            color: #1e6f5c;
+            margin-top: 0.2rem;
+        }
+
+        .upload-panel {
+            background: #fcfdff;
+            padding: 2rem 2rem 2rem 2.2rem;
+        }
+
+        .upload-panel h2 {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #1a4a5f;
+            border-left: 4px solid #2c9b8e;
+            padding-left: 0.8rem;
+            margin-bottom: 1.2rem;
+        }
+
+        .drop-area {
+            border: 2px dashed #cbd5e0;
+            border-radius: 1.5rem;
+            padding: 2.2rem 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: 0.2s;
+            background: #fafcfe;
+        }
+
+        .drop-area:hover {
+            border-color: #7fa8b9;
+            background: #f5f9fc;
+        }
+
+        .drop-area.dragover {
+            border-color: #2c9b8e;
+            background: #e6f7f2;
+        }
+
+        .drop-area .icon {
+            font-size: 2.8rem;
+        }
+
+        ::-webkit-scrollbar {
+            display: none;
+        }
+
+        .drop-area .sub {
+            font-size: 0.8rem;
+            color: #6f8b9a;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .file-info {
+            margin: 0.8rem 0 0.5rem;
+            background: #ecf3f7;
+            border-radius: 40px;
+            padding: 0.3rem 0.8rem 0.3rem 1rem;
+            display: none;
+            align-items: center;
+            gap: 0.6rem;
+            font-size: 0.9rem;
+        }
+
+        .file-info .remove {
+            background: #b6ccd8;
+            border: none;
+            border-radius: 30px;
+            padding: 0.1rem 0.6rem;
+            cursor: pointer;
+        }
+
+        .file-info .remove:hover {
+            background: #9eb6c4;
+        }
+
+        .actions {
+            display: flex;
+            gap: 1rem;
+            margin: 1.8rem 0 1rem;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            background: #1a4a5f;
+            border: none;
+            color: #fff;
+            padding: 0.6rem 1.8rem;
+            border-radius: 40px;
+            font-weight: 500;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: 0.15s;
+        }
+
+        .btn:hover:not(:disabled) {
+            background: #1f5d74;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-outline {
+            background: transparent;
+            color: #1a4a5f;
+            border: 1.5px solid #cbdae3;
+        }
+
+        .btn-outline:hover:not(:disabled) {
+            background: #eef4f7;
+        }
+
+        .log {
+            background: #0e1e2a;
+            color: #d4e2ed;
+            border-radius: 1rem;
+            padding: 0.8rem 1rem;
+            font-family: monospace;
+            font-size: 0.75rem;
+            line-height: 1.6;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+            margin-top: 0.8rem;
+        }
+
+        .log .ok {
+            color: #8bc6c1;
+        }
+
+        .log .err {
+            color: #f5a3a3;
+        }
+
+        .log .info {
+            color: #b3cddc;
+        }
+
+        .footer {
+            font-size: 0.7rem;
+            color: #7e99a8;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 1rem;
+            margin-top: 1rem;
+            text-align: right;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card">
+        <div class="header">
+            <h1>导入 QOT 模块</h1>
+            <p>上传 .zip 模块包 · 自动识别 manifest.json / DLL / exports.func</p>
+        </div>
+        <div class="grid">
+
+            <div class="intro">
+                <h2>模块包规范</h2>
+                <div class="intro-box">
+                    <strong>模块包 (.zip) 必须包含：</strong>
+                    <ul class="file-list">
+                        <li><strong>manifest.json</strong> <span>元数据</span></li>
+                        <li><strong>模块名.dll</strong> <span>动态库</span></li>
+                        <li><strong>exports.func</strong> <span>函数签名</span></li>
+                    </ul>
+                    <div style="margin-top:0.5rem">
+                        <span class="badge">✓ 需签名</span>
+                        <span class="badge" style="margin-left:0.4rem;">✓ DLL 与 manifest 同名</span>
+                    </div>
+                </div>
+                <div class="intro-box" style="border-left-color:#3b82f6;background:#f3f8ff;">
+                    <strong>后端处理</strong>
+                    <ul style="margin:0.4rem 0 0 1.2rem;font-size:0.9rem;">
+                        <li>1. 解压 ZIP 至 /package/模块名/</li>
+                        <li>2. 校验必需文件</li>
+                        <li>3. 验证 manifest.json</li>
+                        <li>4. 返回结果</li>
+                    </ul>
+                </div>
+                <div style="font-size:0.85rem;color:#2d5f6e;margin-top:0.5rem;">
+                    <span style="background:#dee9f0;padding:0.1rem 0.6rem;border-radius:30px;">支持变参</span>
+                    <span style="background:#dee9f0;padding:0.1rem 0.6rem;border-radius:30px;margin-left:0.3rem;">QTC
+                        兼容</span>
+                </div>
+            </div>
+
+            <div class="upload-panel">
+                <h2>⬆上传模块包</h2>
+                <div class="drop-area" id="dropArea">
+                    <div class="icon"></div>
+                    <p><strong>点击选择</strong> 或拖拽 .zip</p>
+                    <div class="sub">仅支持 .zip，最大 20MB</div>
+                    <input type="file" id="fileInput" accept=".zip">
+                </div>
+                <div class="file-info" id="fileInfo">
+                    <span id="fileName">未选择</span>
+                    <button class="remove" id="removeBtn">✕</button>
+                </div>
+                <div class="actions">
+                    <button class="btn" id="uploadBtn" disabled>导入</button>
+                    <button class="btn btn-outline" id="clearBtn">清空日志</button>
+                </div>
+                <div class="log" id="logOutput"><span class="info">等待操作…</span></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            const fileInput = document.getElementById('fileInput');
+            const dropArea = document.getElementById('dropArea');
+            const fileInfo = document.getElementById('fileInfo');
+            const fileName = document.getElementById('fileName');
+            const removeBtn = document.getElementById('removeBtn');
+            const uploadBtn = document.getElementById('uploadBtn');
+            const logOutput = document.getElementById('logOutput');
+            const clearBtn = document.getElementById('clearBtn');
+            let selectedFile = null;
+            function log(msg, type = 'info') {
+                const cls = type === 'ok' ? 'ok' : type === 'err' ? 'err' : 'info';
+                const prefix = type === 'ok' ? '[Great]' : type === 'err' ? '[error]' : '[info]';
+                const time = new Date().toLocaleTimeString();
+                const current = logOutput.innerHTML;
+                const line = `<span class="${cls}">[${time}] ${prefix} ${msg}</span>`;
+                if (current.includes('等待操作…') && !current.includes('[')) {
+                    logOutput.innerHTML = line;
+                } else {
+                    logOutput.innerHTML = current + '\n' + line;
+                }
+                logOutput.scrollTop = logOutput.scrollHeight;
+            }
+
+            function clearLog() {
+                logOutput.innerHTML = '<span class="info">日志已清空</span>';
+            }
+            clearBtn.addEventListener('click', clearLog);
+
+            function updateFileUI(file) {
+                if (file) {
+                    fileName.textContent = file.name + ' (' + (file.size / 1024).toFixed(1) + ' KB)';
+                    fileInfo.style.display = 'flex';
+                    uploadBtn.disabled = false;
+                    selectedFile = file;
+                } else {
+                    fileInfo.style.display = 'none';
+                    uploadBtn.disabled = true;
+                    selectedFile = null;
+                    fileInput.value = '';
+                }
+            }
+
+            dropArea.addEventListener('click', () => fileInput.click());
+
+            fileInput.addEventListener('change', () => {
+                if (fileInput.files && fileInput.files.length > 0) {
+                    const f = fileInput.files[0];
+                    if (f.name.toLowerCase().endsWith('.zip')) {
+                        updateFileUI(f);
+                        log('已选择: ' + f.name);
+                    } else {
+                        log('仅支持 .zip 格式', 'err');
+                        updateFileUI(null);
+                    }
+                }
+            });
+
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                updateFileUI(null);
+                log('已移除文件');
+            });
+
+            // 拖拽
+            dropArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropArea.classList.add('dragover');
+            });
+            dropArea.addEventListener('dragleave', () => {
+                dropArea.classList.remove('dragover');
+            });
+            dropArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropArea.classList.remove('dragover');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    const f = files[0];
+                    if (f.name.toLowerCase().endsWith('.zip')) {
+                        updateFileUI(f);
+                        const dt = new DataTransfer();
+                        dt.items.add(f);
+                        fileInput.files = dt.files;
+                        log('拖拽选择: ' + f.name);
+                    } else {
+                        log('仅支持 .zip', 'err');
+                    }
+                }
+            });
+
+            // 上传
+            uploadBtn.addEventListener('click', async () => {
+                if (!selectedFile) {
+                    log('请先选择文件', 'err');
+                    return;
+                }
+
+                const file = fileInput.files[0];
+                if (!file) {
+                    log('文件对象丢失，请重新选择', 'err');
+                    return;
+                }
+
+               
+                const reader = new FileReader();
+                reader.onload = async function (e) {
+                    const base64Data = e.target.result.split(',')[1];
+
+                    const payload = {
+                        filename: file.name,
+                        data: base64Data,
+                        size: file.size
+                    };
+
+                    uploadBtn.disabled = true;
+                    log('上传中…');
+
+                    try {
+                        const resp = await fetch('callback/import.php', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(payload)
+                        });
+                        const result = await resp.json();
+                        if (result.success) {
+                            log('导入成功: ' + (result.module || '未知模块'), 'ok');
+                            if (result.files) log('文件: ' + result.files.join(', '));
+                        } else {
+                            log('导入失败: ' + (result.error || '未知错误'), 'err');
+                        }
+                    } catch (err) {
+                        log('请求异常: ' + err.message, 'err');
+                    } finally {
+                        uploadBtn.disabled = false;
+                    }
+                };
+                reader.readAsDataURL(file);
+            });
+        })();
+    </script>
+</body>
+
+</html>

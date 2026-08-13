@@ -356,18 +356,17 @@
 
 <script>
     (function() {
-    
+        const API_BASE = 'callback/getmodule.php';
         let modulesData = [];
-        let currentActiveModuleIndex = 0;    
+        let currentActiveModuleIndex = 0;
         let isLoading = true;
 
         const modulesTabsContainer = document.getElementById('modulesTabs');
         const dynamicModuleView = document.getElementById('dynamicModuleView');
 
-        
         function renderCurrentModule() {
             if (!modulesData.length) {
-                dynamicModuleView.innerHTML = `<div class="empty-state">📭 未找到任何模块数据，请检查 module.json 文件</div>`;
+                dynamicModuleView.innerHTML = `<div class="empty-state">未找到任何模块数据</div>`;
                 return;
             }
             if (currentActiveModuleIndex >= modulesData.length) {
@@ -375,14 +374,13 @@
             }
             const module = modulesData[currentActiveModuleIndex];
             if (!module) {
-                dynamicModuleView.innerHTML = `<div class="empty-state">⚠️ 模块数据异常</div>`;
+                dynamicModuleView.innerHTML = `<div class="empty-state">模块数据异常</div>`;
                 return;
             }
 
-        
             const functions = module.f || [];
             const functionsHtml = functions.length === 0 
-                ? `<div class="empty-state" style="padding:2rem;">📌 该模块暂无公开函数</div>`
+                ? `<div class="empty-state" style="padding:2rem;">该模块暂无公开函数</div>`
                 : `<div class="functions-grid">
                     ${functions.map(func => generateFunctionCardHtml(func)).join('')}
                    </div>`;
@@ -394,7 +392,7 @@
                         <div class="module-desc-text">${escapeHtml(module.d || '无描述')}</div>
                     </div>
                     <div class="functions-header">
-                        <h3>📖 公开函数</h3>
+                        <h3>公开函数</h3>
                         <div class="func-badge">${functions.length} 个方法</div>
                     </div>
                     ${functionsHtml}
@@ -402,6 +400,7 @@
             `;
             dynamicModuleView.innerHTML = moduleHtml;
         }
+
         function generateFunctionCardHtml(func) {
             const funcName = escapeHtml(func.n || 'anonymous');
             const funcDesc = escapeHtml(func.d || '暂无描述');
@@ -433,6 +432,7 @@
                 </div>
             `;
         }
+
         function escapeHtml(str) {
             if (!str) return '';
             return str.replace(/[&<>]/g, function(m) {
@@ -440,10 +440,9 @@
                 if (m === '<') return '&lt;';
                 if (m === '>') return '&gt;';
                 return m;
-            }).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function(c) {
-                return c;
             });
         }
+
         function renderTabs() {
             if (!modulesTabsContainer) return;
             if (!modulesData.length) {
@@ -461,10 +460,11 @@
                 `;
             }).join('');
             modulesTabsContainer.innerHTML = tabsHtml;
+            
             const btns = modulesTabsContainer.querySelectorAll('.tab-btn');
             btns.forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    const idxAttr = btn.getAttribute('data-index');
+                btn.addEventListener('click', function() {
+                    const idxAttr = this.getAttribute('data-index');
                     if (idxAttr === null) return;
                     const newIdx = parseInt(idxAttr, 10);
                     if (!isNaN(newIdx) && newIdx !== currentActiveModuleIndex && modulesData[newIdx]) {
@@ -475,26 +475,33 @@
                 });
             });
         }
+
         function showLoading() {
-            dynamicModuleView.innerHTML = `<div class="loading-state"><div>⏳ 正在加载模块索引 ...</div></div>`;
+            dynamicModuleView.innerHTML = `<div class="loading-state">正在加载模块索引 ...</div>`;
         }
+
         function showError(msg) {
-            dynamicModuleView.innerHTML = `<div class="empty-state">❌ ${msg}<br/>请确认 module.json 文件存在且格式正确。</div>`;
+            dynamicModuleView.innerHTML = `<div class="empty-state">${msg}</div>`;
         }
+
         function init() {
             showLoading();
-            fetch('module.json')
+            
+            fetch(API_BASE + '?action=list')
                 .then(response => {
                     if (!response.ok) {
                         throw new Error(`HTTP ${response.status}: 无法加载模块数据`);
                     }
                     return response.json();
                 })
-                .then(data => {
-                    if (!Array.isArray(data) || data.length === 0) {
-                        throw new Error('模块数据为空，请检查 module.json 内容');
+                .then(result => {
+                    if (!result.success) {
+                        throw new Error(result.error || '未知错误');
                     }
-                    modulesData = data;
+                    if (!result.data || result.data.length === 0) {
+                        throw new Error('模块数据为空');
+                    }
+                    modulesData = result.data;
                     currentActiveModuleIndex = 0;
                     renderTabs();
                     renderCurrentModule();
@@ -508,7 +515,6 @@
                 });
         }
 
-        
         init();
     })();
 </script>

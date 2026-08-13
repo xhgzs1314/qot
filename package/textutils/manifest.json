@@ -1,0 +1,102 @@
+{
+    "author": "MOK-XI",
+    "gp": "https://github.com/MOK-XI/qot-plugins",
+    "ct": "mokxi@example.com",
+    "m": {
+        "n": "textutils",
+        "d": "文本处理模块，提供MD5、SHA256、HMAC、Base64、URL编码、CRC32校验等功能",
+        "f": [
+            {
+                "n": "tul_md5",
+                "d": "计算字符串的MD5哈希值，返回32位十六进制字符串",
+                "p": "string_t, number_t",
+                "r": "string_t",
+                "de": [
+                    "待计算MD5哈希值的字符串",
+                    "字符串的长度"
+                ]
+            },
+            {
+                "n": "tul_b64enc",
+                "d": "对字符串进行Base64编码",
+                "p": "string_t, number_t",
+                "r": "string_t",
+                "de": [
+                    "待进行Base64编码的字符串",
+                    "字符串的长度"
+                ]
+            },
+            {
+                "n": "tul_b64dec",
+                "d": "对Base64编码的字符串进行解码",
+                "p": "string_t",
+                "r": "string_t",
+                "de": [
+                    "待解码的Base64编码字符串"
+                ]
+            },
+            {
+                "n": "tul_sha256",
+                "d": "计算字符串的SHA256哈希值，返回64位十六进制字符串",
+                "p": "string_t, number_t",
+                "r": "string_t",
+                "de": [
+                    "待计算SHA256哈希值的字符串",
+                    "字符串的长度"
+                ]
+            },
+            {
+                "n": "tul_hmac_md5",
+                "d": "使用密钥计算数据的HMAC-MD5哈希值，返回32位十六进制字符串",
+                "p": "string_t, number_t, string_t, number_t",
+                "r": "string_t",
+                "de": [
+                    "密钥字符串",
+                    "密钥长度",
+                    "待哈希的数据字符串",
+                    "数据长度"
+                ]
+            },
+            {
+                "n": "tul_hmac_sha256",
+                "d": "使用密钥计算数据的HMAC-SHA256哈希值，返回64位十六进制字符串",
+                "p": "string_t, number_t, string_t, number_t",
+                "r": "string_t",
+                "de": [
+                    "密钥字符串",
+                    "密钥长度",
+                    "待哈希的数据字符串",
+                    "数据长度"
+                ]
+            },
+            {
+                "n": "tul_urlencode",
+                "d": "对字符串进行URL编码（百分号编码），特殊字符和中文会被转换",
+                "p": "string_t",
+                "r": "string_t",
+                "de": [
+                    "待进行URL编码的字符串"
+                ]
+            },
+            {
+                "n": "tul_urldecode",
+                "d": "对URL编码的字符串进行解码，还原为原始字符串",
+                "p": "string_t",
+                "r": "string_t",
+                "de": [
+                    "待解码的URL编码字符串"
+                ]
+            },
+            {
+                "n": "tul_crc32",
+                "d": "计算数据的CRC32校验值，返回无符号整数",
+                "p": "string_t, number_t",
+                "r": "number_t",
+                "de": [
+                    "待计算CRC32的数据字符串",
+                    "数据长度"
+                ]
+            }
+        ]
+    }
+}

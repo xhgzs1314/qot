@@ -1,0 +1,160 @@
+{
+    "author": "MOK-XI",
+    "gp": "https://github.com/MOK-XI/qot-plugins",
+    "ct": "mokxi@example.com",
+    "m": {
+        "n": "sqlite",
+        "d": "SQLite 数据库操作模块，提供轻量级嵌入式数据库的增删改查、事务管理、备份恢复等功能",
+        "f": [
+            {
+                "n": "sqlite_open",
+                "d": "打开 SQLite 数据库文件，返回数据库连接句柄",
+                "p": "str",
+                "r": "ptr",
+                "de": [
+                    "数据库文件路径（UTF-8 编码字符串）"
+                ]
+            },
+            {
+                "n": "sqlite_close",
+                "d": "关闭数据库连接，释放资源",
+                "p": "ptr",
+                "r": "int",
+                "de": [
+                    "数据库连接句柄（由 sqlite_open 返回）"
+                ]
+            },
+            {
+                "n": "sqlite_execute",
+                "d": "执行 SQL 语句（支持 SELECT、INSERT、UPDATE、DELETE、CREATE 等），返回结果集指针",
+                "p": "ptr,str",
+                "r": "ptr",
+                "de": [
+                    "数据库连接句柄",
+                    "要执行的 SQL 语句字符串"
+                ]
+            },
+            {
+                "n": "sqlite_free_result",
+                "d": "释放结果集占用的内存，避免内存泄漏",
+                "p": "ptr",
+                "r": "void",
+                "de": [
+                    "由 sqlite_execute 返回的结果集指针"
+                ]
+            },
+            {
+                "n": "sqlite_get_error",
+                "d": "获取最后一次操作产生的错误信息",
+                "p": "ptr",
+                "r": "str",
+                "de": [
+                    "结果集指针（由 sqlite_execute 返回）"
+                ]
+            },
+            {
+                "n": "sqlite_export",
+                "d": "将当前数据库导出备份到指定文件",
+                "p": "ptr,str",
+                "r": "int",
+                "de": [
+                    "数据库连接句柄",
+                    "备份文件路径（UTF-8 编码）"
+                ]
+            },
+            {
+                "n": "sqlite_import",
+                "d": "从备份文件导入数据库",
+                "p": "ptr,str",
+                "r": "int",
+                "de": [
+                    "数据库连接句柄",
+                    "备份文件路径（UTF-8 编码）"
+                ]
+            },
+            {
+                "n": "sqlite_get_version",
+                "d": "获取 SQLite 库版本号",
+                "p": "",
+                "r": "str",
+                "de": []
+            },
+            {
+                "n": "sqlite_is_open",
+                "d": "检查数据库连接是否有效",
+                "p": "ptr",
+                "r": "int",
+                "de": [
+                    "数据库连接句柄"
+                ]
+            },
+            {
+                "n": "sqlite_last_insert_rowid",
+                "d": "获取最近一次 INSERT 操作自动生成的行 ID",
+                "p": "ptr",
+                "r": "int64",
+                "de": [
+                    "数据库连接句柄"
+                ]
+            },
+            {
+                "n": "sqlite_changes",
+                "d": "获取最近一次 INSERT、UPDATE 或 DELETE 操作影响的行数",
+                "p": "ptr",
+                "r": "int",
+                "de": [
+                    "数据库连接句柄"
+                ]
+            },
+            {
+                "n": "sqlite_begin_transaction",
+                "d": "开始一个事务",
+                "p": "ptr",
+                "r": "int",
+                "de": [
+                    "数据库连接句柄"
+                ]
+            },
+            {
+                "n": "sqlite_commit_transaction",
+                "d": "提交当前事务，永久保存所有更改",
+                "p": "ptr",
+                "r": "int",
+                "de": [
+                    "数据库连接句柄"
+                ]
+            },
+            {
+                "n": "sqlite_rollback_transaction",
+                "d": "回滚当前事务，撤销所有更改",
+                "p": "ptr",
+                "r": "int",
+                "de": [
+                    "数据库连接句柄"
+                ]
+            },
+            {
+                "n": "sqlite_table_exists",
+                "d": "检查指定的表是否存在于数据库中",
+                "p": "ptr,str",
+                "r": "int",
+                "de": [
+                    "数据库连接句柄",
+                    "要检查的表名"
+                ]
+            },
+            {
+                "n": "sqlite_query_single",
+                "d": "执行查询并返回单个值（如 COUNT、MAX、MIN 等聚合函数的结果）",
+                "p": "ptr,str,ptr,int",
+                "r": "int",
+                "de": [
+                    "数据库连接句柄",
+                    "SQL 查询语句",
+                    "结果缓冲区指针",
+                    "缓冲区大小（字节）"
+                ]
+            }
+        ]
+    }
+}
