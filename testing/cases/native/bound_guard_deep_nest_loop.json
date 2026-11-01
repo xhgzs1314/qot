@@ -1,0 +1,11 @@
+{
+  "name": "bound_guard_deep_nest_loop",
+  "runs_on": "vm",
+  "expect": {
+    "exit": 0,
+    "stdout": ["true"],
+    "stderr_empty": true
+  },
+  "tags": ["guard", "control-flow", "deep-nest", "native-matrix"],
+  "note": "S-02 负例矩阵 ⑤：for×for×loop 深嵌套下的 F64 guard 与回边共存。k 由模板保证递减停机（首版用 total<50 条件会死循环——G-8 教训：测试用例自身也必须可证停机）。期望值 9.390625 经 VM 实跑锚定（精确二进制小数，等值比较可靠）。"
+}

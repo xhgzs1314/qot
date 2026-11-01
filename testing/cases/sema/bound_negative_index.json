@@ -1,0 +1,19 @@
+{
+ "name": "bound_negative_index",
+ "runs_on": "vm",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stdout": [
+   "null"
+  ]
+ },
+ "tags": [
+  "array",
+  "oob"
+ ],
+ "note": "负下标视为越界，VM 得 null（README 未记载，实测确认）"
+}

@@ -1,0 +1,20 @@
+{
+ "name": "t16_inline_const_group",
+ "runs_on": "vm",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stderr_empty": true
+ },
+ "tags": [
+  "native",
+  "inline",
+  "unbox",
+  "f64",
+  "regression"
+ ],
+ "note": "N-02 回归：内联×去装箱，常量组（无 v 输入）必须与求解器同判，否则镜像永不赋值"
+}

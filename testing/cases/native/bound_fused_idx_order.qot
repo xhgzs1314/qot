@@ -1,0 +1,22 @@
+// 【缺陷钉 】下标+算术融合（_try_fused_idx_arith）的操作数序。
+// 旧实现把下标结果 _ev 恒当**左操作数**发射：当 INDEX_GET 结果是算术的
+// 右操作数（ai.b == X，如 `x > a[0]` / `t - a[i]` / `t / d["k"]`）时，
+// 非交换运算（> < >= <= - / %）全部错序（`x > a[0]` 被编成 `a[0] > x`，
+// 实测 output(false)）。基准负载全是 `t + a[i]` 交换形态（b6b/b2a），
+// 该缺陷从未被暴露 —— G-03 三元用例首次踩中。本钉把两侧非交换序写死。
+var a = [10, 3];
+var t = 100;
+output(t - a[1]);    // 97
+output(t / a[1]);    // 33.333333
+output(t % a[1]);    // 1
+output(a[1] - t);    // -97
+output(a[1] / t);    // 0.03
+output(t > a[0]);    // true
+output(t < a[0]);    // false
+output(a[0] >= t);   // false
+output(t <= a[0]);   // false
+var d = &< "k": 7 >&;
+output(t - d["k"]);  // 93
+output(d["k"] - t);  // -93
+output(t > d["k"]);  // true
+output(t > d["k"] ? "gt" : "le");  // 三元 × 融合序的组合形态

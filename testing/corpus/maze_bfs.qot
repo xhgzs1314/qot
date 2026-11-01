@@ -1,0 +1,64 @@
+// 语料线 · 19 迷宫 BFS（二维网格 + 队列 + 最短路还原）
+// 任务画像：游戏/路径规划最小版。状态：✅ 可运行。
+number_t func row5(a, b, c, d, e) {
+    var r = arr_new();
+    arr_push(r, a); arr_push(r, b); arr_push(r, c);
+    arr_push(r, d); arr_push(r, e);
+    return r;
+}
+var g = arr_new();
+arr_push(g, row5(0, 0, 1, 0, 0));
+arr_push(g, row5(1, 0, 1, 0, 1));
+arr_push(g, row5(0, 0, 0, 0, 0));
+arr_push(g, row5(0, 1, 1, 1, 0));
+arr_push(g, row5(0, 0, 0, 0, 0));
+
+var rows = arr_len(g);
+var cols = arr_len(arr_get(g, 0));
+
+var dist = dict_new();
+var prev = dict_new();
+var queue = arr_new();
+arr_push(queue, "0,0");
+dict_set(dist, "0,0", 0);
+
+var head = 0;
+var found = false;
+loop (head < arr_len(queue) && found == false) {
+    var cur = arr_get(queue, head);
+    head += 1;
+    var xy = str_split(cur, ",");
+    var r = str_to_int(arr_get(xy, 0));
+    var c = str_to_int(arr_get(xy, 1));
+    if (r == (rows - 1) && c == (cols - 1)) {
+        found = true;
+    } else {
+        var step = dict_get(dist, cur) + 1;
+        var dirs = arr_new();
+        var d0 = arr_new(); arr_push(d0, r + 1); arr_push(d0, c); arr_push(dirs, d0);
+        var d1 = arr_new(); arr_push(d1, r - 1); arr_push(d1, c); arr_push(dirs, d1);
+        var d2 = arr_new(); arr_push(d2, r); arr_push(d2, c + 1); arr_push(dirs, d2);
+        var d3 = arr_new(); arr_push(d3, r); arr_push(d3, c - 1); arr_push(dirs, d3);
+        var d = 0;
+        loop (d < 4) {
+            var xy2 = arr_get(dirs, d);
+            var nr = arr_get(xy2, 0);
+            var nc = arr_get(xy2, 1);
+            if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) {
+                if (arr_get(arr_get(g, nr), nc) == 0) {
+                    var key = int_to_str(nr) + "," + int_to_str(nc);
+                    if (dict_has(dist, key) == false) {
+                        dict_set(dist, key, step);
+                        dict_set(prev, key, cur);
+                        arr_push(queue, key);
+                    }
+                }
+            }
+            d += 1;
+        }
+    }
+}
+output("reached: " + strings(found));
+if (found) {
+    output("steps: " + int_to_str(dict_get(dist, int_to_str(rows - 1) + "," + int_to_str(cols - 1))));
+}

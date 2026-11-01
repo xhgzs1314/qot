@@ -1,0 +1,11 @@
+var arr = [];
+var i = 0;
+loop (i < 100000) {
+    push(arr, i);
+    i = i + 1;
+}
+var t = 0;
+for (j in 100000) {
+    t = t + arr[j];
+}
+output(t);

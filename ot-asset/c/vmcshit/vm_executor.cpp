@@ -1,11 +1,66 @@
 #include "vm_executor.h"
-#include "rpn_executor.h"
 #include <chrono>
 #define QOT_DBG(...) dbgSlow([&]() -> std::string { return (__VA_ARGS__); })
 
 namespace qot
 {
     static const std::string kNoName;
+    static const CodeBlock::CallTarget kEmptyTarget{}; // funcIdx 越界时的安全空目标
+
+    void VMExecutor::resolve_calls(CodeBlock &cb)
+    {
+        cb.callTargets.assign(cb.funcNames.size(), CodeBlock::CallTarget{});
+        for (size_t i = 0; i < cb.funcNames.size(); i++)
+        {
+            const std::string &name = cb.funcNames[i];
+            CodeBlock::CallTarget t;
+            if (BuiltinManager::instance().hasFunction(name))
+            {
+                t.builtin = &BuiltinManager::instance().getFunction(name);
+                if (!*t.builtin)
+                    t.builtin = nullptr; // 空表项当未找到
+            }
+            else
+            {
+                auto it = m_functions.find(name);
+                if (it != m_functions.end())
+                {
+                    t.user = it->second.get();
+                }
+                else
+                {
+                    for (const auto &c : cb.constants)
+                    {
+                        if (c.isCodeBlock())
+                        {
+                            auto p = c.asCodeBlock();
+                            if (!p->funcNames.empty() && p->funcNames[0] == name)
+                            {
+                                t.user = p.get();
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            cb.callTargets[i] = t;
+        }
+    }
+
+    void VMExecutor::resolve_calls_recursive(CodeBlock &cb)
+    {
+        resolve_calls(cb);
+        for (const auto &c : cb.constants)
+        {
+            if (c.isCodeBlock())
+            {
+                auto p = c.asCodeBlock();
+                if (p->callTargets.size() != p->funcNames.size())
+                    resolve_calls_recursive(*p);
+            }
+        }
+    }
+
     void VMExecutor::execute_fast()
     {
         uint8_t op;
@@ -70,6 +125,7 @@ namespace qot
             op = static_cast<uint8_t>(ins.op);
             argLen = ins.argLen;
             fr->ip = ++ip;
+            QOT_PROF_OP_BEGIN();
             switch (op)
             {
             case 0: // NOP
@@ -127,6 +183,7 @@ namespace qot
                     }
                     else if (idx >= 0 && idx < (int32_t)cb->varNames.size())
                     {
+                        QOT_PROF_ADD(globalFallbackReads, 1);
                         const std::string &name = cb->varNames[idx];
                         auto globalIt = m_globals.find(name);
                         if (globalIt != m_globals.end())
@@ -175,6 +232,7 @@ namespace qot
                     }
                     else if (idx >= 0 && idx < (int32_t)cb->varNames.size())
                     {
+                        QOT_PROF_ADD(globalFallbackWrites, 1);
                         const std::string &name = cb->varNames[idx];
                         m_globals[name] = value;
                     }
@@ -431,25 +489,34 @@ namespace qot
             }
             break;
 
-            case 30: 
+            case 30:
             {
                 if (argLen < 8)
                     break;
 
                 int32_t funcIdx = ins.a, argCount = ins.b;
-                const std::string &funcName =
-                    (funcIdx >= 0 && funcIdx < (int32_t)cb->funcNames.size())
-                        ? cb->funcNames[funcIdx]
-                        : kNoName;
+
+                // T-34/T-35：调用目标已在加载期解析（resolve_calls），运行期零字符串哈希。
+                // 防御：若目标表与函数名表失配（直接构造的 CodeBlock 等场景），现场补解析。
+                if (cb->callTargets.size() != cb->funcNames.size())
+                    resolve_calls(*const_cast<CodeBlock *>(cb));
+                const CodeBlock::CallTarget &t =
+                    (funcIdx >= 0 && funcIdx < (int32_t)cb->callTargets.size())
+                        ? cb->callTargets[funcIdx]
+                        : kEmptyTarget;
 
                 if (m_debug)
                 {
+                    const std::string &funcName =
+                        (funcIdx >= 0 && funcIdx < (int32_t)cb->funcNames.size())
+                            ? cb->funcNames[funcIdx]
+                            : kNoName;
                     QOT_DBG("CALL func=" + funcName + " argCount=" + std::to_string(argCount) + " current_ip=" + std::to_string(fr->ip));
                 }
 
-            
-                if (BuiltinManager::instance().hasFunction(funcName))
+                if (t.builtin)
                 {
+                    QOT_PROF_ADD(builtinCalls, 1);
                     std::vector<Value> args;
                     args.reserve(argCount);
                     for (int32_t i = 0; i < argCount; i++)
@@ -460,38 +527,23 @@ namespace qot
                         fr->stack.pop_back();
                     }
                     std::reverse(args.begin(), args.end());
-                    fr->stack.push_back(BuiltinManager::instance().call(funcName, args));
+                    fr->stack.push_back((*t.builtin)(args));
                     break;
                 }
 
-          
-                CodeBlockPtr funcCode = nullptr;
-                auto it = m_functions.find(funcName);
-                if (it != m_functions.end())
-                    funcCode = it->second;
-
-                if (!funcCode)
-                {
-
-                    for (const auto &c : cb->constants)
-                    {
-                        if (c.isCodeBlock())
-                        {
-                            auto cb = c.asCodeBlock();
-                            // 只认 funcNames[0]
-                            if (!cb->funcNames.empty() && cb->funcNames[0] == funcName)
-                            {
-                                funcCode = cb;
-                                break;
-                            }
-                        }
-                    }
-                }
+                QOT_PROF_ADD(userCalls, 1);
+                CodeBlock *funcCode = t.user;
 
                 if (!funcCode)
                 {
                     if (m_debug)
+                    {
+                        const std::string &funcName =
+                            (funcIdx >= 0 && funcIdx < (int32_t)cb->funcNames.size())
+                                ? cb->funcNames[funcIdx]
+                                : kNoName;
                         QOT_DBG("函数未找到: " + funcName);
+                    }
                     fr->stack.emplace_back(nullptr);
                     break;
                 }
@@ -505,14 +557,19 @@ namespace qot
                 OptimizedCallFrame newFrame;
                 if (!m_framePool.empty())
                 {
+                    QOT_PROF_ADD(framePoolHits, 1);
                     newFrame = std::move(m_framePool.back());
                     m_framePool.pop_back();
                     newFrame.frame.reuse();
                 }
-                newFrame.codeBlock = funcCode.get();
-                newFrame.returnIp = returnAddress; 
+                else
+                {
+                    QOT_PROF_ADD(framePoolMisses, 1);
+                }
+                newFrame.codeBlock = funcCode;
+                newFrame.returnIp = returnAddress;
                 newFrame.frame.resize(funcCode->varNames.size(), funcCode->funcNames.size());
-                newFrame.frame.ip = 0; 
+                newFrame.frame.ip = 0;
                 int32_t paramCount = std::min(argCount, (int32_t)funcCode->varNames.size());
                 std::vector<Value> args;
                 args.reserve(paramCount);
@@ -538,7 +595,11 @@ namespace qot
 
                 if (m_debug)
                 {
-                    QOT_DBG("切换到函数 " + funcName + ", 从ip=0开始执行");
+                    const std::string &fnameDbg =
+                        (funcIdx >= 0 && funcIdx < (int32_t)cb->funcNames.size())
+                            ? cb->funcNames[funcIdx]
+                            : kNoName;
+                    QOT_DBG("切换到函数 " + fnameDbg + ", 从ip=0开始执行");
                     QOT_DBG("调用栈深度: " + std::to_string(m_callStack.size()));
                 }
             }
@@ -567,6 +628,7 @@ namespace qot
                     if (m_debug)
                         QOT_DBG("主函数返回，结束执行");
                     m_running = false;
+                    QOT_PROF_OP_END(32);
                     return;
                 }
                 size_t returnIp = m_callStack.back().returnIp;
@@ -677,7 +739,11 @@ namespace qot
                         fr->stack.pop_back();
                         if (key.isString())
                         {
+#ifdef QOT_DICT_LEGACY_BASELINE
                             (*dict)[key.asString()] = value;
+#else
+                            dict->at_h(key.string_hash(), key.asString()) = value;
+#endif
                         }
                     }
                     fr->stack.emplace_back(dict);
@@ -707,11 +773,20 @@ namespace qot
                     else if (container.isDict() && index.isString())
                     {
                         const auto &dict = container.asDict();
+#ifdef QOT_DICT_LEGACY_BASELINE
                         auto it = dict.find(index.asString());
                         if (it != dict.end())
                         {
                             result = it->second;
                         }
+#else
+                        // T-33：键哈希缓存在 StringBox 上，热路径零重算
+                        const Value *hit = dict.find_ptr_h(index.string_hash(), index.asString());
+                        if (hit)
+                        {
+                            result = *hit;
+                        }
+#endif
                     }
                     else if (container.isString() && index.isNumber())
                     {
@@ -754,7 +829,11 @@ namespace qot
                     else if (container.isDict() && index.isString())
                     {
                         auto &dict = container.asDict();
+#ifdef QOT_DICT_LEGACY_BASELINE
                         dict[index.asString()] = value;
+#else
+                        dict.at_h(index.string_hash(), index.asString()) = value;
+#endif
                     }
                     fr->stack.push_back(value);
                 }
@@ -763,6 +842,7 @@ namespace qot
 
             case 51: // STOP
                 m_running = false;
+                QOT_PROF_OP_END(51);
                 return;
 
             case 52: // BREAK
@@ -785,6 +865,7 @@ namespace qot
                     break;
                 }
                 m_running = false;
+                QOT_PROF_OP_END(52);
                 return;
             }
 
@@ -821,297 +902,13 @@ namespace qot
             }
             break;
 
-            case 200: // RPN_LOOP_START
-            {
-                if (m_rpn_enabled && argLen >= 4)
-                {
-                    int32_t loop_id = ins.a;
-                    if (m_debug)
-                        QOT_DBG("[RPN] Loop start: id=" + std::to_string(loop_id));
-
-                    auto it = m_rpn_loops.find(static_cast<uint32_t>(loop_id));
-                    if (it != m_rpn_loops.end())
-                    {
-                        if (it->second.compiled && it->second.iterations > 0)
-                        {
-                            m_in_rpn_loop = true;
-                            m_current_rpn_loop_id = static_cast<uint32_t>(loop_id);
-                            ip = it->second.body_end;
-                            fr->ip = ip;
-                        }
-                    }
-                    else
-                    {
-                        RPNLoopInfo info;
-                        info.loop_id = static_cast<uint32_t>(loop_id);
-                        info.condition_ip = static_cast<uint32_t>(fr->ip - 1);
-                        info.compiled = false;
-                        info.iterations = -1;
-                        info.is_active = false;
-                        m_rpn_loops[static_cast<uint32_t>(loop_id)] = info;
-                    }
-                }
-            }
-            break;
-
-            case 201: // RPN_LOOP_END
-            {
-                if (m_rpn_enabled && argLen >= 4)
-                {
-                    int32_t loop_id = ins.a;
-                    if (m_debug)
-                        QOT_DBG("[RPN] Loop end: id=" + std::to_string(loop_id));
-
-                    auto it = m_rpn_loops.find(static_cast<uint32_t>(loop_id));
-                    if (it == m_rpn_loops.end())
-                        break;
-
-                    RPNLoopInfo &info = it->second;
-                    if (m_in_rpn_loop && m_current_rpn_loop_id == info.loop_id)
-                    {
-                        m_in_rpn_loop = false;
-                        break;
-                    }
-
-                    info.body_end = static_cast<uint32_t>(fr->ip - 1);
-                    if (!find_loop_boundaries(info))
-                    {
-                        m_rpn_loops.erase(it);
-                        break;
-                    }
-
-                    if (!info.compiled)
-                    {
-                        if (compile_rpn_loop(info.body_start, info.body_end, info.expr_info))
-                        {
-                            info.compiled = true;
-                        }
-                        else
-                        {
-                            m_rpn_loops.erase(it);
-                            break;
-                        }
-                    }
-
-                    if (info.iterations < 0)
-                    {
-                        info.iterations = estimate_iterations(info.condition_ip);
-                        if (info.iterations <= 0)
-                        {
-                            m_rpn_loops.erase(it);
-                            break;
-                        }
-                    }
-
-                    std::vector<double> var_values;
-                    std::vector<Value *> var_ptrs;
-                    bool all_numeric = true;
-
-                    for (uint32_t var_idx : info.expr_info.var_indices)
-                    {
-                        if (var_idx >= cb->varNames.size())
-                        {
-                            all_numeric = false;
-                            break;
-                        }
-                        const std::string &var_name = cb->varNames[var_idx];
-                        Value *val_ptr = nullptr;
-                        uint32_t local_idx = cb->get_var_index(var_name);
-                        if (local_idx < fr->locals.size())
-                        {
-                            val_ptr = &fr->get_local(local_idx);
-                        }
-                        else
-                        {
-                            auto git = m_globals.find(var_name);
-                            if (git != m_globals.end())
-                            {
-                                val_ptr = &git->second;
-                            }
-                        }
-
-                        if (!val_ptr || !val_ptr->isNumber())
-                        {
-                            all_numeric = false;
-                            break;
-                        }
-                        var_values.push_back(val_ptr->rawNumber());
-                        var_ptrs.push_back(val_ptr);
-                    }
-
-                    if (!all_numeric || var_values.empty())
-                    {
-                        m_rpn_loops.erase(it);
-                        break;
-                    }
-
-                    for (int64_t i = 0; i < info.iterations; i++)
-                    {
-                        double result = RPNExecutor::execute(
-                            info.expr_info.rpn_code.data(),
-                            static_cast<uint32_t>(info.expr_info.rpn_code.size()),
-                            info.expr_info.constants.data(),
-                            var_values.data(),
-                            static_cast<uint32_t>(var_values.size()));
-
-                        for (size_t j = 0; j < var_ptrs.size() && j < var_values.size(); j++)
-                        {
-                            if (var_ptrs[j])
-                            {
-                                if (is_variable_modified_in_loop(cb->varNames[info.expr_info.var_indices[j]],
-                                                                 info.body_start, info.body_end))
-                                {
-                                    var_values[j] = result;
-                                    *var_ptrs[j] = Value(result);
-                                }
-                            }
-                        }
-                    }
-
-                    while (!fr->stack.empty())
-                    {
-                        fr->stack.pop_back();
-                    }
-                    ip = info.exit_ip;
-                    fr->ip = ip;
-                    m_rpn_loops.erase(it);
-                }
-            }
-            break;
-
             default:
                 if (m_debug)
                     QOT_DBG("Unknown op: " + std::to_string(op));
                 break;
             }
+            QOT_PROF_OP_END(op);
         }
     }
 
-    bool VMExecutor::find_loop_boundaries(RPNLoopInfo &info)
-    {
-        for (uint32_t ip = info.body_end; ip < m_currentCodeBlock->instructions.size(); ip++)
-        {
-            auto &instr = m_currentCodeBlock->instructions[ip];
-            if (instr.op == OpCode::JUMP)
-            {
-                int32_t target = instr.a;
-                info.jump_back_ip = ip;
-                info.body_start = static_cast<uint32_t>(target);
-                info.exit_ip = ip + 1;
-                if (info.body_start < info.body_end)
-                {
-                    return true;
-                }
-                break;
-            }
-        }
-        for (uint32_t ip = info.condition_ip; ip < m_currentCodeBlock->instructions.size(); ip++)
-        {
-            auto &instr = m_currentCodeBlock->instructions[ip];
-            if (instr.op == OpCode::JUMP_IF_FALSE || instr.op == OpCode::JUMP_IF_TRUE)
-            {
-                int32_t target = instr.a;
-                if (target > 0 && target < (int32_t)ip)
-                {
-                    info.body_start = static_cast<uint32_t>(target);
-                    info.exit_ip = ip + 1;
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    bool VMExecutor::is_variable_modified_in_loop(const std::string &var_name,
-                                                  uint32_t loop_start,
-                                                  uint32_t loop_end)
-    {
-        for (uint32_t ip = loop_start; ip < loop_end && ip < m_currentCodeBlock->instructions.size(); ip++)
-        {
-            auto &instr = m_currentCodeBlock->instructions[ip];
-            if (instr.op == OpCode::STORE_VAR)
-            {
-                int32_t var_idx = instr.a;
-                if (var_idx >= 0 && var_idx < (int32_t)m_currentCodeBlock->varNames.size())
-                {
-                    if (m_currentCodeBlock->varNames[var_idx] == var_name)
-                    {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
-    }
-
-    bool VMExecutor::compile_rpn_loop(uint32_t loop_start, uint32_t loop_end,
-                                      ExpressionInfo &out_info)
-    {
-        if (loop_start >= loop_end)
-            return false;
-
-        std::vector<std::pair<uint8_t, std::vector<uint8_t>>> converted;
-        for (uint32_t ip = loop_start; ip < loop_end; ip++)
-        {
-            OpCode op = m_currentCodeBlock->instructions[ip].op;
-            if (op == OpCode::JUMP || op == OpCode::JUMP_IF_FALSE ||
-                op == OpCode::JUMP_IF_TRUE || op == OpCode::RPN_LOOP_START ||
-                op == OpCode::RPN_LOOP_END)
-            {
-                continue;
-            }
-            const Instr &src = m_currentCodeBlock->instructions[ip];
-            std::vector<uint8_t> raw;
-            if (src.blobIdx >= 0)
-            {
-                raw = m_currentCodeBlock->blobs[src.blobIdx];
-            }
-            else
-            {
-                uint8_t buf[8];
-                std::memcpy(buf, &src.a, 4);
-                std::memcpy(buf + 4, &src.b, 4);
-                raw.assign(buf, buf + src.argLen);
-            }
-            converted.emplace_back(static_cast<uint8_t>(op), std::move(raw));
-        }
-
-        if (converted.empty())
-            return false;
-
-        return RPNExecutor::compile_from_bytecode(
-            converted, 0, static_cast<uint32_t>(converted.size()),
-            m_currentCodeBlock->varNames, m_currentCodeBlock->constants, out_info);
-    }
-
-    int64_t VMExecutor::estimate_iterations(uint32_t loop_start)
-    {
-        for (uint32_t ip = loop_start; ip < (uint32_t)m_currentCodeBlock->instructions.size(); ip++)
-        {
-            auto &instr = m_currentCodeBlock->instructions[ip];
-            if (instr.op == OpCode::JUMP_IF_FALSE || instr.op == OpCode::JUMP_IF_TRUE)
-            {
-                for (uint32_t j = ip; j > loop_start; j--)
-                {
-                    if (m_currentCodeBlock->instructions[j].op == OpCode::PUSH_CONST)
-                    {
-                        int32_t const_idx = m_currentCodeBlock->instructions[j].a;
-                        if (const_idx >= 0 && const_idx < (int32_t)m_currentCodeBlock->constants.size())
-                        {
-                            const Value &v = m_currentCodeBlock->constants[const_idx];
-                            if (v.isNumber())
-                            {
-                                int64_t val = static_cast<int64_t>(v.rawNumber());
-                                if (val > 0 && val < 100000000)
-                                    return val;
-                            }
-                        }
-                        break;
-                    }
-                }
-                break;
-            }
-        }
-        return -1;
-    }
 }

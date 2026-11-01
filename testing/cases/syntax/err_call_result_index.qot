@@ -1,0 +1,4 @@
+array_t func g() {
+    return [1, 2];
+}
+output(g()[0]);

@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>标准库 · QOT</title>
+    <link rel="stylesheet" href="assets/doc.css">
+</head>
+
+<body>
+    <div class="doc">
+        <div class="doc-head">
+            <span class="eyebrow">QOT 语言手册</span>
+            <h1>标准库</h1>
+            <p>
+                标准库就是 <code>.qot</code> 源码——没有隐藏实现，可以直接打开读、直接改、直接抄进自己的项目。
+                仓库里的 <code>std/</code> 目录是它的全部内容。
+            </p>
+        </div>
+
+        <div class="doc-body">
+            <h2>1. 引入方式</h2>
+            <pre><code>require "std/fs.qot";
+require "std/text.qot";</code></pre>
+            <p>引入后模块里的函数就进入当前程序的名字空间，可以直接调用，也可以用
+                <code>模块名##函数名</code> 的写法显式限定：</p>
+            <pre><code>require "std/text.qot";
+
+var rows = csv_parse(text);         // 直接调用
+var rows2 = text##csv_parse(text);  // 显式限定（模块名 = 文件名去掉扩展名）</code></pre>
+
+            <h3>命名空间纪律</h3>
+            <ul>
+                <li>模块是<strong>平坦命名空间</strong>：引入后模块内的顶层名直接进入主程序名字空间。</li>
+                <li>主程序若定义同名顶层名，编译期<strong>显式失败</strong>（不静默遮蔽）。</li>
+                <li>模块内部私有名一律带模块前缀（<code>_sfs_</code> / <code>_stx_</code> / <code>_sdt_</code> /
+                    <code>_scl_</code> / <code>_net_</code>），避免与主程序撞名。</li>
+            </ul>
+
+            <h3>失败约定</h3>
+            <p>标准库统一：<strong>容器类失败返回 <code>null</code></strong>，布尔类失败返回 <code>false</code>，
+                字符串类失败返回空串 <code>""</code>。失败不抛异常，调用方需要自己判空。</p>
+
+            <h2>2. std/fs —— 文件系统</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>函数</th>
+                        <th>说明</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>read_lines(path)</code></td>
+                        <td>按行读文本文件：<code>\r\n</code> 与 <code>\n</code> 统一为无行尾；文件末尾换行视为终止符，不产生空行。失败（打不开 / 路径是目录）→ <code>null</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>write_lines(path, lines)</code></td>
+                        <td>按行写文本文件（每行补 <code>\n</code>，覆盖语义）。<code>lines</code> 非数组 → <code>false</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>append_lines(path, lines)</code></td>
+                        <td>按行追加（每行补 <code>\n</code>）。失败 → <code>false</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>walk(dir)</code></td>
+                        <td>递归遍历目录：返回相对 <code>dir</code> 的路径数组，目录条目带 <code>/</code> 尾；顺序按目录字典序、递归先序。非目录 → <code>null</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>glob(dir, pattern)</code></td>
+                        <td>目录内通配匹配：<code>*</code> 任意串、<code>?</code> 单字符；只匹配本层名字，不递归。pattern 为空或取不到名字 → <code>null</code></td>
+                    </tr>
+                </tbody>
+            </table>
+            <pre><code>require "std/fs.qot";
+
+var lines = read_lines("data.txt");
+if (lines != null) {
+    for (ln in lines) {
+        output(ln);
+    }
+}</code></pre>
+
+            <h2>3. std/text —— 文本与 CSV</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>函数</th>
+                        <th>说明</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>csv_parse(text)</code></td>
+                        <td>CSV 解析（RFC 4180）：引号字段、<code>""</code> 转义、CRLF/LF 行尾、末尾换行不产生空行。返回二维数组</td>
+                    </tr>
+                    <tr>
+                        <td><code>csv_write(rows)</code></td>
+                        <td>生成 CSV（规范形：字段按需加引号，行尾 CRLF）。输入非数组或行元素非数组 → <code>""</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>csv_column(rows, idx)</code></td>
+                        <td>取第 <code>idx</code> 列；缺失字段得 <code>null</code>，<code>rows</code> 非数组 → <code>null</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>trim_all(rows)</code></td>
+                        <td>所有字段去首尾空白；行元素非数组则原样保留</td>
+                    </tr>
+                    <tr>
+                        <td><code>normalize(s)</code></td>
+                        <td>空白归一：去首尾空白 + 内部连续空白压成单个空格</td>
+                    </tr>
+                    <tr>
+                        <td><code>wrap(s, width)</code></td>
+                        <td>贪心按词折行；<code>width &lt; 1</code> → <code>""</code>；超长单词独立成行，不截断</td>
+                    </tr>
+                </tbody>
+            </table>
+            <pre><code>require "std/text.qot";
+
+var rows = csv_parse("a,b\n1,2\n3,4\n");
+output(csv_column(rows, 1));        // ["2", "4"]</code></pre>
+
+            <h2>4. std/data —— 统计与分组</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>函数</th>
+                        <th>说明</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>mean(nums)</code></td>
+                        <td>算术平均（Σ/n）。输入必须是<strong>纯数字数组</strong>（布尔不算数字），否则 <code>null</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>median(nums)</code></td>
+                        <td>中位数：在副本上排序，不改输入；偶数个取中间两数平均</td>
+                    </tr>
+                    <tr>
+                        <td><code>stddev(nums)</code></td>
+                        <td><strong>总体</strong>标准差（除以 n，不是 n-1 的样本口径）</td>
+                    </tr>
+                    <tr>
+                        <td><code>group_count(rows, col)</code></td>
+                        <td>按第 <code>col</code> 列分组计数 → <code>dict{键: 次数}</code>；<code>rows</code> 非数组 → <code>null</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>group_sum(rows, col, valcol)</code></td>
+                        <td>按第 <code>col</code> 列分组、对第 <code>valcol</code> 列求和 → <code>dict{键: 和}</code>；非数值单元格跳过</td>
+                    </tr>
+                </tbody>
+            </table>
+            <pre><code>require "std/data.qot";
+require "std/text.qot";
+
+var rows = csv_parse("city,amount\nbeijing,100\nshanghai,250\nbeijing,50\n");
+var by_city = group_sum(rows, 0, 1);
+output(by_city["beijing"]);       // 150</code></pre>
+
+            <h2>5. std/cli —— 命令行解析</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>函数</th>
+                        <th>说明</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>parse_flags(argv)</code></td>
+                        <td>解析命令行参数 → <code>dict{"flags": dict, "args": array}</code>。规则：<code>--name=value</code> → 值恒为字符串；<code>--name</code> → <code>true</code>；<code>-abc</code> 短簇 → 每个字符一个布尔旗标；其余为位置参数（保序）；重复旗标后写覆盖。<code>argv</code> 非数组 → <code>null</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>usage(lines)</code></td>
+                        <td>打印用法文本（数组逐行、字符串单行），返回是否打印成功</td>
+                    </tr>
+                    <tr>
+                        <td><code>prompt(text)</code></td>
+                        <td>打印提示后读一行标准输入；EOF → <code>""</code>。会阻塞，别放在自动化测试里</td>
+                    </tr>
+                </tbody>
+            </table>
+            <pre><code>require "std/cli.qot";
+
+var parsed = parse_flags(args_get());
+if (dict_has(parsed["flags"], "verbose")) {
+    output("verbose mode");
+}
+for (a in parsed["args"]) {
+    output(a);
+}</code></pre>
+
+            <h2>6. std/net —— HTTP 客户端</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>函数</th>
+                        <th>说明</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>url_parse(url)</code></td>
+                        <td>解析 URL → <code>dict</code>（协议、主机、端口、路径、查询等）</td>
+                    </tr>
+                    <tr>
+                        <td><code>http_get(url)</code></td>
+                        <td>GET 请求 → <code>dict</code>（状态码、响应头、响应体）；失败 → <code>null</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>http_post(url, body, ctype)</code></td>
+                        <td>POST 请求；<code>ctype</code> 缺省为表单编码</td>
+                    </tr>
+                    <tr>
+                        <td><code>download(url, path)</code></td>
+                        <td>下载到本地文件；失败 → <code>null</code></td>
+                    </tr>
+                </tbody>
+            </table>
+            <pre><code>require "std/net.qot";
+
+var resp = http_get("https://example.com/api");
+if (resp != null) {
+    output(resp["status"]);
+}</code></pre>
+
+            <h2>7. 自己写模块</h2>
+            <p>模块就是一个 <code>.qot</code> 文件。把它放进项目目录并 <code>require</code> 即可：</p>
+            <pre><code>// mylib.qot
+any_t func clamp(v, lo, hi) {
+    if (v &lt; lo) { return lo; }
+    if (v &gt; hi) { return hi; }
+    return v;
+}</code></pre>
+            <pre><code>require "mylib.qot";
+output(clamp(12, 0, 10));      // 10</code></pre>
+            <p>约定：模块内的私有函数带前缀（如 <code>_mylib_</code>），避免与主程序撞名。</p>
+
+            <h2>8. 内置函数与标准库的关系</h2>
+            <p>内置函数是<strong>机制层</strong>（<code>file_open</code>、<code>str_find</code>、<code>socket_*</code> 等），
+                标准库是<strong>任务层</strong>（按行读文件、解析 CSV、统计分组）。标准库全部由内置原语拼装而成，
+                因此它们的行为在解释器与原生可执行文件两侧完全一致。完整内置函数清单见
+                <a href="function_inside.html">内置函数参考</a>。</p>
+        </div>
+
+        <div class="doc-foot">
+            <span>QOT 文档中心</span>
+            <span>
+                <a href="index.html">返回目录</a> ·
+                <a href="doc.html">语言总述</a> ·
+                <a href="function_inside.html">内置函数参考</a>
+            </span>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,19 @@
+// 布尔等值定价钉（P0.2 轮修复）：op11/op12 的 BOOL/BOOL 分支此前缺失，
+// native 侧 true==true 恒 false、false!=false 恒 true —— 与解释器 oracle
+// 分歧（宪法 6），由 p17 差分用例逮住后修复。本用例把修复钉成硬断言。
+output(true == true);
+output(false == false);
+output(true == false);
+var t = true;
+var f = false;
+output(t == true);
+output(t == t);
+output(f == f);
+output(t == f);
+output(t != f);
+output(f != f);
+output((1 < 2) == (2 < 3));
+output(t == 1);
+output(f == 0);
+output(t == 0);
+output("pin-end");

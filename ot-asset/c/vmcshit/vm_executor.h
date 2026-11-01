@@ -10,7 +10,6 @@
 #include <vector>
 #include <algorithm>
 #include "module_loader.h"
-#include "rpn_executor.h"
 #include <chrono>
 #include <unordered_map>
 #include "gui_module.h"
@@ -54,11 +53,8 @@ namespace qot
             m_moduleLoader.setDebugCallback([this](const std::string &msg)
                                             { this->debugPrint(msg); });
             m_moduleLoader.setRunningFlag(&m_running);
-            m_rpn_enabled = true;
             m_callStack.reserve(256);
         }
-
-        void setRPNEnabled(bool enable) { m_rpn_enabled = enable; }
 
         bool executeFile(const std::string &filename)
         {
@@ -113,7 +109,8 @@ namespace qot
                     }
                 }
             }
-            m_rpn_loops.clear();
+            // T-34/T-35：加载期一次性解析全部调用点（主块 + 嵌套函数块）
+            resolve_calls_recursive(m_code);
             return execute();
         }
 
@@ -222,7 +219,9 @@ namespace qot
 
             try
             {
+                QOT_PROF_RUN_BEGIN();
                 execute_fast();
+                QOT_PROF_RUN_END();
             }
             catch (const BreakException &e)
             {
@@ -248,33 +247,13 @@ namespace qot
 
     private:
         void execute_fast();
-
-        struct RPNLoopInfo
-        {
-            uint32_t loop_id;
-            uint32_t condition_ip;
-            uint32_t body_start;
-            uint32_t body_end;
-            uint32_t jump_back_ip;
-            uint32_t exit_ip;
-            ExpressionInfo expr_info;
-            bool compiled = false;
-            int64_t iterations = -1;
-            bool is_active = false;
-        };
+        // T-34/T-35：把每个 funcNames[i] 的调用目标解析一次（builtin → 函数指针，
+        // 用户函数 → CodeBlock*），填充 cb.callTargets。解析优先级与旧运行时逐条一致：
+        // 内置表 → m_functions（后注册同名覆盖先注册）→ 本块 constants 里首个同名块。
+        void resolve_calls(CodeBlock &cb);
+        void resolve_calls_recursive(CodeBlock &cb);
 
         bool m_isCallbackExecuting = false;
-        std::unordered_map<uint32_t, RPNLoopInfo> m_rpn_loops;
-        bool m_rpn_enabled = true;
-        bool m_in_rpn_loop = false;
-        uint32_t m_current_rpn_loop_id = 0;
-
-        bool is_variable_modified_in_loop(const std::string &var_name,
-                                          uint32_t loop_start,
-                                          uint32_t loop_end);
-        bool find_loop_boundaries(RPNLoopInfo &info);
-        bool compile_rpn_loop(uint32_t loop_start, uint32_t loop_end, ExpressionInfo &out_info);
-        int64_t estimate_iterations(uint32_t loop_start);
 
         CodeBlock m_code;
         std::vector<OptimizedCallFrame> m_callStack;
@@ -291,7 +270,14 @@ namespace qot
         QOT_NOINLINE void recycleFrame()
         {
             if (m_framePool.size() < 64)
+            {
+                QOT_PROF_ADD(framePoolHits, 1);
                 m_framePool.push_back(std::move(m_callStack.back()));
+            }
+            else
+            {
+                QOT_PROF_ADD(framePoolMisses, 1);
+            }
             m_callStack.pop_back();
         }
 

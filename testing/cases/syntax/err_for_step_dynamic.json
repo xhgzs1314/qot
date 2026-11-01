@@ -1,0 +1,12 @@
+{
+ "name": "err_for_step_dynamic",
+ "runs_on": "none",
+ "compile": { "args": [], "expect_ok": false },
+ "expect": {
+  "exit_not": 0,
+  "stderr_contains": ["[错误]", "字面量"],
+  "artifact": null
+ },
+ "tags": ["syntax", "negative", "G-04"],
+ "note": "G-04 静态步长立法（）：by 的操作数必须是编译期数字（字面量/括号/一元负号/字面量算术）。动态步长 → 编译期致命，用 loop 循环替代。"
+}

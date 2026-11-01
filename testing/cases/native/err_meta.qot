@@ -1,0 +1,14 @@
+// F2 错误对象元语：err / is_err / err_val
+var e = err("payload");
+output(is_err(e));
+output(is_err(7));
+output(err_val(e));
+output(err_val(9));
+try {
+    throw err("wrapped");
+} catch (x) {
+    output(is_err(x));
+    output(err_val(x));
+}
+var msg = err();
+output(is_err(msg));

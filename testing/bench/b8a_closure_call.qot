@@ -1,0 +1,20 @@
+// B8a 闭包 · 调用与捕获读写探针
+// 负载：make_counter() 建一个捕获计数器的闭包，N 次调用各做一次
+// 捕获读 + 捕获写 + 算术。量的是：闭包调用链（CALL_DYNAMIC 分派 +
+// env 安装/摘除）+ upval 读写的单次成本。F1 的 ns 级账单来源
+//（路线图 F1 性能纪律：创建 ≤20ns、调用间接层 ≤5ns 的起步预算以
+// 本负载为口径）。
+number_t func make_counter() {
+    var n = 0;
+    number_t func step(dummy) {
+        n = n + 1;
+        return n;
+    }
+    return step;
+}
+var step = make_counter();
+var acc = 0;
+for (i in 87654321) {
+    acc = step(i);
+}
+output(acc);

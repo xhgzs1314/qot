@@ -1,0 +1,44 @@
+var acc = 0.0;
+for (i in 12) {
+    if (i % 2 == 0) {
+        acc = acc + i;
+    } else {
+        acc = acc + i * 10;
+    }
+}
+output(acc);
+
+var t1 = 0.0;
+var t2 = 0.0;
+for (i in 10) {
+    var inner = i * 3;
+    if (inner > 15) {
+        t1 = t1 + inner;
+    } else {
+        t2 = t2 + inner;
+    }
+}
+output(t1);
+output(t2);
+
+number_t func chain(a) {
+    var b = a * 2;
+    var c = b + 1;
+    return c;
+}
+var s = 0.0;
+for (i in 8) {
+    s = chain(s) - 1;
+}
+output(s);
+
+var m = 1.0;
+for (i in 5) {
+    for (j in 5) {
+        m = m + i % 3 + j % 2;
+        if (m > 1000) {
+            m = 1.0;
+        }
+    }
+}
+output(m);

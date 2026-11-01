@@ -38,7 +38,8 @@ QOT 是一款简洁易用的解释型脚本语言，设计目标是降低编程�
 
 -  动态类型系统，兼顾灵活性与语义检查
 
--  内置 Direct2D 图形界面（`vg_*`，共 62 个函数，**仅 QTC 虚拟机可用**），见 [GUI 手册](plugin/gui_manual.html)
+-  内置图形界面（`vg_*` 约 70 个函数，Direct2D 渲染，解释器与原生程序双实现），见 [GUI 手册](plugin/gui_manual.html)
+-  类与对象模型、协议元语（运算符/迭代/输出的编译期绑定）、编译期宏（`macro` + `name!()`）
 
 # 快速开始
 ## 克隆项目
@@ -112,12 +113,12 @@ qguoat distrust input.qot [output.qbc]
 # 运行 QBC
 qguoat run script.qbc
 
-#编译为QTC字节码
+#编译为QTC字节码（历史产物路径，字节码 VM 已冻结弃管）
 qguoat bstrust compile <input.qot> [output.qtc] [--inline 0|1] [--opt]
 --inline 0|1    是否启用内联模式 (默认: 0)
 --opt           启用优化 (死代码消除、常量折叠等)
 
-#运行QTC字节码
+#运行QTC字节码（历史产物路径）
 qguoat bstrust run <file.qtc> [--debug]
 --debug 启用VM Debug-Info输出
 
@@ -133,10 +134,13 @@ qguoat hdps
 
 | 文档 | 内容 |
 |---|---|
-| [plugin/doc.html](plugin/doc.html) | 语言文档（语法、模块、错误、两个运行时的差异、GUI） |
-| [plugin/function_inside.html](plugin/function_inside.html) | 解释器内置函数表 |
-| [plugin/function_inside2.html](plugin/function_inside2.html) | 字节码 VM 内置函数表 |
-| [plugin/gui_manual.html](plugin/gui_manual.html) | GUI（`vg_*`）开发手册 |
+| [plugin/doc.html](plugin/doc.html) | 语言文档（语法、模块、错误、两条执行路径的差异、GUI） |
+| [plugin/function_inside.html](plugin/function_inside.html) | 内置函数参考（双端可用性逐条标注） |
+| [plugin/stdlib.html](plugin/stdlib.html) | 标准库参考 |
+| [plugin/objects.html](plugin/objects.html) | 类与对象 |
+| [plugin/protocols.html](plugin/protocols.html) | 协议元语 |
+| [plugin/macros.html](plugin/macros.html) | 编译期宏 |
+| [plugin/gui_manual.html](plugin/gui_manual.html) | GUI 开发手册 |
 
 # 项目结构
 
@@ -157,10 +161,13 @@ QOT/
 ├── index.py            # 入口逻辑
 ├── LICENSE             # 许可证文件
 ├── package.py          # 编译QOT本体
-├── ot-asset/           # 资源文件目录
+├── ot-asset/           # 资源文件目录（C 运行时、原生插件 ABI 等）
+├── std/                # 标准库（.qot 源码）
 ├── package/            # 系统模块目录
-├── plugin/             # 插件目录
-├── qotrun.dll          # 运行时动态库
+├── plugin/             # 离线文档中心与站点工具
+├── qot_macro.py        # 编译期宏（转换器 + 展开器）
+├── qot_proto.py        # 协议元语绑定器
+├── qotrun.dll          # 旧字节码 VM 运行时（历史资产）
 ├── requirements.txt    # Python 依赖
 ├── require_inliner.py  # 模块内联处理
 ├── server.py           # 网页控制台服务
@@ -176,19 +183,20 @@ QOT 是一种动态类型的脚本语言。它设计简洁，语法直观，适�
 
 QOT 语言支持基本的数据类型、控制结构、函数定义与调用，以及数组和字典等复合数据类型，能够满足基础编程需求。
 
-### 1.1 两套运行时（重要）
+### 1.1 两种执行方式（重要）
 
-**同一份 `.qot` 源码，QOT 有两条完全独立的执行路径。它们并不等价**——内置函数表不同，部分语义也不同。学习时请先确定自己走的是哪一条：
+**同一份 `.qot` 源码，QOT 有两条执行路径。它们并不等价**——内置函数面不同，部分语义也不同。学习时请先确定自己走的是哪一条：
 
 | 路径 | 命令 | 实现 | 定位 |
 | --- | --- | --- | --- |
-| 解释器 | python index.py run a.qot | Python 树遍历解释器 | 快速试错、调试；启动快，执行慢 |
-| 字节码 VM | python index.py bstrust compile a.qot a.qtc
- python index.py bstrust run a.qtc | C++ 虚拟机（qotrun.dll） | 生产环境用这条；GUI 只在这条路径上可用 |
+| 解释器 | python index.py run a.qot | Python 树遍历解释器 | 快速试错、调试；启动快，执行慢；图形界面函数只在这条路径上可用 |
+| 原生可执行文件 | python index.py aot a.qot a.exe | AOT 编译（LIR → C → 原生程序） | 生产环境用这条；数值输出格式与解释器不同 |
 
-本文档正文描述的是**两条路径共有**的语法。凡是两边行为不一致的地方，都会用「⚠ 运行时差异」明确标出，并在 [第 21 章](#runtime-diff) 集中列表。
+本文档正文描述的是**两条路径共有**的语法。凡是两边行为不一致的地方，都会用「⚠ 运行环境差异」明确标出，并在 [第 21 章](#runtime-diff) 集中列表。
 
-* 建议：写生产代码时始终以字节码 VM 为准。**解释器不支持 GUI，数值输出格式也不同，仅适合验证逻辑。
+**建议：写生产代码时以原生可执行文件为准，用解释器验证逻辑。**
+
+> 早期的字节码 VM（`.qtc` / `qotrun.dll`）已**冻结弃管**：不再接受功能开发，仓库中保留相关子命令仅用于处理历史产物。
 
 ## 2. 基本语法
 
@@ -218,10 +226,11 @@ var x = 1;   @-@-@ 错误：注解不能跟在语句后面
 
 QOT 包含以下关键字：
 
-- 控制结构：`if`、`else`、`eif`（else if 的简写）、`loop`、`for`、`in`
+- 控制结构：`if`、`else`、`eif`（else if 的简写）、`loop`、`for`、`in`、`continue`
 - 变量声明：`var`、`const`
 - 函数相关：`func`、`return`
 - 类型说明符：`number_t`、`string_t`、`boolean_t`、`array_t`、`any_t` （**只有这 5 个**，没有 `dict_t`，字典请用 `any_t`）
+- 类与宏：`class`、`macro`
 - 其他：`null`、`stop`、`true`、`false`、`require`
 - 数值字面量：支持十进制、十六进制（`0x`）、二进制（`0b`）、八进制（`0o`）
 
@@ -229,7 +238,7 @@ QOT 包含以下关键字：
 
 - `while`：QOT 的条件循环叫 `loop`
 - `break`：跳出循环用 `stop;`
-- `continue`：**QOT 没有 continue**，只能用 `if` 把循环体剩下的部分包起来
+- `continue`：**continue 现在是关键字**（跳过本轮剩余语句，进入下一轮）
 - `function`：定义函数用 `func`，而且前面必须写返回类型
 - `else if`：要写成一个词 `eif`
 - `output`、`strings` 等：这些是**内置函数**，不是关键字，可以被同名的用户函数覆盖
@@ -304,19 +313,16 @@ output("八进制: " + oct);
 '这是一个字符串';
 ```
 
-字符串可以用 `+` 拼接，另一边是数字时会自动转成字符串：
+字符串可以用 `+` 拼接，另一边是数字时会自动转成字符串（**恒为拼接**，见 20.3 的 S-14 终审）：
 
 ```
 output("a" + 3);     // a3
 output(3 + "a");     // 3a
+output("123" + 5);   // 1235（旧定价曾为 128 —— 字面量不再隐式转数字）
 ```
 
-不过**推荐显式用 `strings()` 转换**。因为 `+` 是否走拼接取决于运行期的实际类型，一旦左边不是字符串就变成了数字加法，这类 bug 很难查：
-
-```
-var n = 3;
-output("值是 " + strings(n));   // 推荐：意图明确，结果稳定
-```
+**推荐显式用 `strings()` 转换**表达拼接意图；反向（字符串转数字做算术）用
+`str_to_num()` / `to_num()`：
 
 字符串支持**按下标取字符**，下标从 0 开始，返回一个长度为 1 的字符串：
 
@@ -429,12 +435,12 @@ const MAX_SIZE = 100;
 
 `const` 声明**必须同时赋初值**，`const X;` 是语法错误。
 
-⚠ **运行时差异**：
+⚠ **运行环境差异**：
 
 - **解释器**（`index.py run`）会检查常量：修改或重复声明常量都会报错并中止。
-- **字节码 VM**（`bstrust`）**完全不检查**：`const PI = 3.14159; PI = 0;` 会静默成功，`PI` 真的变成 0。
+- **原生程序**不保证拦截这类写入。
 
-也就是说，在生产路径上 `const` 目前**只是一个给读代码的人看的约定**，没有任何强制力。别指望它拦住谁。这是性能优先取向下的有意取舍——不为运行期加一次检查。
+也就是说，`const` 在原生程序里目前**只是一个给读代码的人看的约定**。这是性能优先取向下的有意取舍——不为运行期加一次检查。
 
 ### 4.3 作用域规则
 
@@ -473,38 +479,28 @@ output(local);        // null —— 局部变量在函数外不可见
 
 注意最后一行：`output(local)` **不报错**，而是打印 `null`。QOT 不区分「未定义的变量」和「值为 null 的变量」。
 
-#### ⚠ 函数内写全局变量：两个运行时不一致
+#### ⚠ 函数内写全局变量：两条路径不一致
 
-函数里给一个全局变量赋值，改动是否会留下来，**两条路径的答案不同**：
+函数里给一个全局变量赋值，改动是否会留下来，**两条路径的答案不同**（解释器丢弃，原生程序生效）：
 
 ```
 var g = 10;
 
-any_t func setIt() {
-    g = 15;
+any_t func touch() {
+    g = 15;          // 没有 var，指的是外面那个 g
 }
 
-setIt();
-output(g);
+touch();
+output(g);           // 解释器: 10　　原生程序: 15
 ```
 
-| 路径 | 输出 | 行为 |
-| --- | --- | --- |
-| 解释器 index.py run | 10 | 函数内的赋值只改了函数自己的一份副本，返回后丢弃 |
-| 字节码 VM bstrust | 15.000000 | 真正写回了全局槽位，改动保留 |
-
-**依赖这个行为的代码，请只在字节码 VM 上运行。**GUI 回调修改界面状态就是靠这个机制（见 [第 22 章](#gui)），所以 GUI 程序本来也只能走 VM。
-
-如果你希望代码在两条路径上都一样，就**别在函数里写全局变量**——用返回值传出去：
+**不要依赖任何一边的行为。**要改全局就 `return` 出来再赋值，要局部就老老实实写 `var`：
 
 ```
-var g = 10;
-
-number_t func computeIt() {
+number_t func compute() {
     return 15;
 }
-
-g = computeIt();   // 两边都是 15
+g = compute();       // 两条路径结果一致
 ```
 
 #### 变量名的解析规则
@@ -564,7 +560,7 @@ const b = 4;
 ```
 
 - **解释器**：报错「不能修改常量 'b'」并中止。
-- **字节码 VM**：静默通过，`b` 变成 4。
+- **原生程序**：不保证拦截。
 
 ## 5. 运算符
 
@@ -583,7 +579,7 @@ const b = 4;
 ⚠ 关于幂运算，两点务必记住：
 
 - QOT 的幂运算符是 `^`，**不是 `**`**。`2 ** 10` 是语法错误。
-- `^` **不是**按位异或。QOT 没有位运算符（`&`、`|`、`~`、`<<`、`>>` 都不支持）。
+- `^` **不是**按位异或。QOT **没有位运算符语法**（`&`、`|`、`~`、`<<`、`>>` 不存在）——位运算以**原语形态**提供：`bit_and` / `bit_or` / `bit_xor` / `bit_not` / `bit_shl` / `bit_shr`，int64 域，失败哨兵 -1。移位口径：`bit_shl` 按 uint64 承载（高位截断），`bit_shr` 为算术右移（符号跟随），移位数必须在 [0, 63]（越域 -1）。例：`bit_or(bit_shl(1, 3), 1)` → 9（0b1001）。
 - `^` 右结合且优先级高于 `*`：`2 ^ 3 ^ 2` = `2 ^ (3 ^ 2)` = 512；`2 ^ 2 * 3` = `(2 ^ 2) * 3` = 12。
 
 **QOT 没有自增自减**：`i++`、`++i`、`i--` 全部是语法错误。请写 `i = i + 1;` 或 `i += 1;`。
@@ -605,16 +601,18 @@ QOT 只有这一组比较运算符，**没有 `===` / `!==`**。
 
 - `&&`：逻辑与
 - `||`：逻辑或
-
-⚠ **QOT 没有逻辑非运算符。**`!a` 是语法错误——注意 `!` 只在 `!=` 里出现，单独用不构成表达式。要取反，请这样写：
+- `!`：**一元逻辑非**
 
 ```
-// 想写 if (!flag)，改成：
-if (flag == false) { ... }
-
-// 想写 if (!(a > b))，改成：
-if (a <= b) { ... }
+if (!flag) { ... }          // truthy 取反
+var ok = !list_is_empty(a);
 ```
+
+truthy 表（`!` 与 `if`/`loop` 条件同一张，interp ≡ native 逐位同律）：
+`null`/`false`/`0`/空串/空数组/空字典 = 假；非零数/非空串/非空容器/对象 = 真。
+`!` 的优先级与一元负号同级（`!a + b` = `(!a) + b`），右结合（`!!x` 合法）。
+注意：标识符后紧跟 `!(` 是**宏调用**（见 §25），`!` 作逻辑非只出现在
+**前缀位**——两者文法零冲突。
 
 ⚠ **`&&` 和 `||` 优先级完全相同**，从左到右结合。这跟 C、Java、Python、JavaScript 都不一样，是最容易踩的坑：
 
@@ -633,7 +631,8 @@ if (isVip || (age > 60 && hasCard)) { ... }   // 明确，正确
 ### 5.4 赋值运算符
 
 - `=`：赋值
-- `+=`、`-=`、`*=`、`/=`、`%=`：复合赋值
+- `+=`、`-=`、`*=`、`/=`、`%=`：复合赋值（G-03 定稿：五算子族全量可用；
+  语义就是 `x = x op e` 的语法糖，两侧同律）
 
 ⚠ **复合赋值只能用在普通变量名上。**左边写数组下标或字典键是**语法错误**：
 
@@ -653,20 +652,34 @@ d["n"] = d["n"] + 1;  // 正确写法
 - 不能写在条件里：`if (x = 5)` 是语法错误（这条反而帮你避免了经典的 `=`/`==` 笔误）
 - 不能当参数：`f(x = 1)` 是语法错误
 
+#### 三元条件表达式 `? :`
+
+```
+var sign = x > 0 ? "pos" : "neg";
+var grade = s >= 90 ? "A" : s >= 80 ? "B" : "C";   // 右结合，可链式
+var v = cond ? f(x) : g(y);                         // 分支惰性求值（未选中不执行）
+```
+
+- 只求值命中的分支（与 if/else 同语义，不是函数调用的双实参求值）；
+- 右结合：`a ? b : c ? d : e` = `a ? b : (c ? d : e)`；
+- 分支是完整表达式（可含调用、下标、数组/字典字面量、嵌套三元）。
+
 ### 5.5 运算符优先级
 
 下表是 QOT 的**实际**优先级，来自语法规则本身。**它跟 C 系语言有几处重要区别，请逐行看完。**
 
 | 优先级 | 运算符 | 说明 | 结合性 |
 | --- | --- | --- | --- |
-| 1（最高） | () [] -> ## -（一元负号） | 括号、下标、方法调用、模块调用、取负 | 从左到右 |
+| 1（最高） | () [] -> ## -（一元负号） !（逻辑非） | 括号、下标、方法调用、模块调用、取负、逻辑非 | 从左到右 |
 | 2 | ^ | 幂运算 | 从右到左 |
 | 3 | * / % | 乘、除、取模 | 从左到右 |
 | 4 | + - | 加、减 | 从左到右 |
 | 5 | < > <= >= ==!= | 比较（⚠ 6 个同级，相等比较并不比大小比较低） | 从左到右 |
-| 6（最低） | && \|\| | 逻辑与、逻辑或（⚠ 两个同级，与不比或高） | 从左到右 |
+| 6 | && \|\| | 逻辑与、逻辑或（⚠ 两个同级，与不比或高） | 从左到右 |
+| 7（最低） | ? : | 三元条件（G-03） | 从右到左 |
 
 赋值 `=` `+=` … 不在表中，因为它们是语句层面的东西，不参与表达式求值。
+`..` 与 `by` 也不是通用运算符——它们只出现在 for-in 的括号里（§6.2）。
 
 #### 跟 C 系语言的三处差异（务必记住）
 
@@ -755,6 +768,48 @@ for (name in names) {
 }
 ```
 
+#### for 循环（遍历字符串 / 字典）
+
+```
+for (c in "hello") {
+    output(c);          // 依次输出 h, e, l, l, o（字符单位）
+}
+
+var d = &< "x": 1, "y": 2 >&;
+for (k in d) {
+    output(k + " = " + d[k]);   // 迭代键，值用 d[k] 取
+}
+```
+
+迭代面统一（两引擎同律）：**数字**（`while i < N`，小数 N 按原值比较；
+负数/零 → 零次）、**数组**（元素）、**字符串**（`s[i]` 同一单位——native
+按字节、解释器按字符，ASCII 下一致）、**字典**（键）、**null/布尔/其它**
+（零次迭代，不报错）。字典键序 native 为哈希槽序、解释器为插入序
+（已登记分歧族，见 §21.x），需要稳定序用 `dict_keys + arr_sort`。
+
+#### for 循环（区间与步长）
+
+```
+for (i in 0..5) { ... }          // 0,1,2,3,4   —— 半开区间（上限不含）
+for (i in 10..0 by -2) { ... }   // 10,8,6,4,2  —— by 的符号定方向
+for (i in 0..10 by 3) { ... }    // 0,3,6,9
+for (i in 0..1 by 0.25) { ... }  // 小数步长（仅区间形态）
+for (v in arr by -1) { ... }     // 数组倒序遍历
+for (v in arr by 2) { ... }      // 数组跳步（下标 0,2,4…）
+for (k in d by -1) { ... }       // 字典键倒序
+```
+
+定价规则：
+- `A..B` 是**半开区间**（B 不含）——`for (i in N)` 完全等价于 `for (i in 0..N)`；
+  `B <= A`（无 by）是空区间。
+- `by S` 的 **S 必须是编译期数字字面量**（`by 0`、非字面量 → 编译错误；
+  动态步长请用 `loop`）；S 的符号决定方向；序列形态（`E by S`）的 S 必须
+  是非零整数（下标跳步），区间形态允许小数。
+- `for (x in E by S)` 里 E 是数字时等价于 `0..E by S`（`for (i in 10 by -1)`
+  是空区间，不是倒数十个数——倒序请写 `for (i in 10..0 by -1)`）。
+- 体内修改循环变量**不影响**迭代次数（计数器是隐藏槽）。
+- `by` 是保留关键字。
+
 #### loop 循环
 
 ```
@@ -766,7 +821,7 @@ loop (count < 3) {
 // 输出: 计数: 0, 计数: 1, 计数: 2
 ```
 
-#### 循环控制：stop 语句
+#### 循环控制：stop / continue 语句
 
 使用 `stop` 关键字提前终止循环（相当于其他语言的 `break`）：
 
@@ -782,21 +837,20 @@ for (i in 10) {
 
 `stop` 只跳出**最内层**的那一层循环。`stop` 写在循环外面是编译错误。
 
-**⚠ QOT 没有 `continue`。**想跳过本次迭代，只能把剩下的代码用 `if` 包起来：
+`continue` 跳过本轮剩余代码——**for 的步进照常执行**
+（继续点在步进上，不会死循环）：
 
 ```
-// 其他语言里会写 if (i % 2 == 0) { continue; }
 for (i in 10) {
-    if (i % 2 != 0) {
-        output(i);      // 只处理奇数
-    }
+    if (i % 2 == 0) { continue; }
+    output(i);   // 只输出奇数
 }
 ```
 
 #### 三种循环怎么选
 
-- 知道次数 → `for (i in n)`
-- 遍历数组/字典的键数组 → `for (x in arr)`
+- 知道次数 / 数字区间 → `for (i in n)` / `for (i in a..b by s)`
+- 遍历数组/字符串/字典 → `for (x in seq)`（`by ±s` 控制跳步与倒序）
 - 其他一切 → `loop (条件)`
 
 QOT **没有 C 风格的三段式 `for(init; cond; step)`**，也没有 `while` 和 `do-while` 关键字。要手动控制步长，用 `loop`：
@@ -814,6 +868,85 @@ loop (i < 10) {
 - `{}` 不能省略。`if (x) output(1);` 是语法错误，单条语句也必须带大括号。
 - 循环体、条件分支的 `{}` **不产生新作用域**，里面 `var` 的变量出来还在（见 [4.3](#scope)）。
 - 无限循环会让程序失去响应，请确保循环条件最终会变假。QOT 不做任何迭代次数保护。
+
+### 6.4 类（最小对象模型）
+
+```
+class Point {
+    var x = 0;                    // 字段（声明序 = 布局偏移；可带默认值）
+    var y = 0;
+    func init(a, b) {             // init = 构造器（类名调用触发）
+        this->x = a;
+        this->y = b;
+    }
+    number_t func dist2() {       // 方法（返回类型可省略 = 隐式 any）
+        return this->x * this->x + this->y * this->y;
+    }
+}
+
+var p = Point(3, 4);      // 构造：字段默认值 → init 体 → 恒返回实例
+output(p->x);             // 字段读
+p->x = 5;                 // 字段写（含 += 等复合族）
+p->y += 10;
+output(p->dist2());       // 方法调用（类型表分派）
+```
+
+**模型定价**（继承/多态/接口刻意后置——按真实需求再加，宪法 7）：
+
+- **对象不是字典**：字段按声明序固定布局，访问是「类型表偏移查表 + 直接
+  下标」（热循环内每字段读 ≈ 7ns 量级，与数组下标同族）；动态属性请用字典。
+- **`this`**：方法体内恒指接收者（遮蔽外层同名变量）；可在方法内的
+  lambda/嵌套函数里捕获（走既有闭包机制）。
+- **构造**：`Point(args)` = 字段默认值（声明序）→ `init` 体 → **恒返回
+  实例**。`init` 内禁止 `return`（编译期致命）；类方法可省返回类型
+  （隐式 `any_t`）；`class` 声明仅限顶层。
+- **宽松定价**（两引擎同律）：未声明字段读得 `null`、写被忽略；对象上
+  调用缺席方法得 `null`；**非对象**接收者的 `->m(args)` 保持既有
+  「receiver 前置」调用定价（`arr->push(x)` ≡ `push(arr, x)`，零迁移）。
+- **相等** = 引用同一性（同一实例才相等）；`gtypes(obj)`/`type(obj)` =
+  `"object"`；`str(obj)` = `"<类名>"`（确定性输出，无地址）。
+- 方法调用链天然支持：`c->inc()->inc()->value()`（方法返回对象即可链式）。
+
+### 6.5 协议元语（dunder 面）
+
+类可以定义 **11 个协议方法**（集合固定，不许增删——追加留触发）。类型已知
+的运算/下标/迭代/输出在**编译期静态绑定**到它们，产物 = 普通方法直调
+（native 走类型表函数指针，无运行时查找）；类型未知（推断不出来）→ 运行期
+现行为不变（要优化请让类型可推断——性能由开发者决定）；**协议方法不存在 →
+既有静默定价**（不报错）。
+
+| 协议方法 | 绑定点 | 签名约定 |
+| --- | --- | --- |
+| `__add__` | `a + b`（及 `+=`） | `func __add__(o)` → 通常返回同型 |
+| `__sub__` | `a - b`（及 `-=`） | 同上 |
+| `__mul__` | `a * b`（及 `*=`） | 同上 |
+| `__div__` | `a / b`（及 `/=`） | 同上 |
+| `__mod__` | `a % b`（及 `%=`） | 同上 |
+| `__eq__` | `a == b` | 返回真值（惯例 1/0）；结果面 = 布尔，不参与链式推断 |
+| `__index_get` | `a[i]` | `func __index_get(i)`；越界自定（建议 null） |
+| `__index_set` | `a[i] = v` | `func __index_set(i, v)` |
+| `__for_keys` | `for k in obj` | 返回键数组（**优先**于 `__iter_len`） |
+| `__iter_len` | `for i in obj` | 返回长度；配合 `__index_get` = 元素序列协议，缺省 = 数字协议（0..len-1） |
+| `__to_str` | `output(obj)`、`"s" + obj` / `obj + "s"` 拼接 | 返回字符串 |
+
+```
+class Vec2 {
+    var x = 0;  var y = 0;
+    func init(ax, ay) { this->x = ax; this->y = ay; }
+    func __add__(o) { return Vec2(this->x + o->x, this->y + o->y); }
+    func __eq__(o)  { return this->x == o->x && this->y == o->y ? 1 : 0; }
+    func __index_get(i) { return i == 0 ? this->x : this->y; }
+    func __to_str() { return "(" + int_to_str(this->x) + "," + int_to_str(this->y) + ")"; }
+}
+var s = Vec2(1,2) + Vec2(10,20);   // 静态绑定 → (Vec2实例)->__add__(…)
+output(s);                          // (11,22)   —— 走 __to_str
+output(s == Vec2(11,22));           // 1
+```
+
+绑定细则（§25 有完整版）：运算分派**只看左操作数**（`a + b` = `a->__add__(b)`）；
+五则方法按惯例返回同型（`(a + b) * c` 这类链式由此可绑定）；`__eq__` 的
+结果是布尔、不参与链式；`!=` 不在协议集（不绑定）。裁判 =
+`testing/cases/native/gs1_proto.qot`（双引擎零分歧）。
 
 ## 7. 函数
 
@@ -918,9 +1051,7 @@ f(1, 2, 3, 4);  // a=3 b=4        多给：取的是最后两个！
 #### 其他注意事项
 
 - 函数支持声明提升，可以在定义之前调用。
-- 函数内部可以读全局变量；写全局变量的行为两个运行时不一致，见 [4.3](#scope)。
-- QOT **没有匿名函数 / lambda / 闭包**。所有函数都必须具名、定义在顶层。
-- QOT **没有默认参数值、没有可变参数、没有函数重载**。同名函数后定义的覆盖先定义的。
+- 函数内部可以读全局变量；写全局变量的行为在两条路径上不一致，见 [4.3](#scope)。
 - 支持递归。
 
 ### 7.2 函数调用
@@ -991,7 +1122,7 @@ vg_button_on_click(btn2, handler);   // 同一个引用可以绑多处
 
 ### 7.4 内置函数
 
-QOT 提供了大量内置函数。**⚠ 两个运行时的内置函数表并不相同**——有些函数只有解释器有，有些只有字节码 VM 有。完整分表见 `funcdoc.html`，这里只列两边都有、最常用的几个：
+QOT 提供了大量内置函数。**⚠ 两条执行路径的内置函数面并不相同**——有些函数只有解释器有。完整清单见 [内置函数参考](plugin/function_inside.html)，这里只列最常用的几个：
 
 | 函数 | 说明 |
 | --- | --- |
@@ -1009,8 +1140,8 @@ QOT 提供了大量内置函数。**⚠ 两个运行时的内置函数表并不�
 
 **几个常见误会：**
 
-- `numbers()`（转数字）、`type()`（取类型名）**只有字节码 VM 有**，解释器里调用会返回 `null`。
-- `max()`、`min()`、`sum()`、`batch_push()`、`prog_end()`、`utf8_enc()`/`utf8_dec()` **只有解释器有**，字节码 VM 里返回 `null`。要在 VM 上求最大值，请自己写循环。
+- `numbers()`（转数字）、`type()`（取类型名）属于旧字节码 VM 的历史面，两条活跃路径都不可用；统一用 `to_num()` / `gtypes()`。
+- `max()`、`min()`、`sum()`、`batch_push()`、`prog_end()`、`utf8_enc()`/`utf8_dec()` **只有解释器有**，原生程序里不可用（编译期报错）。要在原生程序里求最大值，请自己写循环。
 - 调用一个不存在的内置函数**不会报错**，只会得到 `null`。这是最容易浪费时间的坑——发现结果莫名其妙是 `null` 时，先确认这个函数在你用的运行时里存在。
 
 示例：
@@ -1075,7 +1206,7 @@ var idx = arr->get(3);  // idx = 1（值 3 所在的下标）
 arr->pop(0);            // 按下标删除 → arr = [3, 4]
 ```
 
-`batch_push(arr, more)`（批量追加）**只有解释器有**，字节码 VM 上不可用。在 VM 上请自己循环 `push`。
+`batch_push(arr, more)`（批量追加）**只有解释器有**，原生程序上不可用。请自己循环 `push`。
 
 ### 8.6 遍历数组
 
@@ -1093,9 +1224,9 @@ for (i in glen(items)) {
 
 ### 8.7 数组越界处理
 
-**两个运行时对越界的态度完全相反，这是必须先搞清楚的一点。**
+**两条执行路径对越界的态度完全相反，这是必须先搞清楚的一点。**
 
-| 操作 | run（解释器） | bstrust run（VM） |
+| 操作 | run（解释器） | aot（原生程序） |
 | --- | --- | --- |
 | 越界读 arr[5] | 报错 2003 并退出数组索引 5 越界（长度为 3） | 得到 null，继续执行 |
 | 越界写 arr[5] = 99; | 报错并退出 | 静默忽略，数组不变，不报错 |
@@ -1204,7 +1335,7 @@ QOT 支持两种模块类型：
 **先记住这一条：引用 `.qot` 模块时，编译命令必须写 `--inline 1`。**
 
 ```
-qguoat bstrust compile main.qot main.qtc --inline 1
+qguoat aot main.qot main.exe
 ```
 
 不写就会在运行时报「无法加载库: utils.qot / 错误码: 193」。详见 [§11.6](#inline)。
@@ -1309,54 +1440,37 @@ QOT 会检测循环依赖并报错：
 require "b.qot";  // 错误：循环依赖 a -> b -> a
 ```
 
-### 11.4 动态库模块 (.dll)
+### 11.4 原生扩展（动态库与原生插件）
 
-#### 基本用法
+QOT 与原生代码之间有两条通路：**通用 FFI**（直接调用 C 符号）与**原生插件 ABI**（结构化插件协议）。
+两条路径在解释器与原生程序上行为一致。完整说明见 [第 24 章](#24-ffi-与原生插件)。
 
-```
-require "user32.dll";
-var result = user32##MessageBoxA(0, "Hello", "Title", 0);
-```
-
-#### 调用语法
-
-与脚本模块不同，DLL 模块必须使用 `模块名##函数名` 语法调用：
+#### 通用 FFI
 
 ```
-require "miaudio.dll";
-var player = miaudio##MusicPlayer_Create();
-miaudio##MusicPlayer_Play(player);
+var lib = ffi_load("user32.dll");        // 加载动态库 → 句柄（失败 null）
+var sym = ffi_sym(lib, "MessageBoxA");    // 取符号 → 句柄（失败 null）
+ffi_call(sym, 0, 0.0, 0.0, 0.0, 0.0);    // 推断调用：参数与返回值按 f64
+ffi_call_v(sym, types, ...);             // 显式类型调用：types[0]=返回码，其余=实参码
 ```
 
-#### 导出表要求
+辅助：`ffi_str(ptr)` 读 C 字符串、`ffi_ptr(x)` 取字符串副本地址、`ffi_free(lib)` 卸载、
+`ffi_last_error()` 取错误文本、`ffi_abi_version()` 取 ABI 版本。一次调用最多 8 个参数。
 
-DLL 模块需要附带 `export.func` 文件，格式为每行一条函数定义：
-
-```
-函数名|参数类型列表|返回类型
-```
-
-**示例 export.func：**
+#### 原生插件 ABI
 
 ```
-add|int,int|int
-greet|str|str
-processData|ptr,int|void
+var h = plugin_load("my_plugin.dll");        // 装载 → 句柄（失败 null）
+output(plugin_names(h));                     // 注册的函数名数组（注册序）
+var r = plugin_call(h, "add", [2.0, 3.0]);   // 调用 → 5.000000
+plugin_free(h);                              // 卸载，其注册一并失效
 ```
 
-**支持的类型：**
+插件的唯一依赖是公共头 `ot-asset/c/plugin/qot_plugin_abi.h`：导出 `qot_plugin_init`，
+在初始化时用 `api->reg` 注册函数；函数体内只能通过 `api` 访问 QOT 值（构造 / 读取 / 报错 / 注册）。
 
-- `int` - 整数
-- `str` - 字符串（UTF-8）
-- `bool` - 布尔值
-- `ptr` - 指针（用于输出参数）
-- `void` - 无返回值
-- `hwnd` - 窗口句柄
-- `handle` - 通用句柄
-
-#### 安全验证
-
-DLL 模块加载时会验证 `export.func` 的数字签名，验证失败则拒绝加载。
+> 早期的 `export.func` 描述文件机制（`require "x.dll"` + `x##fn()`）属于历史形态，
+> 当前推荐使用上面的 `ffi_*` 与 `plugin_*` 系列。
 
 ### 11.5 路径解析规则
 
@@ -1374,7 +1488,7 @@ require "C:/modules/mymod";  // 绝对路径（可省略 .qot）
 
 ### 11.6 编译选项 `--inline`
 
-用 `bstrust compile` 编译时，`--inline` 控制脚本模块的处理方式。
+用 `bstrust compile` 编译历史 `.qtc` 产物时，`--inline` 控制脚本模块的处理方式；原生编译（`aot`）始终在编译期内联脚本模块。
 
 **⚠ 最重要的一条：`--inline` 默认是 0（关闭），而 `.qot` 脚本模块在关闭时根本用不了。**
 
@@ -1383,7 +1497,7 @@ require "C:/modules/mymod";  // 绝对路径（可省略 .qot）
 
 ```
 # 引用了 .qot 模块，必须这样编译
-qguoat bstrust compile main.qot main.qtc --inline 1
+qguoat aot main.qot main.exe
 ```
 
 #### 内联模式（`--inline 1`）
@@ -1423,7 +1537,7 @@ output(APP);                // MyApp
 **编译并运行：**
 
 ```
-qguoat bstrust compile main.qot main.qtc --inline 1
+qguoat aot main.qot main.exe
 qguoat bstrust run main.qtc
 ```
 
@@ -1442,9 +1556,30 @@ qguoat bstrust run main.qtc
 - **DLL 需要导出表**：没有正确 `export.func` 的 DLL 无法加载
 - **内联后模块固定**：内联模式编译后模块代码已合并进 `.qtc`，改了模块必须重新编译
 
+### 11.8 标准库模块（std/，随仓库分发）
+
+仓库自带 5 个 `.qot` 写成的标准库模块（R15：原语是机制，常用能力全部在库层；
+**全部用本语言自举，内核零特殊化**），`require` 后以 `模块名##函数` 使用：
+
+```
+require "std/text.qot";   // 相对路径按 §11.5；仓库根运行可写 "std/text.qot"
+var rows = text##csv_parse(csv_text);
+```
+
+| 模块 | 提供 | 失败约定 |
+|---|---|---|
+| `std/text` | `csv_parse`（RFC 4180）/ `csv_write` / `csv_column` / `trim_all` / `normalize` / `wrap` | 容器 null / 串 "" |
+| `std/fs` | `read_lines` / `write_lines` / `append_lines` / `walk` / `glob` | 容器 null / 布尔 false |
+| `std/net` | `url_parse` / `http_get` / `http_post`（HTTP/1.0 + close，v0 限制见库头注） | 容器 null |
+| `std/data` | `mean` / `median`（副本排序不改输入）/ `stddev`（**总体**口径）/ `group_count` / `group_sum`（跳过非数值行） | null |
+| `std/cli` | `parse_flags`（`--k=v`/`--flag`/`-abc` 短簇/位置参数，口径见库头注）/ `usage` / `prompt`（R7：不得进测试） | 容器 null / 布尔 false |
+
+模块内私有名带前缀（`_stx_`/`_sfs_`/`_net_`/`_sdt_`/`_scl_`），主程序勿撞名。
+完整参考看各 `.qot` 头注（头注即文档，口径全部登记）。
+
 ## 12. 字符串扩展
 
-⚠ **本章的两个前缀只在解释器上有意义，在字节码 VM 上都得到 `null`。生产代码请不要用。**
+⚠ **本章的两个前缀只在解释器上有意义，在原生程序上都得到 `null`。生产代码请不要用。**
 
 ### 12.1 Unicode 字符串 `U"..."`
 
@@ -1458,7 +1593,7 @@ output(utf8_bytes);   // 解释器：<<E4 B8 AD E6 96 87>> 这样的十六进制
 | 运行时 | U"中文" 的结果 |
 | --- | --- |
 | 解释器 | 字节序列，打印为 <<E4 B8 AD E6 96 87>> |
-| 字节码 VM | null —— 字节类型无法序列化进.qtc，值直接丢失 |
+| 原生程序 | null —— 字节类型无法序列化进产物，值直接丢失 |
 
 需要在 VM 上处理 UTF-8 字节，请改用普通字符串加 `json_encode` / 文件读写这类接口。
 
@@ -1471,9 +1606,9 @@ var wide_str = L"宽字符串";
 | 运行时 | L"宽字符串" 的结果 |
 | --- | --- |
 | 解释器 | 就是一个普通字符串，gtypes() 返回 "string"，L 前缀没有实际效果 |
-| 字节码 VM | null |
+| 原生程序 | null |
 
-**结论：这两个前缀现在都不要用。**QOT 的普通字符串本来就是 UTF-8 的，中文可以直接写在 `"..."` 里，两个运行时都正常。
+**结论：这两个前缀现在都不要用。**QOT 的普通字符串本来就是 UTF-8 的，中文可以直接写在 `"..."` 里，两条路径都正常。
 
 ## 13. 程序执行与编译
 
@@ -1493,24 +1628,44 @@ qguoat run program.qot
 qguoat run program.qot --console
 ```
 
-### 13.2 用字节码 VM 执行（推荐）
+### 13.2 编译为原生可执行文件（推荐）
 
-分两步：先编译成 `.qtc`，再运行。
+一条命令走完：`.qot` → 中间表示 → C 源码 → 原生程序。
+
+```
+qguoat aot program.qot program.exe
+```
+
+常用参数：
+
+| 参数 | 说明 |
+| --- | --- |
+| --opt | 开启 AST 层优化（常量折叠等） |
+| --keep-c | 保留生成的 C 源码，便于排查 |
+| --emit-c <file.cpp> | 把 C 源码写到指定文件 |
+| --split-tu | 按模块切分编译单元，增量编译 |
+| --cache-stats / --explain | 打印各层缓存命中率 / 本次命中详情 |
+| --determinism | 确定性自测：同输入连编两次比对产物哈希 |
+| --no-static | 动态链接（默认静态链接，产物无运行时依赖） |
+| --unsafe-index | 移除下标边界检查（越界 = 未定义行为，默认关闭） |
+| -j N / --jobs N | 并行度（默认 min(4, CPU 核数)） |
+
+**编译失败时不会产出可执行文件，退出码为 1。**
+
+### 13.2.1 用字节码 VM 执行（历史产物路径）
+
+字节码 VM 已冻结弃管，仅用于处理历史 `.qtc` 产物：
 
 ```
 qguoat bstrust compile program.qot program.qtc
 qguoat bstrust run program.qtc
 ```
 
-可选参数：
-
 | 参数 | 用在 | 说明 |
 | --- | --- | --- |
 | --opt | compile | 开启 AST 层优化（常量折叠等），详见 18.4 |
-| --inline 0\|1 | compile | 默认 0（关）。引用了.qot 脚本模块时必须显式写 --inline 1，否则运行时报错码 193，见 §11.6 |
+| --inline 0\|1 | compile | 默认 0（关）。引用了 .qot 脚本模块时必须显式写 --inline 1，否则运行时报错码 193，见 §11.6 |
 | --debug / -d | run | 打印 VM 调试信息 |
-
-**编译失败时不会生成 `.qtc`，退出码为 1。**看到「编译成功」才说明整个文件都被正确解析了。
 
 ### 13.3 编译为 EXE
 
@@ -1518,7 +1673,7 @@ qguoat bstrust run program.qtc
 qguoat build program.qot
 ```
 
-详见第 17 章。
+`build` 是打包命令（可带图标等资源），详见第 17 章；纯原生编译用上面的 `aot`。
 
 ### 13.4 QBC 字节码
 
@@ -1534,11 +1689,48 @@ qguoat run script.qbc
 |  | QBC.qbc | QTC.qtc |
 | --- | --- | --- |
 | 内容 | 编码后的 AST | 虚拟机指令序列 |
-| 由谁执行 | Python 解释器（run） | C++ 字节码 VM（bstrust run） |
+| 由谁执行 | Python 解释器（run） | C++ 字节码 VM（bstrust run，历史路径） |
 | 目的 | 源码保护，不给人直接读 | 性能 |
 | 速度 | 和解释源码基本一样 | 快得多 |
 
 要性能用 QTC，要藏源码用 QBC。QBC 不会让程序变快。
+
+### 13.5 包模式（`pkg`，M6）
+
+一个"包" = 目录 + `qot.pkg` 清单。拿到别人的包目录后，**一条命令**跑起来：
+
+```
+python index.py pkg run 某个包目录
+```
+
+清单（TOML，字段见 `qot_pkg.py` 头注）：
+
+```toml
+[package]
+name = "logstat"
+version = "0.1.0"
+entry = "main.qot"            # 相对包目录
+
+# 可选：C 插件（第 24 章的 ABI），构建到 包目录/build/plugins/
+[[plugin]]
+name = "shaper"
+source = "plugin/shaper.c"
+```
+
+子命令：
+
+| 命令 | 作用 |
+|---|---|
+| `pkg init <dir>` | 生成模板包（清单 + hello 入口） |
+| `pkg build <dir> [-o 产物] [--opt]` | 先构建清单声明的 C 插件（幂等：源未变跳过），再 AOT 编译入口 → `包目录/build/<name>.exe` |
+| `pkg run <dir> [-- args...]` | 构建后运行；**工作目录 = 包目录**（插件与数据的相对路径稳定）；`--` 之后的参数透传给程序（`args_get()`） |
+
+现成示例：`python index.py pkg run examples/logstat`（访问日志分析器，
+`--lines 1000` / `--out report.txt` 可调）。
+
+注意：包模式只做**本地构建编排**（插件构建 + AOT 编译 + 运行），不做依赖
+解析 / 锁文件 / 中心仓库；`.qot` 模块复用走编译期内联（§11）。嵌入形态 =
+AOT 独立 exe（宿主进程经 `proc_spawn`/FFI 调用），无单独 dll 输出。
 
 ## 14. 类型系统
 
@@ -1588,7 +1780,7 @@ number_t x = 1;                                     // ✗ 同上
 
 ### 14.4 获取值的类型
 
-用 `gtypes()` 获取一个值的类型名（两个运行时都有）：
+用 `gtypes()` 获取一个值的类型名（两条路径都有）：
 
 | 值 | gtypes() 返回 |
 | --- | --- |
@@ -1607,7 +1799,11 @@ if (gtypes(x) == "number") {    // ✓
 }
 ```
 
-字节码 VM 上另有一个 `type()`，作用类似，但**解释器没有**——为了两边都能跑，统一用 `gtypes()`。
+**交叉引用**：类实例的 `gtypes()` = `"object"`（§6.4）；类实例参与运算符/
+下标/迭代/输出时的类型面与静态绑定规则见 **§6.5 协议元语**（GOD-SELF-G1：
+类型已知 → 编译期绑定，类型未知 → 运行期既有定价）。
+
+旧字节码 VM 上另有一个 `type()`，作用类似，但两条活跃路径都没有——统一用 `gtypes()`。
 
 ## 15. 方法调用语法
 
@@ -1626,7 +1822,7 @@ arr->remove(2);          // 等价于 remove(arr, 2)
 var len = arr->glen();   // 等价于 glen(arr)
 ```
 
-⚠ **这不是面向对象。**QOT 没有类、没有对象、没有 `this`。`->` 纯粹是「把左边当第一个参数」的语法糖，用户自定义函数也一样适用：
+⚠ 对**非对象**接收者，`->` 纯粹是「把左边当第一个参数」的语法糖，用户自定义函数也一样适用：
 
 ```
 any_t func twice(x) {
@@ -1648,7 +1844,7 @@ QOT 支持将源码编译为不可直接阅读的 QBC 文件，用于代码分�
 | 格式 | 内容 | 生成 | 执行 | 用途 |
 | --- | --- | --- | --- | --- |
 | .qbc | 序列化后的 AST | distrust | qguoat run（解释器） | 防止源码被直接阅读 |
-| .qtc | 真正的字节码 | bstrust compile | bstrust run（C++ VM） | 性能 |
+| .qtc | 真正的字节码 | bstrust compile | bstrust run（C++ VM，历史路径） | 性能 |
 
 **QBC 跑在解释器上，不快**；要性能请用 QTC（第 18 章）。两者不能互相转换，也不能互相执行。
 
@@ -1906,57 +2102,21 @@ qguoat bstrust compile main.qot --inline 1 --opt
 - 优化过程不会改变程序的原始逻辑和行为
 - 建议在正式发布或部署时启用优化，调试阶段可暂不使用以便于排查问题
 
-### 18.5 循环表达式加速执行
+### 18.5 循环执行性能（现状说明）
 
-从 V1 版本开始，虚拟机在执行循环时，能够自动识别并优化符合特定条件的数值计算表达式，从而显著提升循环执行效率。该优化对开发者完全透明，无需任何额外配置。
+#### 18.5.1 实测数据（本机）
 
-#### 18.5.1 优化原理
-
-当虚拟机执行循环时，会分析循环体内部的表达式结构。对于满足条件的纯数值计算表达式，虚拟机会将其转换为一组紧凑的内部指令序列。在后续循环迭代中，表达式直接以指令序列形式执行，避免了每次迭代重复进行表达式解析和语法分析的开销。
-
-#### 18.5.2 触发条件
-
-优化自动生效需同时满足以下条件：
-
-| 条件 | 说明 |
+| 写法 | ns/迭代 |
 | --- | --- |
-| 循环结构 | 仅对 loop for 循环体中的表达式进行优化 |
-| 纯数值运算 | 表达式中仅包含数值类型的变量和常量，支持加减乘除等基本算术运算 |
-| 无函数调用 | 表达式中不包含自定义函数或内置函数调用 |
-| 无复杂控制流 | 表达式内部不包含条件跳转逻辑 |
+| `for (i in N) { b += i; }` | 322 |
+| `for (i in N) { b = b + i; }` | 310 |
+| `loop (n > 0) { b = b + n; n = n - 1; }` | 249 |
+| `loop (b < N) { b = b + 1; }` | 185 |
+| `loop (n > 0) { n = n - 1; }` | 209 |
 
-#### 18.5.3 性能收益示例
+（N = 10⁶，进程内计时，已剥离 Python 启动开销。测量脚本见 `testing/perf/`。）
 
-**适用优化的写法：**
-
-```
-var sum = 0;
-var n = 1000000;
-loop (n > 0) {
-    sum = sum + n * 2;
-    n = n - 1;
-}
-```
-
-**触发效果：** 当循环次数超过 1000 次时，执行效率可提升 30% 至 200%。循环次数越大，收益越明显。
-
-**不适用优化的场景：**
-
-```
-loop (count > 0) {
-    result = result + process(data);  // 包含函数调用，不触发优化
-    str = str + "x";                   // 字符串拼接，不触发优化
-    arr[i] = arr[i] * 2;              // 数组成员访问，不触发优化
-    count = count - 1;
-}
-```
-
-#### 18.5.4 注意事项
-
-- **结果等价性**：优化只改变表达式的内部执行路径，不改变最终计算结果。
-- **适用规模**：循环次数较少（少于 100 次）时，优化效果不明显，虚拟机会根据实际情况自动决策。
-- **类型一致性**：循环表达式中涉及的所有变量建议保持数值类型一致，避免隐式类型转换带来的额外开销。
-- **变量修改检测**：如果参与计算的变量在循环内部同时被修改，优化效果可能略有下降，但结果始终保持正确。
+作为参照：同等语义的原生 C 循环在 1 ns/迭代量级。**差距约两个数量级。**
 
 ## 19. 代码签名与安全
 
@@ -2132,22 +2292,22 @@ QOT 错误系统将错误分为以下几个大类，每个错误都有唯一的�
 
 ### 20.3 常见错误示例
 
-**⚠ 本节最重要的一句话：下面这些「错误」，绝大多数只在解释器上是错误。字节码 VM 遇到同样的代码不会报错，会给个默认值继续往下跑。**
+**⚠ 本节最重要的一句话：下面这些「错误」，绝大多数只在解释器上是错误。原生程序遇到同样的代码不会报错，会给个默认值继续往下跑。**
 
-这是 QOT「**性能优先，安全交给使用者**」的直接后果：VM 里没有边界检查、没有除零检查、没有常量检查，因为这些检查每条指令都要花钱。**用 VM 跑生产代码，就必须自己保证输入是对的——出了事是你代码的问题，VM 不会拦你。**
+这是 QOT「**性能优先，安全交给使用者**」的直接后果：原生程序里没有边界检查、没有除零检查、没有常量检查，因为这些检查每条指令都要花钱。**用原生程序跑生产代码，就必须自己保证输入是对的——出了事是你代码的问题，它不会拦你。**
 
-调试期建议先用 `qguoat run`（解释器）跑一遍，它会把这些问题当场炸出来；确认没问题再编译成 `.qtc` 上线。
+调试期建议先用 `qguoat run`（解释器）跑一遍，它会把这些问题当场炸出来；确认没问题再 `qguoat aot` 编译。
 
-#### 速查：同一段错误代码在两个运行时上的表现
+#### 速查：同一段错误代码在两条路径上的表现
 
-| 代码 | run（解释器） | bstrust run（VM） |
+| 代码 | run（解释器） | aot（原生程序） |
 | --- | --- | --- |
-| output(x); x 未声明 | 错误 2001，退出 | 输出 null，继续 |
+| output(x); x 未声明 | 编译期告警 2000，不产出 | 输出 `<none>`，继续 |
 | arr[5]，数组长度 3 | 错误 2003，退出 | 得到 null，继续 |
 | 10 / 0 | 错误 2004，退出 | 得到 0，继续 |
-| const PI = 3.14; PI = 999; | 错误 2006，退出 | 改成功，输出 999 |
-| 同名函数定义两次 | 错误 2014，退出 | 后定义的覆盖先定义的，继续 |
-| 缺少分号 | 错误 1000，两边都编译失败（语法错误没有宽容可言） |
+| const PI = 3.14; PI = 999; | 错误 2006，退出 | 不保证拦截 |
+| 同名函数定义两次 | 编译期失败 | 编译期失败 |
+| 缺少分号 | 两边都编译失败（语法错误没有宽容可言） |
 
 #### 变量未定义
 
@@ -2155,7 +2315,7 @@ QOT 错误系统将错误分为以下几个大类，每个错误都有唯一的�
 output(x);  // x 从未声明
 ```
 
-先在编译期得到一条**警告**（两个运行时都有）：
+先在编译期得到一条**警告**（两条路径都有）：
 
 ```
 [警告] [2000]
@@ -2171,21 +2331,26 @@ output(x);  // x 从未声明
 
 VM 则直接把它当 `null`，程序继续跑。**那条编译期警告是你在 VM 上唯一的提示，别把它当噪音划过去。**
 
-#### 字符串与数字相加（这不是错误）
+#### 字符串与数字相加（S-14 终审：恒为拼接）
 
 ```
 var num = "123";
-output(num + 5);    // 128 —— 不报错！
+output(num + 5);    // 1235 —— 字符串拼接
 ```
 
-`+` 遇到字符串和数字时，会**先尝试把字符串当数字解析**；解析得动就做加法，解析不动才退回拼接：
+**【S-14 终审，（M5 命名规范化）】**字符串字面量**保持字符串**，
+不再编译期尝试转数字；`+` 遇到字符串与数字时**恒为拼接**：
 
 ```
-output("123" + 5);   // 128    能转成数字 → 相加
-output("abc" + 5);   // abc5   转不了   → 拼接
+output("123" + 5);   // 1235   字符串拼接（旧定价为 128 —— 已废除）
+output("abc" + 5);   // abc5   同上
 ```
 
-两个运行时行为一致（VM 打印为 `128.000000`）。**这条规则很容易咬人**：用户输入的 `"123"` 会悄悄变成数字，而 `"12a"` 会变成字符串拼接，同一段代码在不同输入下走两条完全不同的路。要拼接就显式写 `strings()`，要算术就显式写 `numbers()`（VM）或 `ints()`/`floats()`（解释器）。
+旧定价（"先尝试把字符串当数字解析，解析得动就做加法"）在语言层**静默改写
+值的类型**，已三次咬伤真实负载（M0 基准负载初值失效 / FFI str 码拒收 /
+std_net 端口错型），且造成解释器与 VM 的既定分歧（`"9"+"a"` 一边报 2002
+一边拼接）。该歧义已废除，两条路径现在**逐字节一致**。要算术就显式写
+`str_to_num()` / `str_to_int()` / `to_num()`，要拼接就是 `+` 本身。
 
 #### 索引越界
 
@@ -2303,15 +2468,14 @@ output(x);
 
 ### 20.5 错误处理最佳实践
 
-QOT 没有 `try/catch`，也没有异常。**错误处理在这门语言里就是「自己先判一下」**——尤其是在 VM 上，没人替你判。
 
-- **调试用解释器，上线用 VM**：`qguoat run` 会把越界、除零、改常量、重复定义当场炸出来；确认干净了再 `bstrust compile`。这是本节最有用的一条。
+- **调试用解释器，上线用原生程序**：`qguoat run` 会把越界、除零、改常量当场炸出来；确认干净了再 `qguoat aot`。这是本节最有用的一条。
 - **编译期警告一条都别放过**：VM 运行期不报错，那几行警告就是你唯一的防线
 - **下标先判范围**：`if (i >= 0 && i < glen(arr))`
 - **除数先判零**：VM 上 `x / 0` 得到 0，不会报错，错误会一路传下去
 - **取值先判 null**：字典缺键、数组越界、未定义变量在 VM 上一律给 `null`，拿到就先 `if (v == null)`
 - **类型转换写显式的**：别依赖 `"123" + 5` 这种隐式行为，拼接写 `strings()`，算术写 `numbers()`
-- **始终以分号结尾**：语法错误是唯一两个运行时都会硬拦下来的错误，改起来最省事
+- **始终以分号结尾**：语法错误是唯一两条路径都会硬拦下来的错误，改起来最省事
 - **函数名唯一**：VM 上重名不报错，只是后面的悄悄覆盖前面的
 - **写 `.qot` 模块记得 `--inline 1`**：漏了会在运行期报 193，跟代码本身没关系
 
@@ -2329,190 +2493,173 @@ QOT 没有 `try/catch`，也没有异常。**错误处理在这门语言里就�
 
 > **提示：** 错误信息中的行号指向源代码中出错的位置，请根据提示行号检查对应代码。如果遇到无法理解的错误，请检查语法是否正确，或参考本文档其他章节。
 
-## 21. 两个运行时的差异对照
+## 21. 解释器与原生程序的差异对照
 
-QOT 有**两套互相独立的执行引擎**，同一份 `.qot` 源码在它们上面跑，结果可能不一样。这一章把所有已知差异集中列出来——**如果你只读本文档的一章，就读这一章。**
-
-|  | 解释器 | 字节码 VM |
-| --- | --- | --- |
-| 启动方式 | qguoat run x.qotqguoat run x.qbc | qguoat bstrust compile x.qot x.qtcqguoat bstrust run x.qtc |
-| 实现 | Python，遍历 AST 执行 | C++（qotrun.dll），执行字节码 |
-| 速度 | 慢 | 快得多 |
-| 定位 | 开发调试 | 生产运行 |
+同一份源码，两条路径的行为并不完全一致。下面是**实测**结论。
 
 ### 21.1 出错行为：最重要的差异
 
-一句话概括：**解释器会拦你，VM 不会。**
+一句话概括：**解释器会拦你，原生程序不会**。
 
-| 情况 | 解释器 | VM |
+| 情况 | 解释器 | 原生程序 |
 | --- | --- | --- |
-| 读未定义变量 | 错误 2001，退出 | null，继续 |
-| 数组越界读 | 错误 2003，退出 | null，继续 |
-| 数组越界写 | 错误，退出 | 静默丢弃，继续 |
-| 除以零 | 错误 2004，退出 | 得到 0，继续 |
-| 修改 const | 错误 2006，退出 | 改成功，继续 |
-| 函数重复定义 | 错误 2014，退出 | 后者覆盖前者，继续 |
-| 语法错误 | 两边都编译失败，不产出.qtc |
+| 读未定义变量 | 编译期语义告警 `[2000]`，不产出 | 得到 `<none>`，继续 |
+| 数组越界读 | 错误 `[2003]`，退出 | `null`，继续 |
+| 数组越界写 | 错误 `[2003]`，退出 | 静默丢弃，继续 |
+| 除以零 | 错误 `[2004]`，退出 | 得到 `0`，继续 |
+| 修改 `const` | 运行期错误 `[2006]`，退出 | 不保证拦截 |
+| 语法错误 / 未定义函数 | 编译期失败，不产出 | 编译期失败，不产出 |
 
-这不是 VM 的 bug，是它的定价方式：**省下每条指令上的检查，换取速度**。完整说明见第 20.3 节。
+这不是缺陷，是定价方式：**原生程序省下每条指令上的检查，换取速度**。完整错误码见 [第 20 章](#20-错误处理系统)。
 
 ### 21.2 语义差异
 
-| 特性 | 解释器 | VM |
+| 特性 | 解释器 | 原生程序 |
 | --- | --- | --- |
-| 函数内给全局变量赋值 | 改动丢弃，函数外看不到 | 改动生效，函数外看得到 |
-| const 保护 | 运行期强制 | 完全不强制 |
-| 数字打印格式 | 3 | 3.000000（一律六位小数） |
-| U"..." / L"..." | 字节序列 / 宽字符串 | 都是 null，值直接丢失 |
-| require "x.qot" | 直接可用 | 编译时必须加 --inline 1，否则报错码 193 |
-| GUI | window_* 一套（旧） | vg_* 一套（第 22 章） |
-
-**「函数内给全局变量赋值」这一条最容易出事**，因为它不报任何错，只是结果不一样：
-
-```
-var g = 10;
-
-any_t func touch() {
-    g = 15;          // 没有 var，指的是外面那个 g
-}
-
-touch();
-output(g);           // 解释器: 10　　VM: 15
-```
-
-**不要依赖任何一边的行为。**要改全局就 `return` 出来再赋值，要局部就老老实实写 `var`：
-
-```
-number_t func compute() {
-    return 15;
-}
-g = compute();       // 两个运行时结果一致
-```
+| 函数内给全局变量赋值 | 改动**丢弃**，函数外看不到 | 改动**生效**，函数外看得到 |
+| 数字打印格式 | `3` / `3.5` | `3.000000` / `3.500000`（一律六位小数） |
+| 字符串拼接数字 | 一致（`"n=" + 3` → `n=3`） | 一致 |
+| 图形界面 | 可用（`vg_*`，经 `build/qotgui.dll`） | 可用（同一份 wingui 实现，编译期链接） |
+| 闭包与异常 | 可用 | 可用（行为逐位一致） |
 
 ### 21.3 内置函数差异
 
-两套运行时的内置函数表是**各自独立维护**的，并不完全重合。
+内置函数面以仓库的 `builtins.toml` 为唯一真相源，两侧可用性逐条标注，完整清单见 [内置函数参考](plugin/function_inside.html)。
 
-#### 两边都有（38 个，放心用）
+| 集合 | 数量 | 说明 |
+| --- | --- | --- |
+| 解释器 + 原生程序都有 | 340 | 放心用（含全部 `vg_*` GUI 函数） |
+| 仅解释器 | 59 | 写进原生程序会在编译期报错；ShellCode、部分系统调用属于这一类 |
+| 仅原生程序 | 3 | 原生后端专有 |
+| 含旧字节码 VM | 47 | 冻结的历史面（两条活跃路径多数也可用）；纯 VM 专属的 5 个两条活跃路径都不可用 |
 
-```
-ScExec  ScLoad  ScSweep  cinget  cmd_exec  dict_get  dict_keys  dict_set
-fclose  fnew  fopen  fread  fsize  fwrite  get  get_env  glen  gtypes
-http_send  json_decode  json_encode  output  pop  pow  push  rand  remove
-round  set_env  sleep  sqrt  strcase  strings  strrep  tnow  tstamp
-unlink  unset_env
-```
+另有 6 个兼容别名（`float` / `input` / `int` / `len` / `replace` / `str`）指向各自的新名，可用性一致。
 
-（另有 `__is_number`、`__iter_len` 两个是 `for` 脱糖用的内部函数，两边都有，但**不要直接调用**。）
+## 22. 图形界面
 
-#### 只有 VM 有（7 个）
+QOT 的官方图形界面是 **`vg_*` 系列（约 70 个函数，Direct2D 渲染）**，在
+解释器与原生程序上**双实现**：同一份 C++ 源（`ot-asset/c/wingui`），
+解释器经 `build/qotgui.dll` 驱动，原生程序编译期直接链接——行为由同一份
+代码保证一致。控件覆盖：窗口、标签、按钮、复选框、开关、输入框、滑块、
+进度条、卡片、下拉、列表、选项卡、加载指示。
 
-```
-numbers  type
-http_clear_headers  http_get_headers  http_set_header
-http_set_user_agent  http_set_verify_ssl
-```
+| API | 函数数 | 可用环境 | 说明 |
+| --- | --- | --- | --- |
+| `vg_*` | 约 70 | **解释器 + 原生程序** | 官方 GUI（wingui / Direct2D） |
+| `window_*` | 14 | 解释器 | 轻量 Tk 窗口，适合极简脚本 |
 
-加上 [第 22 章](#gui) 的 62 个 `vg_*` GUI 函数。解释器里也注册了同名的 `vg_*`，但全都是**报错桩**，调了只会抛出 `GUI 函数 vg_init() 只在编译执行下可用`。
+### 22.1 事件模型：轮询（vg_wait_event / vg_poll_event）
 
-#### 只有解释器有（33 个）
-
-```
-batch_push  beair  bools  entry_get  floats  getpath  ints
-json_pretty  json_valid  lists  max  min  parts  prog_end  sum
-utf8_dec  utf8_enc
-webloc_init  webloc_run  webloc_sbp
-window_bind  window_bind_get  window_button  window_config  window_entry
-window_label  window_loop  window_msg_info  window_new  window_place
-window_size  window_title  window_visible
-```
-
-⚠ **用了这些函数，你的程序就编译不成能跑的 `.qtc` 了。** 尤其注意几个常用的：
-
-- `max` / `min` / `sum` —— VM 上没有，得自己写循环
-- `ints` / `floats` / `bools` / `lists` —— VM 上只有一个 `numbers`
-- `utf8_enc` / `utf8_dec` —— VM 上没有
-- `window_*` 这一整套旧 GUI —— VM 上请改用 `vg_*`
-
-### 21.4 该怎么选
-
-推荐的工作方式是**两个都用**：
-
-1. **写代码时用解释器**（`qguoat run`）。它会把越界、除零、改常量、拼错变量名当场炸出来，省你半天时间。
-2. **发布前编译成 `.qtc`**（`bstrust compile... --opt`）用 VM 跑，拿性能。
-3. **只用两边都有的那 38 个内置函数**，这样两个阶段跑的是同一份代码。
-
-如果你的程序一开始就注定只在 VM 上跑（比如用了 GUI），那就直接按 VM 的规矩写：**自己判边界、自己判零、自己判 null**。
-
-## 22. 图形界面（vg_*）
-
-**`vg_*` 只能在字节码 VM 上运行。**
+按钮"回调"在 QOT 里是主循环的显式事件分派：
 
 ```
-qguoat bstrust compile app.qot app.qtc
-qguoat bstrust run app.qtc
+var w = vg_create_window("演示", 520, 340);
+var box = vg_create_textbox(w, "在这里输入名字...", 40, 104, 300, 34);
+var btn = vg_create_button(w, "打招呼", 40, 152, 140, 42);
+var result = vg_create_label(w, "结果会显示在这里", 40, 216, 440, 28);
+vg_show_window(w);
+
+var running = 1;
+loop (running == 1) {
+    var ev = vg_wait_event(15);          // 泵消息；空闲近零 CPU
+    if (ev == null) {
+        continue;                        // 超时无事件，下一轮
+    }
+    var id = ev[0];
+    var kind = ev[1];                    // 1 点击 / 2 改变 / 3 选中 / 9 窗口已关闭
+    if (kind == 1 && id == btn) {
+        var name = vg_textbox_get_text(box);
+        vg_label_set_text(result, "你好, " + name + "！");
+    }
+    if (kind == 9) {
+        running = 0;                     // 窗口被 X 掉 → 退出主循环
+    }
+}
 ```
 
-用 `qguoat run`（解释器）跑会得到 `GUI 函数 vg_init() 只在编译执行下可用` 这句报错——解释器里注册的只是一批占位存根。 解释器自己那套 GUI 是完全不同的 `window_*` 系列函数，两者**不能混用**。
+`vg_wait_event(ms)` 内部泵 Windows 消息并把控件事件排队，事件延迟 ≤1ms、
+空闲 CPU 近零；`vg_poll_event()` 是它的非阻塞版。**为什么不做成
+`command=函数` 那样的回调**：C 实现层无法反向调用各引擎的函数值，轮询让
+解释器与原生程序天然同语义。
 
-### 22.1 最小可运行程序
+### 22.2 完整可运行示例
+
+`testing/gui/hello_gui.qot`——输入名字 → 点「打招呼」→ 显示问候（这就是
+tkinter 初学者第一课的 QOT 版，源码头部带 tkinter ↔ QOT 逐行对照表）。
+两种跑法：
 
 ```
-any_t func onClick() {
-    output("按钮被点了");
+python index.py run testing/gui/hello_gui.qot      # 解释器（需先构建 build/qotgui.dll）
+python index.py aot testing/gui/hello_gui.qot hello.exe   # 原生程序
+```
+
+`build/qotgui.dll` 由 `python ot-asset/c/wingui/build_qotgui.py` 构建。
+
+### 22.3 vg_* 函数速查
+
+常用子集（完整清单见 [内置函数参考](plugin/function_inside.html)，按 GUI 组过滤）：
+
+| 类别 | 函数 |
+| --- | --- |
+| 窗口 | `vg_create_window` / `vg_show_window` / `vg_close_window` / `vg_run`（阻塞式消息循环） / `vg_set_window_title` / `vg_set_window_size` / `vg_set_window_bg_gradient` |
+| 创建 | `vg_create_label / _button / _checkbox / _toggle / _textbox / _slider / _progressbar / _card / _combobox / _listbox / _tabcontrol / _spinner` |
+| 通用 | `vg_set_position` / `vg_set_size` / `vg_set_visible` / `vg_set_enabled` / `vg_destroy` |
+| 文字 | `vg_button_set_text` / `vg_label_set_text` / `vg_card_set_title` / `vg_textbox_get_text` / `vg_textbox_set_placeholder` / `vg_label_set_font_size` |
+| 状态 | `vg_slider_get_value` / `vg_checkbox_get_checked` / `vg_combobox_get_selected` / `vg_listbox_get_selected`（及对应 set） |
+| 外观 | `vg_button_set_color` / `vg_button_set_text_color` / `vg_label_set_text_color` / `vg_button_set_border_radius` / `vg_card_set_bg_color` |
+| 事件 | `vg_wait_event(ms)` / `vg_poll_event()` |
+
+**注意**：事件循环未运行期间（比如在 `vg_run()` 之后的代码）界面不会有响应；
+所有 UI 搭建和 `vg_wait_event` 主循环请按 22.1 的骨架来。
+
+### 22.4 window_*（解释器可用，轻量替代）
+
+| 函数 | 作用 |
+| --- | --- |
+| `window_new(title)` | 创建窗口，返回窗口句柄 |
+| `window_title(win, title)` | 设置窗口标题 |
+| `window_size(win, w, h)` | 设置窗口尺寸 |
+| `window_button(win, text, command)` | 放置一个按钮，`command` 是回调函数名 |
+| `window_label(win, text)` | 放置一个标签 |
+| `window_entry(win, variable)` | 放置一个输入框，值写入指定变量名 |
+| `window_place(win, x, y, w, h)` | 用绝对坐标摆放控件 |
+| `window_bind(win, event, handler)` | 绑定事件（点击、按键等）到回调 |
+| `window_bind_get(win, event)` | 读取事件绑定的当前回调 |
+| `entry_get(win, index)` | 读输入框内容 |
+| `window_config(win, ...)` | 配置窗口属性 |
+| `window_visible(win, visible)` | 显示 / 隐藏窗口 |
+| `window_msg_info(win, text)` | 弹出信息框 |
+| `window_loop(win)` | 进入事件循环（窗口关闭后返回） |
+
+```
+var counter = 0;
+
+any_t func on_click() {
+    counter = counter + 1;
+    output("点击次数: " + strings(counter));
 }
 
-vg_init();
-var win = vg_create_window("我的窗口", 400, 300);
-
-var btn = vg_create_button(150, 120, 100, 36, "点我");
-vg_button_on_click(btn, onClick);
-
-vg_show_window();      // 注意：不传 win
-vg_run();              // 阻塞，直到窗口关闭
-vg_uninit();
+var win = window_new("QOT 窗口");
+window_size(win, 420, 240);
+window_label(win, "点下面的按钮");
+window_button(win, "点我", "on_click");
+window_loop(win);
 ```
 
-骨架永远是这五步，顺序不能乱：
+**注意**：GUI 函数只在解释器侧可用，编译成原生程序会在编译期报「该内置在原生后端缺席」。
+事件回调里要改的变量请声明在**顶层**（解释器里函数内写全局变量不生效，见 [21.2](#212-语义差异)）。
 
-1. `vg_init()` —— 初始化，必须最先调
-2. `vg_create_window(...)` —— 建窗口，返回一个**字符串 ID**
-3. 建控件、设属性、绑事件
-4. `vg_show_window()` 然后 `vg_run()` —— `vg_run()` 会**阻塞**在这里跑消息循环
-5. 窗口关掉后 `vg_run()` 返回，调 `vg_uninit()` 收尾
+### 22.5 附录：vg_* 详细参考（旧版手册）
 
-⚠ **所有 `vg_create_*` 返回的是字符串 ID，不是对象。****控件**类函数都拿这个 ID 当第一个参数。ID 传错了函数**只会返回 `false`，不会报错**——控件没反应时先怀疑这里。
+以下小节来自旧版手册的详细说明。**过时之处**：事件模型已改为轮询
+（`vg_wait_event` / `vg_poll_event`，见 22.1），旧 `*_on_*` 回调注册函数
+已移除；实现也不再依赖旧字节码 VM（现为 wingui，双引擎同源）。创建、
+属性、取值等函数形态仍然适用，可作速查。
 
-#### ⚠ 但窗口类函数一个都不收窗口 ID
+### 22.6 附录 A：旧版事件绑定（`*_on_*` 已移除，历史参考）
 
-`vg_show_window()`、`vg_close_window()`、`vg_set_window_title()`、 `vg_set_window_size()`、`vg_set_window_bg_gradient()` 内部固定操作「当前主窗口」， 参数是**从第 0 个数起**的。顺手把 `win` 传进去，只会把第一个真参数挤掉，而且不报错：
-
-```
-// ✗ 错：win 被当成标题，标题变成了 "obj_1" 这种 ID 字符串
-vg_set_window_title(win, "新标题");
-// ✗ 错：win 被当成起始色（非数组 → 黑），c2 被完全忽略
-vg_set_window_bg_gradient(win, c1, c2);
-
-// ✓ 对
-vg_set_window_title("新标题");
-vg_set_window_bg_gradient(c1, c2);
-```
-
-`vg_show_window(win)` / `vg_close_window(win)` 多传参数无害（直接被忽略）， 但没必要写。**QOT 全程不检查实参个数**，位置写错就是静默地干错事。
-
-#### 创建函数的参数全都可以省
-
-所有 `vg_create_*` 缺参时用内置默认值（位置一律 50,50，尺寸见下面的函数总表）， 所以 `vg_create_button()` 一个参数不给也能建出按钮来。
-
-但 `vg_init()` 之前建窗口、或者窗口之前建控件，函数会往 stderr 打一行 `[Error]` 并返回 `null`；之后拿着这个 `null` 调任何控件函数， 全都静默返回 `false`——界面一片空白却零报错，多半就是这个原因。
-
-#### ⚠ 颜色只认 `[r, g, b, a]` 数组，取值 0–1
-
-传字符串（`"#ff0000"`、`"red"`）、数字、`null`， **一律当成不透明黑 [0,0,0,1]**，不报错也不警告。数组不足 4 个元素时，缺的 r/g/b 补 0、 缺的 a 补 1，所以 `[1, 0, 0]` 就是不透明纯红。
-
-### 22.2 事件绑定：四种写法
-
-所有 `*_on_*` 函数的回调参数都支持下面四种写法，前三种可以混用。
+旧实现支持 `*_on_*` 回调注册的四种写法（前三种可混用）。**这套函数已从
+API 移除**，现行事件模型见 22.1——本节仅作历史参考。
 
 #### 写法一：直接给函数名（最常用）
 
@@ -2593,7 +2740,7 @@ vg_combobox_on_selected(cb, pick);
 
 **形参个数请照着上表写全**，不要指望「少写几个就只收前几个」。
 
-### 22.3 函数总表（62 个）
+### 22.7 附录 B：函数总表（旧版 62 个形态；现行清单以[内置函数参考](plugin/function_inside.html)的 GUI 组为准）
 
 #### 生命周期与窗口
 
@@ -2701,7 +2848,7 @@ vg_combobox_on_selected(cb, pick);
 
 ⚠ `vg_tabcontrol` **没有**切换事件回调，也没有 `get_selected`。
 
-### 22.4 一个完整例子
+### 22.8 附录 C：一个完整例子（旧版形态，事件部分需按 22.1 改写）
 
 ```
 var win;
@@ -2747,7 +2894,7 @@ vg_run();
 vg_uninit();
 ```
 
-### 22.5 注意事项
+### 22.9 附录 D：注意事项（旧版要点，现行实现基本沿用）
 
 - **返回值是 ID 字符串**，不是对象；`vg_*` 函数失败时**只返回 `false`，不报错**，控件没反应先查 ID 传对没有
 - **窗口类函数不收窗口 ID**（`vg_show_window` / `vg_close_window` / `vg_set_window_*`），多传一个 `win` 会把真参数挤掉
@@ -2758,7 +2905,244 @@ vg_uninit();
 - **回调形参个数照 §22.2 的表写全**，多余实参从前面丢，写少了拿到的是后面的参数
 - **没有 `vg_create_label`**；要显示静态文字，可以用禁用的按钮或卡片标题代替
 - **坐标是绝对像素**，没有自动布局，窗口缩放不会跟着变
-- **只能在 VM 上跑**，别忘了 `bstrust compile`
+- **现行实现 = wingui（双引擎同源）**；旧字节码 VM 里的那份已随弃管作废，本节条目以现行 wingui 行为为准
+
+## 23. 闭包与异常
+
+> 闭包与异常在**解释器与原生程序**上双实现，两侧行为逐位一致。
+> 旧字节码 VM 不支持这两项特性（已冻结弃管）。
+
+### 23.1 闭包
+
+**嵌套函数**：函数体内可以再声明函数（必须带返回类型，与顶层一致）。
+嵌套函数是**词法作用域**的闭包值，可以赋值、传递、返回：
+
+```
+number_t func make_counter() {
+    var n = 0;
+    number_t func step() {
+        n = n + 1;      // 捕获外层的 n（按引用）
+        return n;
+    }
+    return step;
+}
+var c1 = make_counter();
+var c2 = make_counter();
+output(c1());   // 1
+output(c1());   // 2
+output(c2());   // 1  ← 独立实例，各自的 n
+```
+
+**lambda 字面量**（单表达式语法糖）：
+
+```
+var add = func(a, b) -> a + b;
+number_t func make_adder(k) {
+    return func(x) -> x + k;    // 捕获形参 k
+}
+```
+
+**语义定价**（两侧逐位一致）：
+
+- **按引用捕获**：闭包记住的是变量本身（env 单元），不是创建时的值快照。
+  外层后续的写入对闭包可见；多个闭包共享同一外层变量时互相可见。
+- **循环捕获 = Python 同款**：捕获的是循环变量这个"槽"，循环结束后读取
+  拿到的是最后一次写入。要每次迭代的值，在体内先 `var x = 循环变量;`。
+- **递归闭包**：闭包体内按名字调用自己即递归（`fib(n-1) + fib(n-2)`）。
+- **词法可见性**：嵌套函数只在其外层函数的词法范围内可调用；
+  顶层 `var f = 函数值` 后，`f(...)` 在任意深度可调用（全局函数值）。
+- **顶层函数声明不是闭包**：顶层的 `number_t func f()...` 保持既有全局
+  函数语义（零迁移成本）。
+- **内存定价**：env / 闭包对象只分配不回收（与短命对象同一套账）。
+
+### 23.2 try / catch / throw
+
+```
+try {
+    throw "boom";
+} catch (e) {
+    output(e);          // boom
+}
+```
+
+- `throw <表达式>;` 可抛任何值（字符串、数字、数组、err 对象……）。
+- `catch (e)` 把被抛值绑定到 `e`（声明语义，可遮蔽）；`catch { ... }`
+  允许不绑定。
+- **catch 只捕获 `throw`**。越界/除零等仍是既定静默定价（§21.4）；
+  `stop`/`return` 穿透 try 正常执行（语义与无 try 时逐位一致）。
+- **未捕获 throw = 确定性致命**：stderr `[错误] [2001] 未捕获的 throw: <值>`
+  + **exit 124**（与递归深度/超时同档）。两引擎逐字节同格式。
+- **错误对象元语**（解释器与原生程序都有）：
+  - `err(payload)` → 错误对象；`err()` 的 payload 为 null
+  - `is_err(v)` → 是否错误对象
+  - `err_val(e)` → 解包 payload；非错误对象得 null
+  - 错误对象不参与值相等（`==` 恒 false，两侧一致）；`type()` 视角为 `error`
+- **原生实现形态**：setjmp/longjmp 着陆栈；try 区间内的槽声明为
+  volatile（C 标准 setjmp 契约）。**无 try 的程序零开销**（不触碰任何异常设施）。
+- **基准口径**：`b5a_try_overhead`（try 快路径）、`b5b_throw_catch`
+  （抛接）进 `bench_native.py`，首录：try 区间 ~57 ns/iter、
+  抛接 ~1548 ns/throw（py 1562 / php 101——PHP 的 VM 级异常更快，
+  这是 setjmp/longjmp 形态的已知定价；优化杠杆：volatile 影响面收窄、
+  sigsetjmp(0)）。
+- **多文件**：`require "xxx.qot"` 在原生编译时是**编译期内联**，模块顶层名全量导出，
+  `mod##fn` 调用；循环依赖编译期报错。
+
+## 24. FFI 与原生插件
+
+QOT 通过两条路接 C 世界（**冻结 ABI v2**）：
+C 标量调用面（`ffi_*`，9 条）与原生插件（`plugin_*`，4 条）。失败一律走
+哨兵（null/false/""/0），错误文本在 `ffi_last_error()`。
+
+### 24.1 C 标量调用面
+
+```
+var h = ffi_load("msvcrt.dll");        // 加载动态库 → 句柄
+var sq = ffi_sym(h, "sqrt");           // 取符号 → 符号句柄
+output(ffi_call(sq, [2.0]));           // 推断调用（全 f64，libm 类）→ 2.000000
+
+// 显式类型调用：types[0]=返回码，其后=实参码（左到右，≤8 参）
+// 码表：void/i32/i64/f64/str/ptr
+output(ffi_call_v(ffi_sym(h, "ldexp"), ["f64", "f64", "i32"], [1.5, 3]));
+                                       // 12.000000 —— 混族调用（v2）：
+                                       // f64 实参走浮点寄存器、i32 走整型寄存器，
+                                       // 每个实参按自己的码独立定类
+```
+
+- `str` 码只收字符串/null（字符串转指针用 `ffi_ptr`）；`ptr` 码收数字地址。
+- 多余实参按 C ABI 被被调方忽略（被调只读自己声明的个数，调用方帧按 8 参
+  平衡）——因此"多传了"是可预测行为，不是错误。
+- 未知类型码、值与码不符、坏句柄 → `null` + `ffi_last_error()` 非空。
+- `ffi_free(h)` 卸载；其符号句柄一并失效（世代断复用，旧句柄不复活）。
+
+### 24.2 原生插件
+
+插件 = 导出 `qot_plugin_init` 的普通 C 动态库，**唯一依赖是一个自包含公共头**
+`ot-asset/c/plugin/qot_plugin_abi.h`（不需要 QOT 的其余任何东西）：
+
+```c
+#include "qot_plugin_abi.h"
+
+static void add(qot_value *ret, const qot_plugin_api *api,
+                const qot_value *args, int argc) {
+    api->set_num(ret, api->num_of(&args[0]) + api->num_of(&args[1]));
+}
+
+QOT_PLUGIN_EXPORT int qot_plugin_init(const qot_plugin_api *api) {
+    int n = 0;
+    n += api->reg("add", add, 2, "sum of two numbers");  // 名字全局唯一
+    return n;                                            // = 注册个数（契约）
+}
+```
+
+QOT 侧（native 与解释器同一 DLL、同一行为）：
+
+```
+var h = plugin_load("my_plugin.dll");          // 装载 → 句柄（init 契约校验）
+output(plugin_call(h, "add", [2.0, 3.0]));     // 5.000000
+var names = plugin_names(h);                   // 注册的函数名数组（注册序）
+plugin_free(h);                                // 卸载，其注册一并失效
+```
+
+- 插件函数只经 **api 访问值**（构造：set_null/set_bool/set_num/set_str/
+  arr_new/arr_push/dict_new/dict_set；读取：tag_of/num_of/bool_of/str_of/
+  arr_len/arr_at/dict_get；报错：set_error → 调用方得 null；注册：reg）。
+  这样同一插件在两个宿主下行为一致。
+- 插件内 `api->set_error("...")` 后，QOT 侧 `plugin_call` 得 null，
+  `ffi_last_error()` 给出文本。
+- `str_of` 返回的是借用引用（**非 NUL 结尾**，以 len 为准），仅本次调用内有效；
+  `set_str` 是拷贝。容器由宿主持有，`qot_value` 是 16 字节值，可自由拷贝。
+- v2 明确不做（要用请提需求）：插件回调 QOT 闭包、多线程调用、结构体按值
+  传参、变参插件函数。
+
+编译插件（Windows 示例，gcc/g++）：
+
+```
+g++ -shared -I ot-asset/c/plugin my_plugin.c -o my_plugin.dll -static-libgcc -static-libstdc++
+```
+
+> 嵌入方向（宿主程序加载 QOT 产物）走 AOT 的 dll 输出（§17），与本章的
+> "QOT 调 C" 是同一 ABI 家族的两个方向。
+
+## 25. 编译期宏与协议元语
+
+> 设计决议：**特性 = 库，语言 = 底座**。语言不再逐一内置"特性"，而是把
+> **编译期扩展权**下放给开发者——协议方法（§6.5）承接运算符/迭代/输出，
+> 编译期宏承接语法级改写。扩展代码走既有全部优化管线，产物与手写等价
+> 代码同价。这不是运行期反射，是编译期展开。
+
+### 25.1 `macro`：用 QOT 写编译期变换
+
+```
+macro twice(x) {
+    // 宏体 = 普通 QOT 函数；形参收【实参的 AST 节点】（不是值）
+    return &< "kind": "binary_op", "op": "+", "left": x, "right": x >&;
+}
+var n = twice!(21);        // 调用 = name!(...)；展开一次，产物 = 21 + 21
+output(n);                 // 42
+```
+
+- **声明**：`macro 名(形参...) { 语句 }`，仅限顶层（函数体内声明 = 编译期
+  致命）；宏名不占运行期命名面（变量/函数可同名互不干扰）；重定义 =
+  编译期致命（官方宏 `swap`/`unless` 同样不可遮蔽）。
+- **调用**：`name!(args)`；语句位可带块：`name!(args) { 语句... }`——块以
+  语句列表绑定到**最后一个形参**（控制流宏的载体，见 `unless!`）。
+- **执行时机**：AST 构建后、字节码/求值前。解释器与 native 共用同一份
+  展开后 AST——**一次实现，双引擎天然逐字节同果**。
+- **形参收 AST 节点值**：节点 = `{"kind": "...", 字段..., "line": 行号}`
+  的字典（字段名表登记在 `qot_macro.py` 的 `NODE_FIELDS`，与文法一一对应）；
+  dict 字面量的 entry 是数组 `[键值, 值值[, 行号]]`。未写 `"line"` 的产物
+  节点自动补**调用点行号**（报错定位到展开点）。返回**数组**的宏 = 语句块
+  宏（语句位拼接）；返回其它节点的宏 = 表达式宏；在表达式位返回语句块
+  （或语句位返回非调用表达式）= 编译期报错。
+- **嵌套**：实参先展开再展开外层（`twice!(twice!(3))`）；宏体内调用其他宏
+  = **值语义**（实参先求值成节点值再展开，`inc!(inc!(x))` 即代数叠加）。
+- **宏内报错**：定位到调用点行号；宏体执行期任何异常 = 编译期致命
+  `[4000] 宏体执行失败（调用点行 N）`。
+- **上限**：展开深度默认 64、单次编译总步数默认 1,000,000；环境变量
+  `QOT_MACRO_DEPTH` / `QOT_MACRO_LIMIT` 可调，**0 = 不限**；超限 =
+  `[4000] 宏展开超限（depth/steps…）`。
+- **卫生：不做（业主裁决，开发者自责）**。展开体共享调用点作用域——宏
+  引入的临时名可能捕获/遮蔽调用点同名变量。约定：宏库临时名用 `_m_` 前缀。
+
+### 25.2 官方宏：`swap!` 与 `unless!`（内建，验收载体）
+
+```
+var a = 1;  var b = 2;
+swap!(a, b);               // C6 引用语义涌现：真实交换两个变量（标识符实参）
+output(a);                 // 2
+
+unless!(a > 5) {           // 控制流涌现：展开 = if (a > 5) {} else { … }
+    output("not big");
+}
+```
+
+- `swap!(x, y)`：实参必须是**标识符**（非标识符在展开期明确报错）。
+- `unless!(cond) { body }`：cond 为假时执行 body；条件为真 = 空转。
+- 两者都是普通宏（与用户宏同一条展开路径，无特权）——读 §25.1 即知其
+  全部行为。
+
+### 25.3 边界面与保留名
+
+- `name!(...)` 只解析**编译期宏**：未定义的名字 = 编译期致命
+  `[4000] 宏 'x' 未定义`。
+- **保留名**：`__` 双下划线前缀 = 编译器隐藏临时（for 脱糖的
+  `__for_*`、协议绑定脱糖的 `__gs_*`、方法 this 改写的 `__qot_this_*`）。
+  用户全局变量**不要用 `__` 前缀**——函数体内读取会被按局部槽编译
+  （读到 null）。宏库约定用 `_m_` 前缀。
+- 协议绑定脱糖可能引入 `__gs_seq_N/__gs_lim_N/__gs_idx_N` 隐藏变量
+  （`__iter_len` 序列协议的 for-in 形态），同样不与用户名冲突的前提是
+  用户避开 `__` 前缀。
+- 明确**不做**（留触发）：卫生机制、宏的 import/作用域系统、`!` 参与宏
+  名之外的其它语法、G3 求值模型开放。
+
+### 25.4 裁判（可复现验收）
+
+| 钉 | 内容 |
+| --- | --- |
+| `testing/cases/native/gs1_proto.qot` | 11 协议方法全绑定 + 类型未知/未定义回落，双引擎零分歧 |
+| `testing/cases/native/gs2_macro.qot` | 官方宏 + 用户宏三形态 + 嵌套，双引擎逐字节同果 |
+| `testing/cases/native/gs3_emergent.qot` | **涌现验收**：纯 .qot 长出运算符重载（C4）/接口多态（C1）/引用语义（C6）/yield! 生成器原型（C3），零内核依赖 |
+| `testing/unit/test_macro.py` | AST↔值往返无损（全节点 × 真实用例 × 带/strip 两形态）、上限矩阵、宏语义、`!` 消歧 |
 
 # 许可证
 

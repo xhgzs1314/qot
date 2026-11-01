@@ -1,0 +1,11 @@
+{
+  "name": "bound_logic_numeric_interp",
+  "runs_on": "interp",
+  "expect": {
+    "exit": 0,
+    "stdout": ["false", "true", "true", "false", "false", "true"],
+    "stderr_empty": true
+  },
+  "tags": ["logic", "numeric", "interp-only", "pricing"],
+  "note": "解释器定价钉：&& / || 一律返回 bool（visit_binary_op: bool(left and/or right)）。VM 侧数值×数值得 null，见 vm/bound_logic_numeric_interp。既定分歧（fuzz 白名单 KNOWN-LOGIC-NUMERIC）。"
+}

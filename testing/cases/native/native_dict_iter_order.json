@@ -1,0 +1,10 @@
+{
+  "name": "native_dict_iter_order",
+  "runs_on": "native",
+  "expect": {
+    "exit": 0,
+    "stderr_empty": true
+  },
+  "tags": ["dict", "iteration-order", "slot-layout", "native", "e1"],
+  "note": "E1 回归钉：字典迭代顺序（槽序）逐行钉死，golden 由 native 口径录制（--update-golden --reason）。24 个长键（外部借用）+ 21 个 1 字符短键（键内联 + 静态驻留），强制多次 rehash 与探测冲突，使顺序对槽布局敏感。改哈希宽度/探测步进/放置规则而本用例不过 = 可观察语义被改动，不许落地。口径（R5）：native-only —— VM 是另一套布局（qot_flatdict.h）且已冻结（§8.7），解释器是 Python dict，跨引擎一致在此面上无意义也不可得。"
+}

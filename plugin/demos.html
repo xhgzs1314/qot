@@ -171,10 +171,18 @@
 <body>
     <h1>QOT-More Demos</h1>
     <h2>Qot-A001 数据库操作</h2>
-    <pre><code class="code-highlight">require "mysqli";
+    <pre><code class="code-highlight">// FFI 版：需将 libmysql.dll 置于同目录
+var mysql = ffi_load("libmysql.dll");
 var linkings = "555555:555555@tcp(localhost:3306)/555555?charset=utf8mb4";
-var conn = MySQLConnect(linkings);
-MySQLExecute(conn,"DELETE FROM users WHERE username = 'admin';");</code></pre>
+var conn = ffi_call_v(ffi_sym(mysql, "mysql_init"), ["ptr"], [0]);
+// 原 MySQLConnect(linkings)：连接串按 libmysql 参数拆分（user:pass@tcp(host:port)/db）
+ffi_call_v(ffi_sym(mysql, "mysql_real_connect"),
+           ["ptr", "ptr", "ptr", "ptr", "ptr", "i32", "ptr", "i32"],
+           [conn, ffi_ptr("localhost"), ffi_ptr("555555"), ffi_ptr("555555"),
+            ffi_ptr("555555"), 3306, 0, 0]);
+// 原 MySQLExecute(conn, "DELETE ...")
+ffi_call_v(ffi_sym(mysql, "mysql_query"), ["i32", "ptr", "ptr"],
+           [conn, ffi_ptr("DELETE FROM users WHERE username = 'admin';")]);</code></pre>
     <h2>Qot-A002</h2>
     <pre><code class="code-highlight">var students = [["张三", 90], ["李四", 85], ["王五", 78]];
 any_t func add_score(arr, name, score) {
@@ -207,8 +215,66 @@ if (avg > 85) {
     output("待提升");
 }</code></pre>
     <h2>Qot-A003 绘图</h2>
-    <pre><code class="code-highlight">//QOT-Demo-PD库-绘图
-require "painting";
+    <pre><code class="code-highlight">//QOT-Demo-PD库-绘图（FFI 版：需将 painting.dll 置于同目录——原 painting 模块
+//已移除；以下包装把原 Turtle_* 调用原样接到 DLL 导出，参数码按实际签名调整）
+var painting = ffi_load("painting.dll");
+func Turtle_Create(w, h, t) {
+    return ffi_call_v(ffi_sym(painting, "Turtle_Create"), ["ptr", "i32", "i32", "ptr"], [0, w, h, ffi_ptr(t)]);
+}
+func Turtle_SetSpeed(t, v) {
+    ffi_call_v(ffi_sym(painting, "Turtle_SetSpeed"), ["void", "ptr", "f64"], [t, v]);
+}
+func Turtle_SetPenColor(t, r, g, b) {
+    ffi_call_v(ffi_sym(painting, "Turtle_SetPenColor"), ["void", "ptr", "i32", "i32", "i32"], [t, r, g, b]);
+}
+func Turtle_SetPenWidth(t, w) {
+    ffi_call_v(ffi_sym(painting, "Turtle_SetPenWidth"), ["void", "ptr", "f64"], [t, w]);
+}
+func Turtle_SetBgColor(t, r, g, b) {
+    ffi_call_v(ffi_sym(painting, "Turtle_SetBgColor"), ["void", "ptr", "i32", "i32", "i32"], [t, r, g, b]);
+}
+func Turtle_PenDown(t) {
+    ffi_call_v(ffi_sym(painting, "Turtle_PenDown"), ["void", "ptr"], [t]);
+}
+func Turtle_PenUp(t) {
+    ffi_call_v(ffi_sym(painting, "Turtle_PenUp"), ["void", "ptr"], [t]);
+}
+func Turtle_Forward(t, d, s) {
+    ffi_call_v(ffi_sym(painting, "Turtle_Forward"), ["void", "ptr", "f64", "f64"], [t, d, s]);
+}
+func Turtle_Left(t, deg, s) {
+    ffi_call_v(ffi_sym(painting, "Turtle_Left"), ["void", "ptr", "f64", "f64"], [t, deg, s]);
+}
+func Turtle_Circle(t, r, deg, seg) {
+    ffi_call_v(ffi_sym(painting, "Turtle_Circle"), ["void", "ptr", "f64", "f64", "f64"], [t, r, deg, seg]);
+}
+func Turtle_Goto(t, x, y, s) {
+    ffi_call_v(ffi_sym(painting, "Turtle_Goto"), ["void", "ptr", "f64", "f64", "f64"], [t, x, y, s]);
+}
+func Turtle_ShowTurtle(t) {
+    ffi_call_v(ffi_sym(painting, "Turtle_ShowTurtle"), ["void", "ptr"], [t]);
+}
+func Turtle_SetFillColor(t, r, g, b) {
+    ffi_call_v(ffi_sym(painting, "Turtle_SetFillColor"), ["void", "ptr", "i32", "i32", "i32"], [t, r, g, b]);
+}
+func Turtle_BeginFill(t) {
+    ffi_call_v(ffi_sym(painting, "Turtle_BeginFill"), ["void", "ptr"], [t]);
+}
+func Turtle_EndFill(t) {
+    ffi_call_v(ffi_sym(painting, "Turtle_EndFill"), ["void", "ptr"], [t]);
+}
+func Turtle_Write(t, s, bold, align, size) {
+    ffi_call_v(ffi_sym(painting, "Turtle_Write"), ["void", "ptr", "ptr", "i32", "ptr", "i32"], [t, ffi_ptr(s), bold, ffi_ptr(align), size]);
+}
+func Turtle_MainLoop(t) {
+    ffi_call_v(ffi_sym(painting, "Turtle_MainLoop"), ["void", "ptr"], [t]);
+}
+func Turtle_ExitOnClick(t) {
+    ffi_call_v(ffi_sym(painting, "Turtle_ExitOnClick"), ["void", "ptr"], [t]);
+}
+func Turtle_Destroy(t) {
+    ffi_call_v(ffi_sym(painting, "Turtle_Destroy"), ["void", "ptr"], [t]);
+}
 var turtle = Turtle_Create(800, 600, "绘图演示");
 turtle->Turtle_SetSpeed(0);
 turtle->Turtle_SetPenColor(0, 0, 255);
@@ -270,32 +336,59 @@ turtle->Turtle_MainLoop();
 turtle->Turtle_ExitOnClick();
 turtle->Turtle_Destroy();</code></pre>
     <h2>Qot-A004 音乐播放</h2>
-    <pre><code class="code-highlight">require "miaudio";
-var player = miaudio##MusicPlayer_Create();
-var result = miaudio##MusicPlayer_Open(player, "chengnan.mp3"); //城南花已开...
+    <pre><code class="code-highlight">// FFI 版：miaudio.dll 在 package\miaudio\，音乐在 ot-asset\audio\。
+// 注意：返回指针/句柄的函数必须用 ffi_call_v 显式定类（["ptr"]）——用 ffi_call
+// 推断会把指针按 f64 读成次正规值，传回时被拒。
+var miaudio = ffi_load("package/miaudio/miaudio.dll");
+func MusicPlayer_Create() {
+    return ffi_call(ffi_sym(miaudio, "MusicPlayer_Create"), []);
+}
+func MusicPlayer_Open(p, f) {
+    return ffi_call_v(ffi_sym(miaudio, "MusicPlayer_Open"), ["i32", "ptr", "ptr"], [p, ffi_ptr(f)]);
+}
+func MusicPlayer_Play(p) {
+    ffi_call_v(ffi_sym(miaudio, "MusicPlayer_Play"), ["void", "ptr"], [p]);
+}
+func MusicPlayer_GetState(p) {
+    return ffi_call_v(ffi_sym(miaudio, "MusicPlayer_GetState"), ["i32", "ptr"], [p]);
+}
+func MusicPlayer_GetPosition(p) {
+    return ffi_call_v(ffi_sym(miaudio, "MusicPlayer_GetPosition"), ["f64", "ptr"], [p]);
+}
+func MusicPlayer_GetDuration(p) {
+    return ffi_call_v(ffi_sym(miaudio, "MusicPlayer_GetDuration"), ["f64", "ptr"], [p]);
+}
+func MusicPlayer_Destroy(p) {
+    ffi_call_v(ffi_sym(miaudio, "MusicPlayer_Destroy"), ["void", "ptr"], [p]);
+}
+
+var player = MusicPlayer_Create();
+var result = MusicPlayer_Open(player, "chengnan.mp3"); //城南花已开...
 if (result == 0) {
     output("打开文件失败！");
     return false;
 }
-miaudio##MusicPlayer_Play(player);
+MusicPlayer_Play(player);
 loop (true) {
-    var state = miaudio##MusicPlayer_GetState(player);
-    var position = miaudio##MusicPlayer_GetPosition(player);
-    var duration = miaudio##MusicPlayer_GetDuration(player);
+    var state = MusicPlayer_GetState(player);
+    var position = MusicPlayer_GetPosition(player);
+    var duration = MusicPlayer_GetDuration(player);
     if (state == 3 || position >= duration) {
         output("\n播放结束！");
         stop;
     }
     sleep(100);
 }
-miaudio##MusicPlayer_Destroy(player);</code></pre>
+MusicPlayer_Destroy(player);</code></pre>
     <h2>Qot-A005 Win-API</h2>
-    <pre><code class="code-highlight">require "win32";
-var MB_OK = win32##get_const("MB_OK");
-var msgBoxAddr = win32##get_address("MessageBoxW");
+    <pre><code class="code-highlight">// FFI 版：user32.dll 是系统自带，可直接跑
+var user32 = ffi_load("user32.dll");
+var MB_OK = 0;                                     // 原 win32##get_const("MB_OK")
+var msgBoxAddr = ffi_sym(user32, "MessageBoxA");   // 原 get_address("MessageBoxW")：A 版直接收 ANSI 串
 var title ="Hellos";
 var text = "你好世界";
-var result = win32##call_address(msgBoxAddr, 4, 0, title, text, 0);</code></pre>
+var result = ffi_call_v(msgBoxAddr, ["i32", "ptr", "ptr", "i32"],
+                        [0, ffi_ptr(text), ffi_ptr(title), MB_OK]);</code></pre>
  <h2>Qot-A006 天气API调用</h2>
     <pre><code class="code-highlight">//Thanks to uapis.cn
 http_set_user_agent("QOT-WeatherClient/1.0");
@@ -322,15 +415,15 @@ if (statusCode == 200) {
         // 给出建议
         var condition = weatherData["weather"];
         if (strrep(condition, "雨", "") != condition) {
-            output("💡 建议：有雨，出门请带伞");
+            output("建议：有雨，出门请带伞");
         } eif (strrep(condition, "雪", "") != condition) {
-            output("💡 建议：下雪，注意保暖和出行安全");
+            output("建议：下雪，注意保暖和出行安全");
         } eif (strrep(condition, "晴", "") != condition) {
-            output("💡 建议：天气晴朗，适合户外活动");
+            output("建议：天气晴朗，适合户外活动");
         } eif (strrep(condition, "云", "") != condition) {
-            output("💡 建议：多云天气，适宜出行");
+            output("建议：多云天气，适宜出行");
         } else {
-            output("💡 建议：请关注天气变化");
+            output("建议：请关注天气变化");
         }
     } else {
         output("解析天气数据失败");
@@ -341,29 +434,103 @@ if (statusCode == 200) {
         output("错误信息: " + responseData);
     }
 }</code></pre>
-<h2>Qot-A007 Vgui</h2>
-<pre><code class="code-highlight">any_t func on_button_click() {
-    output("按钮被点击了!");
-    vg_button_set_text(label, "按钮已被点击！");
-    vg_button_set_color(btn, [0.3, 0.8, 0.4, 1.0]);
+<h2>Qot-A007 类 · 协议 · 宏</h2>
+<pre><code class="code-highlight">// 协议方法：让自定义类型参与运算与输出
+class Vec2 {
+    var x = 0;
+    var y = 0;
+    func init(ax, ay) { this-&gt;x = ax; this-&gt;y = ay; }
+    func __add__(o) { return Vec2(this-&gt;x + o-&gt;x, this-&gt;y + o-&gt;y); }
+    func __eq__(o) { return this-&gt;x == o-&gt;x &amp;&amp; this-&gt;y == o-&gt;y ? 1 : 0; }
+    func __to_str() { return "(" + int_to_str(this-&gt;x) + "," + int_to_str(this-&gt;y) + ")"; }
 }
-var window;
-var btn;
-var label;
-vg_init();
-window = vg_create_window("My-QOT-Application", 800, 600);
-vg_set_window_bg_gradient([0.05, 0.05, 0.12, 1], [0.12, 0.08, 0.22, 1]);
-btn = vg_create_button(300, 250, 200, 50, "点击我");
-vg_button_set_color(btn, [0.2, 0.6, 1.0, 1.0]);
-vg_button_set_hover_color(btn, [0.3, 0.7, 1.0, 1.0]);
-vg_button_set_border_radius(btn, 25);
-vg_button_on_click(btn, on_button_click);
-label = vg_create_button(300, 200, 200, 40, "等待点击...");
-vg_button_set_color(label, [0.12, 0.12, 0.18, 1.0]);
-vg_button_set_hover_color(label, [0.12, 0.12, 0.18, 1.0]);
-vg_show_window(window);
-vg_run();
-vg_uninit();</code></pre>
+
+output(Vec2(1, 2) + Vec2(10, 20));    // (11,22)
+output(Vec2(1, 2) == Vec2(1, 2));     // 1
+
+// 编译期宏：把重复的代码形状交给编译器
+macro twice(x) {
+    return &lt; "kind": "binary_op", "op": "+", "left": x, "right": x &gt;&amp;;
+}
+output(twice!(21));                   // 42
+
+// 官方宏：真交换两个变量
+var a = 1;
+var b = 2;
+swap!(a, b);
+output(int_to_str(a));               // 2
+output(int_to_str(b));               // 1</code></pre>
+
+<h2>Qot-A008 标准库：CSV 统计</h2>
+<pre><code class="code-highlight">require "std/text.qot";
+require "std/data.qot";
+
+var csv = "city,amount,kind
+beijing,100,a
+shanghai,250,b
+beijing,50,c
+";
+var rows = csv_parse(csv);
+
+// 按城市分组求和
+var by_city = group_sum(rows, 0, 1);
+output(by_city["beijing"]);          // 150
+output(by_city["shanghai"]);         // 250
+
+// 取第一列并做计数
+output(group_count(rows, 2)["a"]);   // 1
+
+// 清洗与折行
+var cleaned = trim_all(rows);
+output(normalize("  hello    world  "));   // hello world
+output(wrap("alpha beta gamma", 11));</code></pre>
+
+<h2>Qot-A009 文件处理流水线</h2>
+<pre><code class="code-highlight">require "std/fs.qot";
+require "std/text.qot";
+
+var lines = read_lines("data.txt");
+if (lines == null) {
+    output("读取失败");
+} else {
+    var total = 0;
+    for (ln in lines) {
+        var t = trim_all(ln);
+        if (t != "") {
+            total = total + 1;
+        }
+    }
+    output("有效行数: " + int_to_str(total));
+    write_lines("clean.txt", lines);
+}</code></pre>
+
+<h2>Qot-A010 GUI：打招呼</h2>
+<p>完整源码见 <code>testing/gui/hello_gui.qot</code>（可 <code>python index.py run</code> 跑，
+    也可 <code>python index.py aot</code> 编译成单文件 exe——两引擎行为逐位一致）。
+    核心骨架：</p>
+<pre><code class="code-highlight">var w = vg_create_window("你好 · GUI", 520, 340);
+var name_box = vg_create_textbox(w, "在这里输入名字...", 40, 104, 300, 34);
+var btn_hello = vg_create_button(w, "打招呼", 40, 152, 140, 42);
+var result = vg_create_label(w, "结果会显示在这里", 40, 216, 440, 28);
+vg_show_window(w);
+
+var running = 1;
+loop (running == 1) {
+    var ev = vg_wait_event(15);              // mainloop 的心跳
+    if (ev == null) { continue; }
+    var id = ev[0];
+    var kind = ev[1];                        // 1 点击 / 2 改变 / 3 选中 / 9 关闭
+    if (kind == 9) { running = 0; }
+    if (kind == 1 && id == btn_hello) {
+        var name = vg_textbox_get_text(name_box);      // entry.get()
+        if (name == null || name == "") {
+            vg_label_set_text(result, "请先输入名字");
+        } else {
+            vg_label_set_text(result, "你好, " + name + "！");
+        }
+    }
+}</code></pre>
+
     <blockquote>
         <a href="index.html">回退</a></br>
     </blockquote>

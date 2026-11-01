@@ -1,0 +1,18 @@
+{
+ "name": "builtin_fastpath_matrix",
+ "runs_on": "vm",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stderr_empty": true
+ },
+ "tags": [
+  "builtin",
+  "n05",
+  "fastpath"
+ ],
+ "note": "N-05 内置快速通道的语义矩阵：单参核心入口（iter_len/is_number/glen/type/gtypes/strings/numbers）+ push 双参 + output 数字直通，覆盖 全类型输入（num/str/arr/dict/null/bool/负数）。hot loop 驱动 argc==1 快路径。native 侧与 VM 逐行差分（--suite native）；改动 qotrt_*1/qotrt_push2/qotrt_output1 或 cgen._builtin_core 前必跑。"
+}

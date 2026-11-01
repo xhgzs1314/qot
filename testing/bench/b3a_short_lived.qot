@@ -1,0 +1,17 @@
+// B3a 分配密集 · 短命对象（数组 + 字典 + 字符串各一，立即丢弃）
+// 负载：ITER 轮，每轮构造 3 个短命对象（3 元素数组 / 1 键字典 / 短串），
+// 累加它们的长度防消除，然后全部变成垃圾。
+// 拷问点（§6.3.1 P0）：qotrt 是裸 malloc/free，无 RC 无 GC。短命对象走
+// 系统 malloc 的代价 + 是否会泄漏，都必须用这个负载先测再定策略。
+// 配套：b3b_longrun 用 RSS 曲线验泄漏；本负载只给「每轮分配」的 ns 数字。
+// 短串用固定字母表取字符（而非 strings(i)）：strings() 在 QOT 里是 %f 格式
+// （8 字符），在 Python 里是 1 字符，两边每轮工作量不等 → 数字不可比。
+var acc = 0;
+var base = "abcdefghij";
+for (i in 87654321) {
+    var a = [i, i, i];
+    var d = &< "k": i >&;
+    var s = base[i % 10] + "x";
+    acc = acc + glen(a) + glen(d) + glen(s);
+}
+output(acc);

@@ -1,0 +1,19 @@
+{
+ "name": "bound_undefined_var",
+ "runs_on": "vm",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stdout": [
+   "null"
+  ],
+  "stderr_empty": true
+ },
+ "tags": [
+  "scope"
+ ],
+ "note": "README 21.1：VM 读未定义变量得 null"
+}

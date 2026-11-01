@@ -1,0 +1,8 @@
+// 【GOD-SELF-G2 负例 】宏重定义 = 编译期致命（F0 现律；
+// 官方宏 swap/unless 亦不可遮蔽 —— 展开器注册面同律）。
+macro dup(a) {
+    return a;
+}
+macro dup(b) {
+    return b;
+}

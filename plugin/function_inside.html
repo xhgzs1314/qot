@@ -398,15 +398,20 @@
 <body>
     <div class="docs-container">
         <div class="docs-header">
-            <h1> QOT · 内置函数表</h1>
+            <h1> QOT · 内置函数参考</h1>
         </div>
         <div class="runtime-banner">
-            <strong>⚠ 这一页是「解释器」的函数表——只对 <code>qguoat run x.qot</code> 有效。</strong><br>
-            QOT 有两套互相独立的运行时，内置函数表<strong>并不相同</strong>。本页共 73 个函数，其中
-            <strong style="color:#9b1c1c">33 个在字节码 VM 上不存在</strong>（表格最后一列标了
-            <span class="vm-no">✗ 仅解释器</span>）。用了它们，程序就编译不成能跑的 <code>.qtc</code>。<br>
-            要写能跑在 VM 上的代码（性能、GUI 都在那边），请对照 <a href="function_inside2.html"><strong>QTC · 内置函数表</strong></a>，
-            或看主文档<a href="doc.html#runtime-diff">第 21 章「两个运行时的差异对照」</a>。
+            <strong>本页覆盖 QOT 全部内置函数，共 <span id="statTotal">—</span> 个名字
+            （含兼容别名）。</strong><br>
+            QOT 现在有两个活跃运行时：<strong>解释器</strong>（<code>qguoat run x.qot</code>）与
+            <strong>原生可执行文件</strong>（<code>qguoat aot x.qot -o x.exe</code>）。两者的内置函数面
+            <strong>并不相同</strong>：表格给出「解释器」与「原生 (AOT)」两列可用性标记。<br>
+            标 <span class="vm-no">✗ 仅解释器</span> 的函数<strong>不能</strong>出现在 AOT 产物里
+            （编译期就会报「该内置在原生后端缺席」）；标
+            <span class="vm-no">✗ 仅旧 VM</span> 的条目属于已冻结的字节码 VM，不再是可用面。<br>
+            函数语义、参数与返回值的权威定义在仓库的 <code>builtins.toml</code>，本表由
+            <code>_gen_builtin_docs.py</code> 从该清单生成；标准库（<code>std/</code>）函数不在本表，
+            见 <a href="stdlib.html"><strong>标准库参考</strong></a>。
         </div>
         <div class="category-nav" id="categoryNav">
 
@@ -419,191 +424,22 @@
                         <th>描述</th>
                         <th>参数</th>
                         <th>返回值</th>
-                        <th>字节码 VM</th>
+                        <th>解释器</th>
+                        <th>原生 (AOT)</th>
                     </tr>
                 </thead>
                 <tbody id="tableBody">
                     <tr>
-                        <td colspan="5" class="no-result">加载函数库中…</td>
+                        <td colspan="6" class="no-result">加载函数库中…</td>
                     </tr>
                 </tbody>
             </table>
         </div>
     </div>
 
+    <script src="builtin_data.js"></script>
     <script>
-        const INTERP_ONLY = new Set([
-            "batch_push", "beair", "bools", "entry_get", "floats", "getpath", "ints",
-            "json_pretty", "json_valid", "lists", "max", "min", "parts", "prog_end", "sum",
-            "utf8_dec", "utf8_enc",
-            "webloc_init", "webloc_run", "webloc_sbp",
-            "window_bind", "window_bind_get", "window_button", "window_config", "window_entry",
-            "window_label", "window_loop", "window_msg_info", "window_new", "window_place",
-            "window_size", "window_title", "window_visible"
-        ]);
 
-        const FUNCTIONS_DATA = [
-            // 基础输入输出
-            { name: "output", desc: "输出内容到控制台/标准输出", params: [{ name: "value", type: "任意类型", desc: "要输出的数据" }], returns: "无 (None)", category: "I/O 操作" },
-            { name: "cinget", desc: "获取用户控制台输入", params: [{ name: "prompt", type: "任意类型", desc: "提示信息 (可选)" }], returns: "输入字符串", category: "I/O 操作" },
-            // 类型转换/工具
-            { name: "strings", desc: "将任意值转换为字符串表示", params: [{ name: "value", type: "any", desc: "待转换变量" }], returns: "转换后的字符串", category: "类型转换" },
-            { name: "ints", desc: "转换为整数类型", params: [{ name: "value", type: "any", desc: "数字/字符串" }], returns: "整数", category: "类型转换" },
-            { name: "floats", desc: "转换为浮点数", params: [{ name: "value", type: "any", desc: "可转换值" }], returns: "浮点数", category: "类型转换" },
-            { name: "bools", desc: "转换为布尔值(QOT规则)", params: [{ name: "value", type: "str/number", desc: "待转换对象" }], returns: "True/False", category: "类型转换" },
-            { name: "lists", desc: "将可迭代对象转换为列表", params: [{ name: "iterable", type: "str/bytes/generator", desc: "原始序列" }], returns: "列表(array)", category: "类型转换" },
-            { name: "gtypes", desc: "获取变量类型字符串", params: [{ name: "obj", type: "any", desc: "任意数据" }], returns: "'string' / 'array' / 'number' / 'any'", category: "工具函数" },
-            { name: "glen", desc: "获取字符串或数组长度，支持测试参数", params: [{ name: "obj", type: "string/array", desc: "待测对象" }, { name: "test_flag", type: "any(可选)", desc: "测试用额外参数" }], returns: "长度(整数)", category: "数组/字符串" },
-            { name: "push", desc: "向数组末尾添加元素", params: [{ name: "array", type: "array", desc: "目标数组" }, { name: "element", type: "any", desc: "待添加元素" }], returns: "True (布尔)", category: "数组/字符串" },
-            { name: "remove", desc: "从数组中移除指定元素(首次出现)", params: [{ name: "array", type: "array", desc: "目标数组" }, { name: "element", type: "any", desc: "要移除的元素" }], returns: "True / 失败时false", category: "数组/字符串" },
-            { name: "pop", desc: "根据索引弹出数组元素", params: [{ name: "array", type: "array", desc: "数组对象" }, { name: "index", type: "整数", desc: "要删除的元素索引" }], returns: "True (成功) / False", category: "数组/字符串" },
-            { name: "get", desc: "获取元素在数组中的索引", params: [{ name: "array", type: "array", desc: "数组载体" }, { name: "element", type: "any", desc: "查找的元素" }], returns: "索引值(整数) 或 -1", category: "数组/字符串" },
-            { name: "batch_push", desc: "批量添加元素到数组", params: [{ name: "target_array", type: "数组", desc: "目标数组" }, { name: "elements", type: "列表", desc: "要添加的元素列表" }], returns: "True", category: "数组/字符串" },
-            {
-                name: "json_encode",
-                desc: "将 QOT 对象编码为 JSON 字符串",
-                params: [
-                    { name: "obj", type: "任意类型", desc: "要编码的 QOT 对象" },
-                    { name: "indent", type: "整数(可选)", desc: "缩进空格数，用于美化输出" },
-                    { name: "ensure_ascii", type: "布尔(可选)", desc: "是否转义非ASCII字符，默认false" }
-                ],
-                returns: "JSON 字符串",
-                category: "编解码"
-            },
-            {
-                name: "json_decode",
-                desc: "将 JSON 字符串解码为 QOT 对象",
-                params: [
-                    { name: "json_string", type: "字符串", desc: "有效的 JSON 格式字符串" }
-                ],
-                returns: "解码后的 QOT 对象（字典/列表/字符串/数字等）",
-                category: "编解码"
-            },
-            {
-                name: "json_pretty",
-                desc: "将对象编码为格式化的 JSON 字符串（美化输出）",
-                params: [
-                    { name: "obj", type: "任意类型", desc: "要编码的对象" },
-                    { name: "indent", type: "整数(可选)", desc: "缩进空格数，默认2" }
-                ],
-                returns: "格式化的 JSON 字符串",
-                category: "编解码"
-            },
-            {
-                name: "json_valid",
-                desc: "验证字符串是否为有效的 JSON 格式",
-                params: [
-                    { name: "json_string", type: "字符串", desc: "待验证的字符串" }
-                ],
-                returns: "布尔值 (True=有效, False=无效)",
-                category: "编解码"
-            },
-            { name: "parts", desc: "分割字符串为生成器", params: [{ name: "string", type: "str", desc: "源字符串" }, { name: "delimiter", type: "str(可选)", desc: "分隔符(默认逗号)" }], returns: "生成器(Generator)", category: "数组/字符串" },
-            { name: "beair", desc: "去除字符串首尾空白", params: [{ name: "str", type: "string", desc: "原始字符串" }], returns: "修剪后的字符串", category: "数组/字符串" },
-            { name: "strcase", desc: "转换大小写", params: [{ name: "str", type: "string" }, { name: "mode", type: "int(可选)", desc: "1小写/默认大写" }], returns: "转换后字符串", category: "数组/字符串" },
-            { name: "strrep", desc: "替换子串", params: [{ name: "source", type: "str" }, { name: "old", type: "str" }, { name: "new", type: "str" }], returns: "新字符串", category: "数组/字符串" },
-            { name: "fopen", desc: "打开文件获得句柄", params: [{ name: "path", type: "str", desc: "文件路径" }, { name: "mode", type: "str", desc: "打开模式('r' - 只读; 'w' - 只写（覆盖）; 'a' - 追加写入; 'r+' - 读写 ; 'w+' - 读写（覆盖）; 'a+' - 读写（追加）" }, { name: "encoding", type: "str(可选)", desc: "默认utf-8" }], returns: "文件句柄对象", category: "文件系统" },
-            { name: "fread", desc: "读取文件全部内容", params: [{ name: "file_handle", type: "资源", desc: "fopen返回的句柄" }], returns: "文件内容(字符串)", category: "文件系统" },
-            { name: "fclose", desc: "关闭文件句柄", params: [{ name: "file_handle", type: "资源", desc: "文件句柄" }], returns: "True", category: "文件系统" },
-            { name: "fwrite", desc: "写入内容到文件", params: [{ name: "file_handle", type: "资源", desc: "文件句柄" }, { name: "content", type: "str", desc: "要写入的字符" }], returns: "True", category: "文件系统" },
-            { name: "unlink", desc: "删除磁盘文件", params: [{ name: "file_path", type: "str", desc: "文件完整路径" }], returns: "True / False", category: "文件系统" },
-            { name: "fnew", desc: "创建新文件(空文件)", params: [{ name: "file_path", type: "str", desc: "新文件路径" }], returns: "True(创建成功)", category: "文件系统" },
-            { name: "fsize", desc: "获取文件大小(支持单位转换)", params: [{ name: "path", type: "str", desc: "文件路径" }, { name: "unit_flag", type: "bool(可选)", desc: "是否转换可读单位" }], returns: "字节数/可读大小", category: "文件系统" },
-            // 数学 & 随机
-            { name: "sqrt", desc: "计算N次方根", params: [{ name: "number", type: "数值", desc: "底数" }, { name: "root_degree", type: "整数", desc: "方根次数" }], returns: "计算结果(浮点)", category: "数学运算" },
-            { name: "pow", desc: "幂运算", params: [{ name: "base", type: "整数" }, { name: "exponent", type: "整数" }], returns: "幂结果", category: "数学运算" },
-            { name: "max", desc: "取最大值(多个数值或列表)", params: [{ name: "*args", type: "数值/列表", desc: "可变参数或数组" }], returns: "最大值", category: "数学运算" },
-            { name: "min", desc: "取最小值", params: [{ name: "*args", type: "数值/列表", desc: "多个数值或列表" }], returns: "最小值", category: "数学运算" },
-            { name: "sum", desc: "求和", params: [{ name: "values", type: "数值列表/多个参数", desc: "待求和序列" }], returns: "总和", category: "数学运算" },
-            { name: "round", desc: "四舍五入保留小数位", params: [{ name: "number", type: "数值" }, { name: "ndigits", type: "整数" }], returns: "舍入后数值", category: "数学运算" },
-            { name: "rand", desc: "生成随机数(范围/类型)", params: [{ name: "start", type: "整数(可选)", desc: "下限" }, { name: "end", type: "整数(可选)", desc: "上限" }, { name: "type_flag", type: "可选", desc: "类型控制" }], returns: "随机整数/浮点", category: "数学运算" },
-            // 时间/系统
-            { name: "tnow", desc: "获取当前日期时间", params: [], returns: "YYYY-MM-DD HH:MM:SS", category: "系统工具" },
-            { name: "tstamp", desc: "毫秒级时间戳", params: [], returns: "整数时间戳(ms)", category: "系统工具" },
-            { name: "sleep", desc: "程序休眠指定毫秒", params: [{ name: "milliseconds", type: "整数", desc: "休眠时长(ms)" }], returns: "True", category: "系统工具" },
-            { name: "prog_end", desc: "终止当前程序执行", params: [], returns: "无返回(程序退出)", category: "系统工具" },
-            { name: "cmd_exec", desc: "执行系统命令", params: [{ name: "command", type: "字符串", desc: "要执行的命令" }], returns: "subprocess.Popen对象", category: "系统工具" },
-            { name: "getpath", desc: "获取路径", params: [{ name: "flag", type: "整数", desc: "1=当前工作目录，其他=脚本目录" }], returns: "路径字符串", category: "系统工具" },
-            // 字典操作
-            { name: "dict_get", desc: "获取字典键值", params: [{ name: "dict", type: "字典对象" }, { name: "key", type: "键" }], returns: "值 / None", category: "字典操作" },
-            { name: "dict_set", desc: "设置字典键值对", params: [{ name: "dict", type: "字典" }, { name: "key", type: "键" }, { name: "value", type: "值" }], returns: "True", category: "字典操作" },
-            { name: "dict_keys", desc: "获取字典所有键列表", params: [{ name: "dict", type: "字典" }], returns: "键列表", category: "字典操作" },
-            // 网络/HTTP
-            { name: "http_send", desc: "发送HTTP请求", params: [{ name: "URL", type: "str" }, { name: "params", type: "可选" }, { name: "method", type: "可选(GET/POST)" }, { name: "timeout", type: "可选" }], returns: "(状态码, 响应头, 内容)", category: "网络通信" },
-            // GUI 窗口组件
-            { name: "window_new", desc: "创建新窗口对象", params: [], returns: "窗口对象", category: "GUI 窗口" },
-            { name: "window_title", desc: "设置窗口标题", params: [{ name: "window", type: "窗口对象" }, { name: "title", type: "字符串" }], returns: "无", category: "GUI 窗口" },
-            { name: "window_size", desc: "设定窗口尺寸", params: [{ name: "window", type: "窗口对象" }, { name: "size", type: "如\"800x600\"" }], returns: "无", category: "GUI 窗口" },
-            { name: "window_loop", desc: "启动窗口主循环", params: [{ name: "window", type: "窗口对象" }], returns: "无", category: "GUI 窗口" },
-            { name: "window_button", desc: "创建按钮控件", params: [{ name: "parent, text, bg, fg, font", type: "可选参数" }], returns: "按钮对象", category: "GUI 控件" },
-            { name: "window_label", desc: "创建标签组件", params: [{ name: "parent", type: "窗口对象" }, { name: "text", type: "字符串" }, { name: "bg", type: "字符串(可选)" }, { name: "fg", type: "字符串(可选)" }, { name: "font", type: "字符串(可选)" }], returns: "标签对象", category: "GUI 控件" },
-            { name: "window_entry", desc: "创建输入框组件", params: [{ name: "parent", type: "窗口对象" }, { name: "textvariable", type: "变量" }, { name: "bg", type: "字符串(可选)" }, { name: "fg", type: "字符串(可选)" }, { name: "font", type: "字符串(可选)" }], returns: "输入框对象", category: "GUI 控件" },
-            { name: "window_place", desc: "放置组件", params: [{ name: "component", type: "组件对象" }, { name: "x", type: "整数" }, { name: "y", type: "整数" }, { name: "width", type: "整数" }, { name: "height", type: "整数" }], returns: "无", category: "GUI 布局" },
-            { name: "window_bind", desc: "绑定事件", params: [{ name: "component", type: "组件对象" }, { name: "event_id", type: "整数/字符串" }, { name: "callback", type: "函数" }], returns: "无", category: "GUI 事件" },
-            { name: "window_bind_get", desc: "获取事件信息", params: [{ name: "event_id", type: "整数/字符串(可选)", desc: "无则列出所有事件" }], returns: "事件描述", category: "GUI 事件" },
-            { name: "entry_get", desc: "获取输入框内容", params: [{ name: "entry_object", type: "输入框对象" }], returns: "输入框内容字符串", category: "GUI 控件" },
-            { name: "window_msg_info", desc: "显示信息对话框", params: [{ name: "title", type: "字符串" }, { name: "content", type: "字符串" }], returns: "无", category: "GUI 窗口" },
-            { name: "window_config", desc: "配置组件属性", params: [{ name: "component", type: "组件对象" }, { name: "properties", type: "字典" }, { name: "allowed_list", type: "列表(可选)" }], returns: "True", category: "GUI 控件" },
-            { name: "window_visible", desc: "设置组件可见性", params: [{ name: "component", type: "组件对象" }, { name: "state", type: "整数", desc: "0隐藏，1显示，2销毁" }], returns: "无", category: "GUI 控件" },
-            // Web本地服务器
-            { name: "webloc_init", desc: "初始化本地Web服务器", params: [], returns: "PHPLocalServer对象", category: "Web服务" },
-            { name: "webloc_sbp", desc: "设置服务器根目录", params: [{ name: "server", type: "服务器对象" }, { name: "directory", type: "字符串" }], returns: "无", category: "Web服务" },
-            { name: "webloc_run", desc: "启动服务器", params: [{ name: "server", type: "服务器对象" }], returns: "无", category: "Web服务" },
-            // 编解码
-            { name: "utf8_enc", desc: "UTF-8编码", params: [{ name: "string", type: "字符串", desc: "待编码字符串" }], returns: "编码后的字节序列", category: "编解码" },
-            { name: "utf8_dec", desc: "UTF-8解码", params: [{ name: "bytes", type: "字节序列", desc: "待解码字节" }], returns: "解码后的字符串", category: "编解码" },
-            {
-                name: "ScLoad", desc: "从文件路径读取并加载 shellcode 到内存，返回实例对象", params: [
-                    { name: "shellcode_path", type: "字符串", desc: "shellcode 文件的路径" }
-                ], returns: "ShellcodeInstance 对象（包含地址、大小等信息）", category: "安全/执行"
-            },
-
-            {
-                name: "ScExec", desc: "执行已加载的 shellcode 实例，支持超时控制（第二个参数可选）", params: [
-                    { name: "shellcode_inst", type: "对象", desc: "ScLoad 返回的 ShellcodeInstance 实例" },
-                    { name: "timeout_ms", type: "整数(可选)", desc: "超时时间(毫秒)，默认 5000，可不传" },
-                    { name: "fserun", type: "布尔值(可选)", desc: "是否强制执行未签名.bin(选填)" },
-                    { name: "waitproself", type: "布尔值(可选)", desc: "等待线程自结束(false)" }
-                ], returns: "布尔值 (True 成功执行完成, False 超时)", category: "安全/执行"
-            },
-
-            {
-                name: "ScSweep", desc: "释放 shellcode 实例占用的内存资源", params: [
-                    { name: "shellcode_inst", type: "对象", desc: "需要清理的 ShellcodeInstance 实例" }
-                ], returns: "布尔值 (True 释放成功)", category: "安全/执行"
-            },
-            {
-                name: "set_env",
-                desc: "设置环境变量（影响当前进程及后续子进程）",
-                params: [
-                    { name: "key", type: "字符串", desc: "环境变量名" },
-                    { name: "value", type: "字符串/任意类型", desc: "环境变量值（会自动转为字符串）" }
-                ],
-                returns: "True (布尔值，设置成功)",
-                category: "系统工具"
-            },
-
-            {
-                name: "get_env",
-                desc: "获取环境变量的值",
-                params: [
-                    { name: "key", type: "字符串", desc: "环境变量名" },
-                    { name: "default", type: "任意类型(可选)", desc: "变量不存在时返回的默认值，默认为 None" }
-                ],
-                returns: "环境变量的值（字符串）或默认值",
-                category: "系统工具"
-            },
-
-            {
-                name: "unset_env",
-                desc: "删除指定的环境变量",
-                params: [
-                    { name: "key", type: "字符串", desc: "要删除的环境变量名" }
-                ],
-                returns: "True (布尔值，删除成功)",
-                category: "系统工具"
-            },
-        ];
         const categoriesSet = new Set();
         FUNCTIONS_DATA.forEach(fn => { if (fn.category) categoriesSet.add(fn.category); });
         const ALL_CATEGORIES = ["全部", ...Array.from(categoriesSet).sort()];
@@ -680,7 +516,7 @@
             const tbody = document.getElementById("tableBody");
             const filtered = getFilteredFunctions();
             if (filtered.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" class="no-result">没有找到匹配的函数，试试其他分类或关键词</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" class="no-result">没有找到匹配的函数，试试其他分类或关键词</td></tr>';
                 return;
             }
             let rows = '';
@@ -689,15 +525,20 @@
                 const descHtml = `<span class="func-desc">${escapeHtml(fn.desc)}</span>`;
                 const paramsHtml = renderParams(fn.params);
                 const returnsHtml = `<span class="return-badge">${escapeHtml(fn.returns)}</span>`;
-                const vmHtml = INTERP_ONLY.has(fn.name)
-                    ? '<span class="vm-no">✗ 仅解释器</span>'
-                    : '<span class="vm-yes">✓ 通用</span>';
+                const interpHtml = fn.interp
+                    ? '<span class="vm-yes">✓ 可用</span>'
+                    : (fn.vm ? '<span class="vm-no">✗ 仅旧 VM</span>'
+                             : '<span class="vm-no">✗ 缺席</span>');
+                const nativeHtml = fn.native
+                    ? '<span class="vm-yes">✓ 可用</span>'
+                    : '<span class="vm-no">✗ 仅解释器</span>';
                 rows += `<tr>
                         <td data-label="函数名">${nameHtml}</td>
                         <td data-label="描述">${descHtml}</td>
                         <td data-label="参数">${paramsHtml}</td>
                         <td data-label="返回值">${returnsHtml}</td>
-                        <td data-label="字节码 VM">${vmHtml}</td>
+                        <td data-label="解释器">${interpHtml}</td>
+                        <td data-label="原生 (AOT)">${nativeHtml}</td>
                      </tr>`;
             }
             tbody.innerHTML = rows;
@@ -705,6 +546,10 @@
         function init() {
             renderCategoryNav();
             renderTable();
+            const el = document.getElementById('statTotal');
+            if (el && typeof BUILTIN_STATS !== 'undefined') {
+                el.textContent = String(BUILTIN_STATS.total);
+            }
         }
 
         init();

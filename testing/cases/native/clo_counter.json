@@ -1,0 +1,1 @@
+{"name": "clo_counter", "runs_on": "native", "compile": {"args": [], "expect_ok": true}, "expect": {"exit": 0, "stderr_empty": true}, "tags": ["closure", "f1"], "note": "闭包独立实例：两次 make_counter 的 n 互不影响（按引用捕获，F1 交付钉）"}

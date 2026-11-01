@@ -1,0 +1,8 @@
+{
+ "name": "std_data",
+ "runs_on": "native",
+ "compile": { "args": [], "expect_ok": true },
+ "expect": { "exit": 0, "stderr_empty": true },
+ "tags": ["stdlib", "m5"],
+ "note": "M5：std.data（mean/median/stddev/group_count/group_sum）差分。黄金值 stddev([2,4,4,4,5,5,7,9])=2（总体口径）；median 副本排序不改输入；group_sum 以 num_is_valid 预判跳过非数值行（str_to_num 失败哨兵 -1 与合法值同形，不能当失败判据）。prompt 类 R7 禁令不涉及。"
+}

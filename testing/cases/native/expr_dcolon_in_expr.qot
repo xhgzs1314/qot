@@ -1,0 +1,14 @@
+// 表达式 · ## 静态调用进表达式钉（G-11）：旧语法只允许 mod##fn() 作为
+// 独立语句，`x == mod##fn()` / `1 + mod##fn()` 直接语法错误。
+require "../../modules/dcolon_expr_lib.qot";
+
+var v = dcolon_expr_lib##val();
+if (v == dcolon_expr_lib##val()) { output("eq ok"); }
+if (dcolon_expr_lib##val() == 7) { output("rev ok"); }
+if (dcolon_expr_lib##twice(2) + 1 == 5) { output("arith ok"); }
+// 【缺口旁证】没有一元逻辑非 `!`（token 层就未定义）—— 只能用 if/else 形态
+if (dcolon_expr_lib##val() != 7) { output("unexpected"); }
+else { output("not-ne ok"); }
+var s = "" + int_to_str(dcolon_expr_lib##twice(dcolon_expr_lib##val()));
+output("nested: " + s);
+output("pin-end");

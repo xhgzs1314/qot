@@ -1,0 +1,3 @@
+var s = "hello";
+s[1] = "x";
+output(s);

@@ -1,0 +1,10 @@
+before
+in-try
+caught
+boom
+after
+inner-caught
+outer-caught
+inner
+7.000000
+43.000000

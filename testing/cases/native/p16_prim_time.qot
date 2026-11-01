@@ -1,0 +1,36 @@
+// P16 · P0-G 时间原语差分（P0.2）。
+// 纪律：两侧引擎读取墙钟的时刻不同 → 绝对值一律不打印；只打印
+// 「关系判定 / 由 time_make 造出的确定性时间戳的分量往返」。
+output(time_now() > 1600000000);
+output(time_now_ms() > 1600000000000);
+output(time_monotonic() >= 0);
+output(time_monotonic_ms() >= 0);
+var t1 = time_monotonic();
+time_sleep_ms(15);
+var t2 = time_monotonic();
+output((t2 - t1) * 1000 >= 10);
+output(time_sleep_ms(0));
+output(time_sleep_ms(-1));
+var ts = time_make(2020, 1, 2, 3, 4, 5);
+var p = time_date_parts(ts);
+output(p["year"]);
+output(p["month"]);
+output(p["day"]);
+output(p["hour"]);
+output(p["minute"]);
+output(p["second"]);
+output(p["weekday"]);
+output(p["yday"]);
+var up = time_utc_parts(ts);
+output(up["year"] > 1900);
+output(time_parse(" 03:04:05", "%Y-%m-%d %H:%M:%S") == ts);
+output(time_parse("2020/01/02", "%Y/%m/%d") == time_make(2020, 1, 2, 0, 0, 0));
+output(time_parse("nope", "%Y"));
+output(time_parse("2020", "%Y-%m"));
+output(time_strftime(ts, "%Y-%m-%d"));
+output(time_strftime(ts, "%H:%M:%S"));
+output(str_len(time_strftime(ts, "%Y")));
+output(time_zone_offset(ts) == time_zone_offset(ts));
+var big = time_make(2030, 12, 31, 23, 59, 59);
+output(big > ts);
+output(time_make(2020, 2, 30, 0, 0, 0) > ts);

@@ -1,0 +1,22 @@
+{
+ "name": "expr_dcolon_in_expr",
+ "runs_on": "native",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stderr_empty": true,
+  "stdout": [
+   "eq ok",
+   "rev ok",
+   "arith ok",
+   "not-ne ok",
+   "nested: 14",
+   "pin-end"
+  ]
+ },
+ "tags": ["expression", "module", "dcolon", "G-11", "grammar"],
+ "note": "G-11 `##` 静态调用进表达式钉（）。旧语法把 static_method_call 挂在 expression 顶层（不能接后续运算符），`mod##f() == 7` 是语法错误；改为只挂 primary 层级（顶层那条必须摘掉，否则归约冲突被先声明者抢走）。附带实证：没有一元逻辑非 `!`（token 层未定义），见 。"
+}

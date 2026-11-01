@@ -1,0 +1,4 @@
+// CP-3 端到端验收钉：require examples/csv_report.qot（CSV → 统计 → 报表）。
+// 模块体在 require 期执行（解释器与 native 内联同语义）；报表内容确定性，
+// golden 按 native 口径。oracle 裁判对同一用例零分歧对账。
+require "../../../examples/csv_report.qot";

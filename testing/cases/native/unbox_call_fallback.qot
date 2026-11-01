@@ -1,0 +1,32 @@
+number_t func mix(x) {
+    if (x > 100) { return 0 - 1; }
+    return x * 3;
+}
+
+number_t func noisy(x) {
+    output(x);
+    return x + 1;
+}
+
+number_t func container_sum(x) {
+    var a = [x, x + 1, x + 2];
+    return a[0] + a[1] + a[2];
+}
+
+output(mix(5));
+output(mix(0 - 5));
+output(mix(500));
+var acc = 0.0;
+for (i in 20) {
+    acc = acc + mix(i - 40);
+}
+output(acc);
+
+output(noisy(41));
+output(container_sum(10));
+output(container_sum(0 - 1));
+var s = 0.0;
+for (i in 30) {
+    s = s + container_sum(i);
+}
+output(s);

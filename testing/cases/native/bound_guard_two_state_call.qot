@@ -1,0 +1,12 @@
+any_t func g(x) {
+    return x;
+}
+output(g(1) == 1);
+output(__is_number(g(2)));
+output(g("s") == "s");
+output(__is_number(g(2.5)));
+number_t func f(a, b) {
+    return a * 2 + b;
+}
+output(f(1, 2) == 4);
+output(f(1.5, 2.5) == 5.5);

@@ -1,0 +1,20 @@
+{
+ "name": "expr_compound_family",
+ "runs_on": "native",
+ "compile": { "args": [], "expect_ok": true },
+ "expect": {
+  "exit": 0,
+  "stderr_empty": true,
+  "stdout": [
+   "30.000000",
+   "7.500000",
+   "1.500000",
+   "0.500000",
+   "99.500000",
+   "pos",
+   "1024.000000"
+  ]
+ },
+ "tags": ["expression", "compound-assign", "G-03", "grammar"],
+ "note": "G-03 复合赋值族钉（）。*= /= %= 的语法层（token/产生式/脱糖）早已就位但无钉——本钉补上；含函数内局部槽路径与三元组合。语义定价：脱糖即 x = x op e，两侧同律。"
+}

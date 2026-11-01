@@ -1,0 +1,1 @@
+{"name": "f0_require", "runs_on": "native", "compile": {"args": [], "expect_ok": true}, "expect": {"exit": 0, "stderr_empty": true}, "tags": ["module", "f0", "require"], "note": "F0 验收钉：require .qot 模块在 native 编译期内联（S-15 根治）。模块夹具在 lib/ 子目录（发现器只扫顶层的 .qot+json 对）。解释器同语义（.qot 模块全量导出）由 --suite module 的 interp 路径对账"}

@@ -1,0 +1,18 @@
+{
+ "name": "p14_prim_file",
+ "runs_on": "native",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stderr_empty": true
+ },
+ "tags": [
+  "primitive",
+  "file",
+  "path"
+ ],
+ "note": "P0.1 CP-2：文件/路径原语差分（P0-A）。用例自建自清 p14tmp；mtime 只打印 >0 判定（绝对值机器相关，不入 golden）。"
+}

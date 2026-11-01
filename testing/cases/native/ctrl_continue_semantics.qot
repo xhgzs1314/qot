@@ -1,0 +1,43 @@
+// 控制流 · continue 语义钉（G-01）：for 步进照常 / while / 嵌套只作用于最内层
+// / 与 stop 混用。interp 与 native 必须逐行同果（步进若被跳过 = 死循环，
+// 该钉同时是"不死循环"的守卫 —— 用例自带超时）。
+var odds = arr_new();
+var i = 0;
+for (i in 10) {
+    if (i % 2 == 0) { continue; }
+    arr_push(odds, i);
+}
+output("for-odd: " + arr_join(odds, ","));
+
+var j = 0;
+var acc = 0;
+loop (j < 6) {
+    j += 1;
+    if (j == 3) { continue; }
+    acc += j;
+}
+output("while-skip3: " + int_to_str(acc));
+
+var nested = arr_new();
+var a = 0;
+loop (a < 3) {
+    a += 1;
+    var b = 0;
+    loop (b < 3) {
+        b += 1;
+        if (b == 2) { continue; }
+        arr_push(nested, "" + int_to_str(a) + int_to_str(b));
+    }
+}
+output("nested: " + arr_join(nested, " "));
+
+var mix = arr_new();
+var k = 0;
+loop (k < 10) {
+    k += 1;
+    if (k == 2) { continue; }
+    if (k == 5) { stop; }
+    arr_push(mix, k);
+}
+output("mix: " + arr_join(mix, ","));
+output("pin-end");

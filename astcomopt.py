@@ -14,6 +14,7 @@ NODE_TYPES = {
     'func_declaration': 'func_declaration',
     'return_statement': 'return_statement',
     'stop_statement': 'stop_statement',
+    'continue_statement': 'continue_statement',   # G-01
     'require_statement': 'require_statement',
     'binary_op': 'binary_op',
     'unary_op': 'unary_op',
@@ -37,6 +38,26 @@ NODE_TYPES = {
     'function_ref': 'function_ref',
     'parenthesized': 'parenthesized',
     'annotation': 'annotation',
+    # F2/F1（0）：try/catch/throw 与 lambda。这三个节点有【位置敏感】
+    # 的字段（裸 catch 的 None、lambda 的参数表），不能走通用重建路径
+    # （通用路径会丢弃 None 子节点 → 结构变形），必须用专用 _opt_* 保形。
+    'try_statement': 'try_statement',
+    'throw_statement': 'throw_statement',
+    'lambda_expr': 'lambda_expr',
+    # G-03（0）：三元。三个子节点都是非 None 表达式 → 通用重建
+    # 路径安全（None 子节点丢弃问题不触及）。
+    'ternary_expr': 'ternary_expr',
+    # G-04/M3（0）：for-in 的区间/步长节点。range_expr 的 step
+    # 字段可空（None）→ 必须走专用保形（通用重建会丢 None 子节点 → 结构
+    # 变形，与 try/catch 同一坑）；stepped_expr 三字段皆非 None 但一并
+    # 登记 + 保形，避免 range/step 的表达式位置被通用重建打乱。
+    'range_expr': 'range_expr',
+    'stepped_expr': 'stepped_expr',
+    # M4（0）：对象模型节点。field 的 init 可空 → 保形必需；
+    # class 的 members 是双类型列表 → 保形遍历。
+    'class_declaration': 'class_declaration',
+    'field_access': 'field_access',
+    'field_assignment': 'field_assignment',
 }
 
 
@@ -140,6 +161,14 @@ class DeadCodeOptimizer:
                 name = node[1]
                 self.modified_vars.add(name)
                 self._collect_usage(node[2])
+            elif typ in ('function_call', 'function_ref'):
+                # 【0 修复】调用名必须记为使用：`var f = ...; f()`
+                # 里 f 只以调用名出现（不是 identifier 节点），旧实现不记 →
+                # 声明被判死变量删除（闭包用法引爆的既有潜伏 bug）。
+                if len(node) > 1 and isinstance(node[1], str):
+                    self.used_vars.add(node[1])
+                for child in node[1:]:
+                    self._collect_usage(child)
             else:
                 for child in node[1:]:
                     self._collect_usage(child)
@@ -188,9 +217,88 @@ class DeadCodeOptimizer:
     def _is_terminator(self, node: Any) -> bool:
         if isinstance(node, tuple):
             typ = node[0]
-            if typ in ('return_statement', 'stop_statement'):
+            if typ in ('return_statement', 'stop_statement',
+                       'continue_statement', 'throw_statement'):
                 return True
         return False
+
+    # ---- F2/F1 专用保形优化器（禁止走通用重建：None 字段会被丢弃） ----
+    # 兼容带行号 / strip_line_numbers 后的两种形态（AOT 管线先 strip）。
+    def _opt_try_statement(self, node: Tuple) -> Tuple:
+        # ('try_statement', body, catch_var|None, catch_body[, line])
+        typ, body, catch_var, catch_body = node[:4]
+        opt_body = self._optimize_node(body) or []
+        opt_catch = self._optimize_node(catch_body) if catch_body else None
+        out = (typ, opt_body, catch_var, opt_catch)
+        return out + (node[4],) if len(node) > 4 else out
+
+    # ---- G-04 保形（0）：for-in 区间/步长节点 ----
+    def _opt_range_expr(self, node: Tuple) -> Tuple:
+        # ('range_expr', start, end, step|None [, line])
+        typ, start, end, step = node[:4]
+        out = (typ, self._optimize_node(start), self._optimize_node(end),
+               self._optimize_node(step) if step is not None else None)
+        return out + (node[4],) if len(node) > 4 else out
+
+    def _opt_stepped_expr(self, node: Tuple) -> Tuple:
+        # ('stepped_expr', base, step [, line])
+        typ, base, step = node[:3]
+        out = (typ, self._optimize_node(base), self._optimize_node(step))
+        return out + (node[3],) if len(node) > 3 else out
+
+    # ---- M4 保形（0）：对象模型节点 ----
+    def _opt_field_access(self, node: Tuple) -> Tuple:
+        # ('field_access', obj, name [, line]) —— name 是字符串（非子节点）
+        typ, obj = node[0], self._optimize_node(node[1])
+        out = (typ, obj, node[2])
+        return out + (node[3],) if len(node) > 3 else out
+
+    def _opt_field_assignment(self, node: Tuple) -> Tuple:
+        # ('field_assignment', obj, name, value [, line])
+        typ, obj, name, value = node[:4]
+        out = (typ, self._optimize_node(obj), name, self._optimize_node(value))
+        return out + (node[4],) if len(node) > 4 else out
+
+    def _opt_class_declaration(self, node: Tuple) -> Tuple:
+        # ('class_declaration', name, members [, line])
+        # members = [('field', name, init|None [, line]) |
+        #            ('method', rt, name, params, body [, line])]
+        # strip 后 method 是 5 元组（无行号）—— 位置恒定，两种形态都收
+        typ, cname = node[0], node[1]
+        members = []
+        for m in (node[2] or []):
+            if not isinstance(m, tuple) or not m:
+                members.append(m)
+                continue
+            if m[0] == 'field':
+                init = m[2] if len(m) > 2 else None
+                out_m = ('field', m[1],
+                         self._optimize_node(init) if init is not None else None)
+                if len(m) > 3:
+                    out_m = out_m + (m[3],)
+                members.append(out_m)
+            elif m[0] == 'method' and len(m) >= 5:
+                out_m = (m[0], m[1], m[2], m[3],
+                         self._optimize_node(m[4]) or [])
+                if len(m) > 5:
+                    out_m = out_m + (m[5],)
+                members.append(out_m)
+            else:
+                members.append(m)
+        out = (typ, cname, members)
+        return out + (node[3],) if len(node) > 3 else out
+
+    def _opt_throw_statement(self, node: Tuple) -> Tuple:
+        # throw 是不可达边界（_is_terminator 已识别），表达式保形优化
+        typ, expr = node[0], node[1]
+        out = (typ, self._optimize_node(expr))
+        return out + (node[2],) if len(node) > 2 else out
+
+    def _opt_lambda_expr(self, node: Tuple) -> Tuple:
+        # params 原样保留（空表不能被吃掉）；expr 保形优化
+        typ, params, expr = node[0], node[1], node[2]
+        out = (typ, params, self._optimize_node(expr))
+        return out + (node[3],) if len(node) > 3 else out
 
 
     def _const_expr(self, expr: Any) -> Any:

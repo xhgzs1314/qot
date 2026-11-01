@@ -1,0 +1,56 @@
+// ============================================================================
+// P0-L FFI 差分（CP-4 · ；【M7 v2 修订 · 】混族分派器）：
+// 加载真实 C 库调函数（§8.9 大点 B 的 B3 验收 = FFI 调通成熟库拿正确结果；
+// libm 类走 msvcrt）。
+// 纪律：
+//   * 句柄值两侧各自计数 —— 用例【不打印裸句柄】，只打印派生结果（零分歧面）；
+//   * ffi_last_error 文本两侧各自持有 —— 只断言非空（str_len > 0）；
+//   * 浮点结果两侧调的是同一个 msvcrt 导出 → 位级一致，%.6f 下无噪声。
+//   * v2：ffi_call_v 实参逐码定类（f64→XMM，i32/i64/str/ptr→GP），混族解除；
+//     多余实参按被调 ABI 忽略；未知类型码仍拒（bad types array）。
+// ============================================================================
+
+var h = ffi_load("msvcrt.dll");
+output(is_null(h));                        // false：加载成功
+var sq = ffi_sym(h, "sqrt");
+output(is_null(sq));                       // false
+var st = ffi_sym(h, "strlen");
+output(is_null(st));                       // false
+var at = ffi_sym(h, "atoi");
+output(is_null(at));                       // false
+
+// ---- 推断调用（全 f64 实参 + f64 返回）----
+var r1 = ffi_call(sq, [2.0]);
+output(r1 * r1);                           // 2.000000
+output(ffi_call(sq, [16.0]));              // 4.000000
+
+// ---- 显式类型调用（v2 混族：实参逐码定类）----
+// S-14 终审（）后字符串字面量恒为字符串 —— str 码收任何字符串实参
+// 都安全（旧时代的"数字样字面量会静默变数字、str 码按指针解析"陷阱已废除）。
+output(ffi_call_v(at, ["i32", "str"], ["42abc"]));   // 42.000000
+output(ffi_call_v(st, ["i64", "str"], ["hello"]));   // 5.000000
+// v2 混族（M7）：ldexp(double, int) = f64 + i32 跨族混调（v0 同族限制下
+// 这是被拒的调用）；被调方只读自己声明的个数，多余实参忽略。
+var ld = ffi_sym(h, "ldexp");
+output(is_null(ld));                                 // false
+// types = [返回码, 实参码...]：ldexp(double, int) → ["f64","f64","i32"]
+output(ffi_call_v(ld, ["f64", "f64", "i32"], [1.5, 3]));   // 12.000000（混族 f64+i32）
+output(ffi_call_v(sq, ["f64", "f64", "str"], [1.0, "x"])); // 1.000000（多余实参被忽略）
+output(is_null(ffi_call_v(sq, ["f64", "u64"], [1.0])));    // true：未知类型码仍拒
+
+// ---- ffi_ptr / ffi_str 往返（进程生命周期副本 → 读回）----
+var p = ffi_ptr("ffi-v0");
+output(ffi_str(p));                        // ffi-v0
+output(str_empty(ffi_str(0)));             // true：null 指针哨兵得 ""
+
+// ---- 失败面（错误文本只断非空）----
+var bad = ffi_sym(h, "no_such_symbol_qot_ffi");
+output(is_null(bad));                      // true
+output(str_len(ffi_last_error()) > 0);     // true
+output(is_null(ffi_sym(999999, "sqrt")));  // true：坏库句柄
+output(is_null(ffi_call(999999, [1.0])));  // true：坏符号句柄
+
+// ---- ABI 版本与卸载语义 ----
+output(ffi_abi_version());                 // 2.000000（M7 冻结 v2）
+output(ffi_free(h));                       // true
+output(is_null(ffi_sym(h, "sqrt")));       // true：句柄已失效（世代断复用）

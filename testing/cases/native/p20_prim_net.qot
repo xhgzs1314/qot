@@ -1,0 +1,80 @@
+// ============================================================================
+// P0.3 网络差分（ · docs/ §4.9）：TCP 自环 + UDP 自环
+// + DNS + 失败面，全 hermetic（127.0.0.1 固定端口 47210/47211，不碰外网）。
+// 纪律：
+//   * 自环模式 = bind+listen 后同进程 connect —— 内核 backlog 完成握手，
+//     accept 只出队，单线程即可跑通全程（两侧引擎同构）；
+//   * 固定端口 + bind 恒设 SO_REUSEADDR → 顺序复跑可重绑（TIME_WAIT 友好）；
+//     oracle 差分 = 顺序执行（native 先、interp 后），套接字随进程退出关闭；
+//   * 所有会阻塞的 socket 先 set_timeout(2000) —— 最坏失败而不挂起套件；
+//   * 句柄 = 各自进程计数 → 不打印裸句柄，只打印派生结果（零分歧面）；
+//   * 字符串 = 字节序列（D-12）："ping-你好" = 11 字节。
+// ============================================================================
+
+// ---- TCP：服务端三件套 + 客户端连接 ----
+var srv = socket_new();
+output(is_null(srv));                                   // false
+output(socket_bind(srv, "127.0.0.1", 47210));           // true
+output(socket_set_timeout(srv, 2000));                  // true
+// S-14 终审（）后字符串字面量恒为字符串 —— "127.0.0.1:47210" 这类
+// 断言串不再有"数字样前缀静默变数字"的陷阱（旧时代的规避说明已过时删除）。
+output(str_contains(socket_local_addr(srv), "127.0.0.1:47210")); // true
+output(socket_listen(srv, 4));                          // true
+
+var cli = socket_new();
+output(is_null(cli));                                   // false
+output(socket_connect(cli, "127.0.0.1", 47210));        // true
+output(socket_set_nodelay(cli, true));                  // true
+
+var conn = socket_accept(srv);                          // 出队内核排队连接
+output(is_null(conn));                                  // false
+output(str_contains(socket_remote_addr(conn), "127.0.0.1")); // true
+
+// ---- 数据面：双向 send/recv + recv_line ----
+output(socket_send_all(cli, "ping-你好"));              // 11.000000（字节语义）
+output(socket_recv(conn, 64));                          // ping-你好
+output(socket_send(conn, "pong"));                      // 4.000000
+output(socket_recv(cli, 64));                           // pong
+output(socket_send(conn, "l1\nl2\n"));                  // 6.000000
+output(socket_recv_line(cli));                          // l1
+output(socket_recv_line(cli));                          // l2
+output(socket_send(conn, "no-eol"));                    // 6.000000
+output(socket_close(conn));                             // true（半关：先发后关）
+output(socket_recv_line(cli));                          // no-eol（EOF 前余量读尽）
+output(socket_recv(cli, 64));                           // ""（EOF/失败同 ""）
+
+// ---- 失败面 ----
+var lone = socket_new();
+output(socket_connect(lone, "127.0.0.1", 1));           // false（回环拒绝端口）
+output(socket_send(lone, "x"));                         // -1.000000（未连接）
+output(socket_recv(lone, 8));                           // ""
+output(socket_close(lone));                             // true
+output(socket_close(lone));                             // false（已关，世代断复用）
+output(socket_close(999999));                           // false（坏句柄）
+output(is_null(socket_accept(srv)));                    // true（超时 2s 后 null）
+
+output(arr_contains(socket_resolve("localhost"), "127.0.0.1")); // true（成员断言，
+                                                // 数组序不打印 —— getaddrinfo 序不定）
+output(is_null(socket_resolve("no.such.host.qot.invalid")));     // true（NXDOMAIN）
+// 空 host 的 resolve 不进差分：getaddrinfo("") 各平台行为不一致
+// （Windows 返回本机 v4 面，部分 POSIX 报错）—— 存疑语义不入合同。
+
+// ---- UDP 自环（47211）----
+var u = socket_udp_new();
+output(is_null(u));                                     // false
+output(socket_bind(u, "127.0.0.1", 47211));             // true
+output(socket_set_timeout(u, 2000));                    // true
+var v = socket_udp_new();
+output(socket_udp_send(v, "127.0.0.1", 47211, "hey"));  // 3.000000
+output(socket_udp_recv(u, 64));                         // hey
+output(str_contains(socket_remote_addr(u), "127.0.0.1")); // true（recvfrom 填充）
+output(socket_udp_recv(u, 64));                         // ""（超时 2s 后）
+output(socket_close(u));                                // true
+output(socket_close(v));                                // true
+
+// ---- 收尾：全部句柄失效（世代断复用）----
+output(socket_close(cli));                              // true
+output(socket_close(srv));                              // true
+output(is_handle(srv));                                 // false
+output(is_handle(cli));                                 // false
+output(socket_send(cli, "x"));                          // -1.000000

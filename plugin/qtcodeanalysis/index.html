@@ -307,17 +307,17 @@
 
         <div id="analysisPanel" style="display: none;">
             <div class="info-bar">
-                <div class="badge" id="fileMetaBadge">📄 未加载</div>
-                <div class="badge" id="statsBadge">⚡ 分析完成</div>
+                <div class="badge" id="fileMetaBadge"> 未加载</div>
+                <div class="badge" id="statsBadge"> 分析完成</div>
 
             </div>
 
             <div class="tabs">
-                <button class="tab-btn active" data-tab="instructions">📟 执行步骤</button>
-                <button class="tab-btn" data-tab="constants">📦 数据区</button>
-                <button class="tab-btn" data-tab="variables">🔤 变量清单</button>
-                <button class="tab-btn" data-tab="functions">⚙️ 函数清单</button>
-                <button class="tab-btn" data-tab="metadata">📋 概览信息</button>
+                <button class="tab-btn active" data-tab="instructions"> 执行步骤</button>
+                <button class="tab-btn" data-tab="constants"> 数据区</button>
+                <button class="tab-btn" data-tab="variables"> 变量清单</button>
+                <button class="tab-btn" data-tab="functions"> 函数清单</button>
+                <button class="tab-btn" data-tab="metadata"> 概览信息</button>
             </div>
 
             <div id="tabInstructions" class="tab-content active">
@@ -348,7 +348,7 @@
                             </tr>
                         </thead>
                         <tbody id="constantsBody"></tbody>
-                        柵
+                        
                 </div>
             </div>
 
@@ -389,500 +389,646 @@
 
     <script>
 
-        const SEMANTIC_OPS = {
-            1: "0xF4A3",
-            2: "0x2E7B",
-            3: "0xC91D",
-            4: "0x6B5F",
-            5: "0xA8C2",
-            10: "0x3F4E",
-            11: "0x7D91",
-            20: "0x1A6C",
-            21: "0xE2B4",
-            22: "0xE2B4",
-            30: "0xC57F",
-            31: "0x8A3E",
-            32: "0x9F4C",
-            40: "0x4B7A",
-            41: "0xD6E3",
-            42: "0x2C9F",
-            43: "0x78B1",
-            50: "0xB3E6",
-            51: "0x5A9C",
-            52: "0xEF2D",
-            60: "0x17C8"
-        };
+      
 
-        const BINOP_HINT = {
-            1: "0xF9B7",
-            2: "0x3C6A",
-            3: "0x8E2F",
-            4: "0x1D4B",
-            5: "0xA6C9",
-            6: "0x7F3E",
-            7: "0xCB5D",
-            8: "0x2A8F",
-            9: "0xE7C4",
-            10: "0x43B2",
-            11: "0x9D6E",
-            12: "0x68F1",
-            13: "0x12A7",
-            14: "0xB4C3"
-        };
 
-        function getSemanticOp(opcode) {
-            return SEMANTIC_OPS[opcode] || "0xE1F2";
+const OPCODES = {
+    0:  { name: "NOP",             desc: "空操作" },
+    1:  { name: "PUSH_CONST",      desc: "压入常量" },
+    2:  { name: "PUSH_VAR",        desc: "读取变量" },
+    3:  { name: "STORE_VAR",       desc: "存入变量" },
+    4:  { name: "STORE_CONST",     desc: "存入常量" },
+    5:  { name: "POP",             desc: "弹出栈顶" },
+    10: { name: "BINARY_OP",       desc: "二元运算" },
+    11: { name: "UNARY_OP",        desc: "一元运算" },
+    20: { name: "JUMP",            desc: "无条件跳转" },
+    21: { name: "JUMP_IF_FALSE",   desc: "条件为假跳转" },
+    22: { name: "JUMP_IF_TRUE",    desc: "条件为真跳转" },
+    30: { name: "CALL",            desc: "调用函数" },
+    31: { name: "CALL_METHOD",     desc: "调用方法" },
+    32: { name: "RETURN",          desc: "返回" },
+    33: { name: "CALL_STATIC",     desc: "静态调用" },
+    40: { name: "MAKE_ARRAY",      desc: "构造数组" },
+    41: { name: "MAKE_DICT",       desc: "构造字典" },
+    42: { name: "INDEX_GET",       desc: "下标读取" },
+    43: { name: "INDEX_SET",       desc: "下标写入" },
+    50: { name: "POP_STMT",        desc: "语句结束弹栈" },
+    51: { name: "STOP",            desc: "停止执行" },
+    52: { name: "BREAK",           desc: "跳出循环" },
+    60: { name: "REQUIRE",         desc: "引入模块" },
+    61: { name: "ENV_NEW",         desc: "分配激活环境" },
+    62: { name: "MAKE_CLOSURE",    desc: "构造闭包" },
+    63: { name: "CALL_VALUE",      desc: "调用闭包值" },
+    64: { name: "TRY_PUSH",        desc: "进入 try 区" },
+    65: { name: "TRY_POP",         desc: "退出 try 区" },
+    66: { name: "CATCH_BIND",      desc: "绑定异常值" },
+    67: { name: "THROW",           desc: "抛出异常" },
+    68: { name: "FIELD_GET",       desc: "读取字段" },
+    69: { name: "FIELD_SET",       desc: "写入字段" },
+    70: { name: "CALL_OMETHOD",    desc: "对象方法分派" }
+};
+
+// 二元运算码 → 运算符
+const BINOPS = {
+    1: "+", 2: "-", 3: "*", 4: "/", 5: "%", 6: "^",
+    7: ">", 8: "<", 9: ">=", 10: "<=", 11: "==", 12: "!=",
+    13: "AND", 14: "OR"
+};
+
+// 一元运算码 → 运算符
+const UNOPS = { 1: "负号(-)", 2: "逻辑非(!)" };
+
+// 全局/上行槽位编码
+const GLOBAL_BIT = 0x40000000;
+const UPVAL_BIT  = 0x20000000;
+
+function slotInfo(slot) {
+    // 返回 { kind: 'global'|'upval'|'local', idx }
+    if (typeof slot !== "number") return null;
+    if (slot & GLOBAL_BIT) return { kind: "global", idx: slot & ~GLOBAL_BIT };
+    if (slot & UPVAL_BIT) {
+        const levels = (slot >> 20) & 0x1FF;
+        const idx = slot & 0xFFFFF;
+        return { kind: "upval", levels, idx };
+    }
+    return { kind: "local", idx: slot };
+}
+
+function describeSlot(slot, varNames, funcNames, constants) {
+    const info = slotInfo(slot);
+    if (!info) return String(slot);
+    if (info.kind === "global") {
+        const name = (varNames && varNames[info.idx] !== undefined)
+            ? varNames[info.idx] : `#${info.idx}`;
+        return `全局 ${name}`;
+    }
+    if (info.kind === "upval") {
+        return `上行 ${info.levels} 层 · 槽 ${info.idx}`;
+    }
+    // local
+    const name = (varNames && varNames[info.idx] !== undefined)
+        ? varNames[info.idx] : `槽 ${info.idx}`;
+    return `局部 ${name}`;
+}
+
+function formatConstant(idx, constants) {
+    if (!constants || constants[idx] === undefined) return `常量 #${idx}`;
+    const v = constants[idx];
+    if (v === null) return `null`;
+    if (typeof v === "string") {
+        const s = v.length > 40 ? v.slice(0, 40) + "…" : v;
+        return `"${s}"`;
+    }
+    return String(v);
+}
+
+function describeArgument(opcode, arg, constants, varNames, funcNames) {
+    if (arg === undefined || arg === null) return "—";
+
+    switch (opcode) {
+        case 1: // PUSH_CONST
+            if (typeof arg === "number") {
+                return `常量 ${arg}: ${formatConstant(arg, constants)}`;
+            }
+            return String(arg);
+
+        case 2: // PUSH_VAR
+        case 3: // STORE_VAR
+        case 4: // STORE_CONST
+            if (typeof arg === "number") {
+                return describeSlot(arg, varNames, funcNames, constants);
+            }
+            return String(arg);
+
+        case 10: // BINARY_OP
+            return BINOPS[arg] ? `运算符 ${BINOPS[arg]} (码 ${arg})` : `运算码 ${arg}`;
+
+        case 11: // UNARY_OP
+            return UNOPS[arg] ? `运算符 ${UNOPS[arg]} (码 ${arg})` : `运算码 ${arg}`;
+
+        case 20:
+        case 21:
+        case 22:
+            return `跳转目标 PC=${arg}`;
+
+        case 30: // CALL
+        case 31: // CALL_METHOD
+        case 33: { // CALL_STATIC
+            if (Array.isArray(arg) && arg.length >= 2) {
+                const [fidx, argc] = arg;
+                const fname = (funcNames && funcNames[fidx] !== undefined)
+                    ? funcNames[fidx] : `#${fidx}`;
+                return `调用 ${fname} · 实参 ${argc} 个`;
+            }
+            return String(arg);
         }
 
-
-        function describeArgument(opcode, arg, constantsList, varNamesList, funcNamesList) {
-            if (arg === undefined || arg === null) return "0xA3B4";
-
-
-            if (opcode === 30 && Array.isArray(arg) && arg.length >= 2) {
-                const funcIdx = arg[0];
-                const argCount = arg[1];
-                const funcName = (funcNamesList && funcNamesList[funcIdx]) ? funcNamesList[funcIdx] : null;
-                if (funcName) {
-                    return "0xC7D8";
-                }
-                return "0xE9F0";
+        case 63: { // CALL_VALUE
+            if (Array.isArray(arg) && arg.length >= 2) {
+                const [slot, argc] = arg;
+                return `调用 ${describeSlot(slot, varNames, funcNames, constants)} · 实参 ${argc} 个`;
             }
+            return String(arg);
+        }
 
-
-            if (opcode === 31) {
-                return "0xA1B2";
+        case 70: { // CALL_OMETHOD
+            if (Array.isArray(arg) && arg.length >= 3) {
+                const [fidx, argc, mid] = arg;
+                const fname = (funcNames && funcNames[fidx] !== undefined)
+                    ? funcNames[fidx] : `#${fidx}`;
+                return `对象方法分派 ${fname} · 实参 ${argc} · 方法ID ${mid}`;
             }
+            return String(arg);
+        }
 
+        case 40: // MAKE_ARRAY
+            return `数组元素 ${arg} 个`;
 
-            if (opcode === 11) {
-                if (arg === 1) return "0xC3D4";
-                if (arg === 2) return "0xE5F6";
-                return "0x1A2B";
-            }
+        case 41: // MAKE_DICT
+            return `字典条目 ${arg} 对`;
 
-
-            if (opcode === 10 && typeof arg === 'number') {
-                return BINOP_HINT[arg] || "0x3C4D";
-            }
-
-
-            if (opcode === 1 && typeof arg === 'number') {
-                if (constantsList && constantsList[arg] !== undefined) {
-                    const val = constantsList[arg];
-                    if (val === null) return "0x5E6F";
-                    if (typeof val === 'string') return "0x7A8B";
-                    if (typeof val === 'number') return "0x9C0D";
-                    if (typeof val === 'boolean') return "0xE1F2";
-                    return "0x3A4B";
-                }
-                return "0x5C6D";
-            }
-
-
-            if ((opcode === 2 || opcode === 3 || opcode === 4) && typeof arg === 'number') {
-                if (varNamesList && varNamesList[arg]) {
-                    return "0x7E8F";
-                }
-                return "0x9A0B";
-            }
-
-
-            if (opcode === 60 && typeof arg === 'string') {
-                return "0xC1D2";
-            }
-
-
-            if (opcode === 20 || opcode === 21 || opcode === 22) {
-                return "0xE3F4";
-            }
-
-
-            if (opcode === 40 && typeof arg === 'number') {
-                return "0x5A6B";
-            }
-            if (opcode === 41 && typeof arg === 'number') {
-                return "0x7C8D";
-            }
-
-
-            if (typeof arg === 'string') return `“${arg.substring(0, 40)}”`;
-            if (typeof arg === 'number') return `${arg}`;
-            if (Array.isArray(arg)) return `[${arg.join(', ')}]`;
+        case 42: // INDEX_GET
+        case 43: // INDEX_SET
             return "—";
+
+        case 50:
+        case 51:
+        case 52:
+        case 32:
+        case 65:
+        case 67:
+            return "—";
+
+        case 60: // REQUIRE
+            return `模块 "${arg}"`;
+
+        case 61: { // ENV_NEW
+            if (Array.isArray(arg) && arg.length >= 2) {
+                return `环境槽 ${arg[0]} · 捕获数 ${arg[1]}`;
+            }
+            return String(arg);
         }
 
-
-        async function analyzeQTCFile(arrayBuffer) {
-            const data = new Uint8Array(arrayBuffer);
-
-
-            if (data.length < 8) {
-                throw new Error("文件格式无法识别，请确认是有效的 QTC 文件");
+        case 62: { // MAKE_CLOSURE
+            if (Array.isArray(arg) && arg.length >= 2) {
+                return `函数常量 ${arg[0]} · 外层环境 ${arg[1] === -1 ? "无" : arg[1]}`;
             }
-
-
-            let offset = 4;
-
-
-            let version = "未知";
-            try {
-                if (offset + 4 <= data.length) {
-                    let v = data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16) | (data[offset + 3] << 24);
-                    version = v.toString();
-                    offset += 4;
-                }
-            } catch (e) { version = "未知"; }
-
-
-            try {
-                if (offset + 4 <= data.length) {
-                    let funcInfoLen = data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16) | (data[offset + 3] << 24);
-                    offset += 4;
-                    if (funcInfoLen > 0 && offset + funcInfoLen <= data.length) {
-                        offset += funcInfoLen;
-                    }
-                }
-            } catch (e) { }
-
-
-            const instructions = [];
-            let instCount = 0;
-            try {
-                if (offset + 4 <= data.length) {
-                    instCount = data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16) | (data[offset + 3] << 24);
-                    offset += 4;
-                }
-            } catch (e) { instCount = 0; }
-
-
-            const maxInst = Math.min(instCount, 5000);
-            for (let i = 0; i < maxInst; i++) {
-                if (offset + 1 > data.length) break;
-                const opcode = data[offset];
-                offset++;
-                if (offset + 4 > data.length) break;
-                let argLen = data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16) | (data[offset + 3] << 24);
-                offset += 4;
-                let argRaw = null;
-                if (argLen > 0 && offset + argLen <= data.length) {
-                    const argBytes = data.slice(offset, offset + argLen);
-                    argRaw = readSimpleArgument(argBytes);
-                    offset += argLen;
-                }
-                instructions.push({ opcode, arg: argRaw });
-            }
-
-
-            let constants = [];
-            try {
-                if (offset + 4 <= data.length) {
-                    let constsLen = data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16) | (data[offset + 3] << 24);
-                    offset += 4;
-                    if (constsLen > 0 && offset + constsLen <= data.length) {
-                        const constBytes = data.slice(offset, offset + constsLen);
-                        constants = extractConstantValues(constBytes);
-                        offset += constsLen;
-                    }
-                }
-            } catch (e) { constants = []; }
-
-
-            let varNames = [];
-            try {
-                if (offset + 4 <= data.length) {
-                    let varsLen = data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16) | (data[offset + 3] << 24);
-                    offset += 4;
-                    if (varsLen > 0 && offset + varsLen <= data.length) {
-                        const varBytes = data.slice(offset, offset + varsLen);
-                        varNames = readStringList(varBytes);
-                        offset += varsLen;
-                    }
-                }
-            } catch (e) { varNames = []; }
-
-
-            let funcNames = [];
-            try {
-                if (offset + 4 <= data.length) {
-                    let funcsLen = data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16) | (data[offset + 3] << 24);
-                    offset += 4;
-                    if (funcsLen > 0 && offset + funcsLen <= data.length) {
-                        const funcBytes = data.slice(offset, offset + funcsLen);
-                        funcNames = readStringList(funcBytes);
-                        offset += funcsLen;
-                    }
-                }
-            } catch (e) { funcNames = []; }
-
-            return {
-                version,
-                instructions,
-                constants,
-                varNames,
-                funcNames,
-                rawSize: arrayBuffer.byteLength
-            };
+            return String(arg);
         }
 
+        case 64: // TRY_PUSH
+            return `捕获着陆点 PC=${arg}`;
 
-        function readSimpleArgument(bytes) {
-            if (bytes.length === 0) return null;
-            if (bytes.length === 4) {
-                const view = new DataView(bytes.buffer, bytes.byteOffset, 4);
-                return view.getInt32(0, true);
-            }
-            if (bytes.length > 4) {
-                const view = new DataView(bytes.buffer, bytes.byteOffset, 4);
-                let len = view.getUint32(0, true);
-                if (len > 0 && len <= bytes.length - 4 && len < 1024) {
-                    try {
-                        const strBytes = bytes.slice(4, 4 + len);
-                        return new TextDecoder("utf-8").decode(strBytes);
-                    } catch (e) { }
-                }
-            }
-            return null;
-        }
+        case 66: // CATCH_BIND
+            return describeSlot(arg, varNames, funcNames, constants);
 
+        case 68: // FIELD_GET
+            return `字段 ID ${arg}`;
 
-        function extractConstantValues(data) {
-            const result = [];
-            let offset = 0;
-            const uint8 = new Uint8Array(data);
-            while (offset < uint8.length && result.length < 500) {
-                if (offset >= uint8.length) break;
-                const tag = uint8[offset];
-                offset++;
+        case 69: // FIELD_SET
+            return `字段 ID ${arg}`;
 
-                if (tag === 1) {
-                    if (offset + 4 <= uint8.length) {
-                        result.push(null);
-                        offset += 4;
-                    } else break;
-                } else if (tag === 2) {
-                    if (offset < uint8.length) {
-                        result.push(uint8[offset] !== 0);
-                        offset += 1;
-                    } else break;
-                } else if (tag === 3) {
-                    if (offset + 8 <= uint8.length) {
-                        const val = new DataView(uint8.buffer, uint8.byteOffset + offset, 8).getFloat64(0, true);
-                        result.push(val);
-                        offset += 8;
-                    } else break;
-                } else if (tag === 4) {
-                    if (offset + 4 <= uint8.length) {
-                        let strLen = uint8[offset] | (uint8[offset + 1] << 8) | (uint8[offset + 2] << 16) | (uint8[offset + 3] << 24);
-                        offset += 4;
-                        if (strLen > 0 && offset + strLen <= uint8.length && strLen < 2000) {
-                            const strBytes = uint8.slice(offset, offset + strLen);
-                            const strVal = new TextDecoder("utf-8").decode(strBytes);
-                            result.push(strVal);
-                            offset += strLen;
-                        } else {
-                            result.push("[d]");
-                        }
-                    } else break;
-                } else if (tag === 5) {
-                    if (offset + 4 <= uint8.length) {
-                        let subLen = uint8[offset] | (uint8[offset + 1] << 8) | (uint8[offset + 2] << 16) | (uint8[offset + 3] << 24);
-                        offset += 4;
-                        if (subLen > 0 && offset + subLen <= uint8.length) {
-                            result.push("[fg]");
-                            offset += subLen;
-                        } else {
-                            result.push("[fg]");
-                        }
-                    } else break;
-                } else {
+        default:
+            return String(arg);
+    }
+}
 
-                    result.push("[u]");
-                    break;
-                }
-            }
-            return result;
-        }
+function getOpName(opcode) {
+    const o = OPCODES[opcode];
+    return o ? o.name : `UNKNOWN(0x${opcode.toString(16)})`;
+}
 
-        function readStringList(data) {
-            const result = [];
-            let offset = 0;
-            const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
-            if (data.length < 4) return result;
-            let count = view.getUint32(0, true);
+// ---------------------- 文件解析 ----------------------
+
+async function analyzeQTCFile(arrayBuffer) {
+    const data = new Uint8Array(arrayBuffer);
+
+    if (data.length < 8) {
+        throw new Error("文件格式无法识别，请确认是有效的 QTC 文件");
+    }
+
+    let offset = 4;
+
+    let version = "未知";
+    try {
+        if (offset + 4 <= data.length) {
+            const v = data[offset] | (data[offset + 1] << 8) |
+                      (data[offset + 2] << 16) | (data[offset + 3] << 24);
+            version = v.toString();
             offset += 4;
-            for (let i = 0; i < count && i < 1000; i++) {
-                if (offset + 4 > data.length) break;
-                let strLen = view.getUint32(offset, true);
-                offset += 4;
-                if (strLen > 0 && offset + strLen <= data.length && strLen < 200) {
-                    const strBytes = data.slice(offset, offset + strLen);
-                    const str = new TextDecoder("utf-8").decode(strBytes);
-                    result.push(str);
-                    offset += strLen;
-                } else if (strLen === 0) {
-                    result.push("");
-                } else {
-                    result.push("[n]");
-                }
-            }
-            return result;
         }
+    } catch (e) { version = "未知"; }
 
-
-        function renderAnalysis(parsed) {
-            const { instructions, constants, varNames, funcNames, version, rawSize } = parsed;
-
-            document.getElementById("fileMetaBadge").innerHTML = `📁 文件大小 ${(rawSize / 1024).toFixed(1)} KB · ${instructions.length} 个sd`;
-            document.getElementById("statsBadge").innerHTML = `📊 du:${constants.length} · v:${varNames.length} · fg:${funcNames.length}`;
-
-
-            const instBody = document.getElementById("instructionsBody");
-            instBody.innerHTML = "";
-            instructions.forEach((inst, idx) => {
-                const semanticName = getSemanticOp(inst.opcode);
-                const argDesc = describeArgument(inst.opcode, inst.arg, constants, varNames, funcNames);
-                const extraNote = (inst.opcode === 30 || inst.opcode === 31) ? "er" :
-                    (inst.opcode === 20 || inst.opcode === 21 || inst.opcode === 22) ? "ct" : "";
-                const row = `<tr>
-                <td style="color:#64748b; width:60px;">${idx + 1}</td>
-                <td class="opcode">${semanticName}</td>
-                <td style="font-family:monospace;">${escapeHtml(argDesc) || "—"}</td>
-                <td style="color:#5b6e8c;">${extraNote}</td>
-            </tr>`;
-                instBody.insertAdjacentHTML('beforeend', row);
-            });
-
-            if (instructions.length === 0) {
-                instBody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#888;">暂无cd</td></tr>';
+    // 跳过函数信息区
+    try {
+        if (offset + 4 <= data.length) {
+            const funcInfoLen = data[offset] | (data[offset + 1] << 8) |
+                                (data[offset + 2] << 16) | (data[offset + 3] << 24);
+            offset += 4;
+            if (funcInfoLen > 0 && offset + funcInfoLen <= data.length) {
+                offset += funcInfoLen;
             }
-
-
-            const constBody = document.getElementById("constantsBody");
-            constBody.innerHTML = "";
-            constants.forEach((c, idx) => {
-                let typeShow = "d";
-                let displayValue = "—";
-                if (c === null) { typeShow = "a"; displayValue = "null"; }
-                else if (typeof c === 'boolean') { typeShow = "bl"; displayValue = c ? "rt" : "fl"; }
-                else if (typeof c === 'number') { typeShow = "nm"; displayValue = c.toString(); }
-                else if (typeof c === 'string') {
-                    typeShow = "t";
-                    displayValue = c.length > 60 ? `"${c.substring(0, 60)}…"` : `"${c}"`;
-                }
-                else { displayValue = "[id]"; }
-                constBody.insertAdjacentHTML('beforeend', `<tr><td>${idx + 1}</td><td>${typeShow}</td><td style="word-break:break-all;">${escapeHtml(displayValue)}</td></tr>`);
-            });
-
-
-            const varsBody = document.getElementById("varsBody");
-            varsBody.innerHTML = "";
-            if (varNames.length) {
-                varNames.forEach((v, idx) => {
-                    varsBody.insertAdjacentHTML('beforeend', `<tr><td><span class="var-name">${escapeHtml(v)}</span></td><td style="color:#666;">iv</td></tr>`);
-                });
-            } else {
-                varsBody.innerHTML = '<tr><td colspan="2" style="text-align:center; color:#888;">无v定义</td></tr>';
-            }
-
-
-            const funcsBody = document.getElementById("funcsBody");
-            funcsBody.innerHTML = "";
-            if (funcNames.length) {
-                funcNames.forEach((f, idx) => {
-                    funcsBody.insertAdjacentHTML('beforeend', `<tr><td><span style="background:#eef2ff;padding:2px 10px;border-radius:20px;">${escapeHtml(f)}</span></td><td style="color:#666;">ui</td></tr>`);
-                });
-            } else {
-                funcsBody.innerHTML = '<tr><td colspan="2" style="text-align:center; color:#888;">无fg定义</td></tr>';
-            }
-
-
-            const metadataDiv = document.getElementById("metadataView");
-            const metaObj = {
-                "av": version !== "未知" ? `v${version}` : "标准格式",
-                "sn": instructions.length,
-                "dn": constants.length,
-                "v": varNames.length,
-                "fg": funcNames.length,
-            };
-            metadataDiv.innerHTML = `<pre style="margin:0; font-family:monospace;">${JSON.stringify(metaObj, null, 2)}</pre>`;
         }
+    } catch (e) { /* ignore */ }
 
-        function escapeHtml(str) {
-            if (!str) return "";
-            return String(str).replace(/[&<>]/g, function (m) {
-                if (m === '&') return '&amp;';
-                if (m === '<') return '&lt;';
-                if (m === '>') return '&gt;';
-                return m;
-            });
+    // 指令区
+    const instructions = [];
+    let instCount = 0;
+    try {
+        if (offset + 4 <= data.length) {
+            instCount = data[offset] | (data[offset + 1] << 8) |
+                        (data[offset + 2] << 16) | (data[offset + 3] << 24);
+            offset += 4;
         }
+    } catch (e) { instCount = 0; }
 
-
-        const fileInput = document.getElementById("fileInput");
-        const uploadArea = document.getElementById("uploadArea");
-        const analysisPanel = document.getElementById("analysisPanel");
-        const globalErrorDiv = document.getElementById("globalError");
-
-        function resetError() { globalErrorDiv.innerHTML = ""; }
-        function showError(msg) {
-            globalErrorDiv.innerHTML = `<div class="error-message">⚠️ ${escapeHtml(msg)}</div>`;
-            analysisPanel.style.display = "none";
+    const maxInst = Math.min(instCount, 50000);
+    for (let i = 0; i < maxInst; i++) {
+        if (offset + 1 > data.length) break;
+        const opcode = data[offset];
+        offset++;
+        if (offset + 4 > data.length) break;
+        const argLen = data[offset] | (data[offset + 1] << 8) |
+                       (data[offset + 2] << 16) | (data[offset + 3] << 24);
+        offset += 4;
+        let argRaw = null;
+        if (argLen > 0 && offset + argLen <= data.length) {
+            const argBytes = data.slice(offset, offset + argLen);
+            argRaw = readSimpleArgument(argBytes);
+            offset += argLen;
         }
+        instructions.push({ opcode, arg: argRaw });
+    }
 
-        async function handleFile(file) {
-            if (!file) return;
-            resetError();
-            analysisPanel.style.display = "none";
-
-            if (!file.name.match(/\.qtc$/i)) {
-                showError("请选择 .qtc 格式的字节码文件");
-                return;
+    // 常量区
+    let constants = [];
+    try {
+        if (offset + 4 <= data.length) {
+            const constsLen = data[offset] | (data[offset + 1] << 8) |
+                              (data[offset + 2] << 16) | (data[offset + 3] << 24);
+            offset += 4;
+            if (constsLen > 0 && offset + constsLen <= data.length) {
+                const constBytes = data.slice(offset, offset + constsLen);
+                constants = extractConstantValues(constBytes);
+                offset += constsLen;
             }
+        }
+    } catch (e) { constants = []; }
 
+    // 变量名区
+    let varNames = [];
+    try {
+        if (offset + 4 <= data.length) {
+            const varsLen = data[offset] | (data[offset + 1] << 8) |
+                            (data[offset + 2] << 16) | (data[offset + 3] << 24);
+            offset += 4;
+            if (varsLen > 0 && offset + varsLen <= data.length) {
+                const varBytes = data.slice(offset, offset + varsLen);
+                varNames = readStringList(varBytes);
+                offset += varsLen;
+            }
+        }
+    } catch (e) { varNames = []; }
+
+    // 函数名区
+    let funcNames = [];
+    try {
+        if (offset + 4 <= data.length) {
+            const funcsLen = data[offset] | (data[offset + 1] << 8) |
+                             (data[offset + 2] << 16) | (data[offset + 3] << 24);
+            offset += 4;
+            if (funcsLen > 0 && offset + funcsLen <= data.length) {
+                const funcBytes = data.slice(offset, offset + funcsLen);
+                funcNames = readStringList(funcBytes);
+                offset += funcsLen;
+            }
+        }
+    } catch (e) { funcNames = []; }
+
+    return {
+        version,
+        instructions,
+        constants,
+        varNames,
+        funcNames,
+        rawSize: arrayBuffer.byteLength
+    };
+}
+
+function readSimpleArgument(bytes) {
+    if (bytes.length === 0) return null;
+
+    // 4 字节 → int32
+    if (bytes.length === 4) {
+        const view = new DataView(bytes.buffer, bytes.byteOffset, 4);
+        return view.getInt32(0, true);
+    }
+
+    // >4 字节：可能是 [len:u32][payload...]
+    if (bytes.length > 4) {
+        const view = new DataView(bytes.buffer, bytes.byteOffset, 4);
+        const len = view.getUint32(0, true);
+        if (len > 0 && len <= bytes.length - 4) {
+            const payload = bytes.slice(4, 4 + len);
+            // 若 payload 长度恰好是 8 且 len==8，可能是两个 int32（如 CALL 的 (fidx, argc)）
+            if (len === 8) {
+                const pv = new DataView(payload.buffer, payload.byteOffset, 8);
+                return [pv.getInt32(0, true), pv.getInt32(4, true)];
+            }
+            // 若 payload 长度是 12，可能是三个 int32（如 CALL_OMETHOD 的 (fidx, argc, mid)）
+            if (len === 12) {
+                const pv = new DataView(payload.buffer, payload.byteOffset, 12);
+                return [pv.getInt32(0, true), pv.getInt32(4, true), pv.getInt32(8, true)];
+            }
+            // 否则尝试 UTF-8 文本
             try {
-                const arrayBuffer = await file.arrayBuffer();
-                const parsed = await analyzeQTCFile(arrayBuffer);
-                renderAnalysis(parsed);
-                analysisPanel.style.display = "block";
-
-
-                document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-                document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
-                document.querySelector('.tab-btn[data-tab="instructions"]').classList.add('active');
-                document.getElementById("tabInstructions").classList.add("active");
-            } catch (err) {
-                console.warn(err);
-                showError(`无法解析文件：${err.message || "格式不支持"}`);
-            }
+                const txt = new TextDecoder("utf-8").decode(payload);
+                // 如果解码结果包含大量不可打印字符，则视为二进制
+                let printable = 0;
+                for (let i = 0; i < txt.length; i++) {
+                    const c = txt.charCodeAt(i);
+                    if (c >= 32 || c === 9 || c === 10 || c === 13) printable++;
+                }
+                if (printable / txt.length > 0.85) {
+                    return txt;
+                }
+            } catch (e) { /* ignore */ }
         }
+    }
+    return null;
+}
 
-        uploadArea.addEventListener("click", () => fileInput.click());
-        fileInput.addEventListener("change", (e) => {
-            if (e.target.files.length) handleFile(e.target.files[0]);
+function extractConstantValues(data) {
+    const result = [];
+    let offset = 0;
+    const uint8 = new Uint8Array(data);
+    while (offset < uint8.length && result.length < 2000) {
+        const tag = uint8[offset];
+        offset++;
+
+        if (tag === 1) { // null
+            if (offset + 4 <= uint8.length) {
+                result.push(null);
+                offset += 4;
+            } else break;
+        } else if (tag === 2) { // bool
+            if (offset < uint8.length) {
+                result.push(uint8[offset] !== 0);
+                offset += 1;
+            } else break;
+        } else if (tag === 3) { // float64
+            if (offset + 8 <= uint8.length) {
+                const val = new DataView(
+                    uint8.buffer, uint8.byteOffset + offset, 8
+                ).getFloat64(0, true);
+                result.push(val);
+                offset += 8;
+            } else break;
+        } else if (tag === 4) { // string
+            if (offset + 4 <= uint8.length) {
+                const strLen = uint8[offset] | (uint8[offset + 1] << 8) |
+                               (uint8[offset + 2] << 16) | (uint8[offset + 3] << 24);
+                offset += 4;
+                if (strLen >= 0 && offset + strLen <= uint8.length) {
+                    const strBytes = uint8.slice(offset, offset + strLen);
+                    result.push(new TextDecoder("utf-8").decode(strBytes));
+                    offset += strLen;
+                } else break;
+            } else break;
+        } else if (tag === 5) { // 嵌套（函数代码等）
+            if (offset + 4 <= uint8.length) {
+                const subLen = uint8[offset] | (uint8[offset + 1] << 8) |
+                               (uint8[offset + 2] << 16) | (uint8[offset + 3] << 24);
+                offset += 4;
+                if (subLen >= 0 && offset + subLen <= uint8.length) {
+                    result.push(`<函数体 ${subLen} 字节>`);
+                    offset += subLen;
+                } else break;
+            } else break;
+        } else {
+            // 未知标签：无法继续，终止解析
+            result.push(`<未知标签 0x${tag.toString(16)}>`);
+            break;
+        }
+    }
+    return result;
+}
+
+function readStringList(data) {
+    const result = [];
+    let offset = 0;
+    const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+    if (data.length < 4) return result;
+    const count = view.getUint32(0, true);
+    offset += 4;
+    for (let i = 0; i < count && i < 5000; i++) {
+        if (offset + 4 > data.length) break;
+        const strLen = view.getUint32(offset, true);
+        offset += 4;
+        if (strLen === 0) {
+            result.push("");
+        } else if (offset + strLen <= data.length && strLen < 4096) {
+            const strBytes = data.slice(offset, offset + strLen);
+            result.push(new TextDecoder("utf-8").decode(strBytes));
+            offset += strLen;
+        } else {
+            result.push("<截断>");
+            break;
+        }
+    }
+    return result;
+}
+
+// ---------------------- 渲染 ----------------------
+
+function renderAnalysis(parsed) {
+    const { instructions, constants, varNames, funcNames, version, rawSize } = parsed;
+
+    document.getElementById("fileMetaBadge").innerHTML =
+        ` 文件大小 ${(rawSize / 1024).toFixed(1)} KB · ${instructions.length} 条指令`;
+    document.getElementById("statsBadge").innerHTML =
+        ` 常量:${constants.length} · 变量:${varNames.length} · 函数:${funcNames.length}` +
+        (version !== "未知" ? ` · 版本 ${version}` : "");
+
+    // 指令表
+    const instBody = document.getElementById("instructionsBody");
+    instBody.innerHTML = "";
+    if (instructions.length === 0) {
+        instBody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#888;">无指令</td></tr>';
+    } else {
+        const rows = instructions.map((inst, idx) => {
+            const op = OPCODES[inst.opcode];
+            const opName = op ? op.name : `UNKNOWN(0x${inst.opcode.toString(16)})`;
+            const argDesc = describeArgument(
+                inst.opcode, inst.arg, constants, varNames, funcNames
+            );
+            const note = op ? op.desc : "未知指令";
+            return `<tr>
+                <td style="color:#64748b;width:60px;">${idx + 1}</td>
+                <td class="opcode">${escapeHtml(opName)}</td>
+                <td style="font-family:monospace;">${escapeHtml(argDesc)}</td>
+                <td style="color:#5b6e8c;">${escapeHtml(note)}</td>
+            </tr>`;
         });
+        instBody.innerHTML = rows.join("");
+    }
 
-        uploadArea.addEventListener("dragover", (e) => { e.preventDefault(); uploadArea.style.borderColor = "#3b82f6"; });
-        uploadArea.addEventListener("dragleave", () => { uploadArea.style.borderColor = "#cbd5e1"; });
-        uploadArea.addEventListener("drop", (e) => {
-            e.preventDefault();
-            uploadArea.style.borderColor = "#cbd5e1";
-            const file = e.dataTransfer.files[0];
-            if (file) handleFile(file);
+    // 常量表
+    const constBody = document.getElementById("constantsBody");
+    constBody.innerHTML = "";
+    if (constants.length === 0) {
+        constBody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#888;">无常量</td></tr>';
+    } else {
+        const rows = constants.map((c, idx) => {
+            let typeShow = "未知";
+            let displayValue = "—";
+            if (c === null) { typeShow = "null"; displayValue = "null"; }
+            else if (typeof c === "boolean") {
+                typeShow = "布尔"; displayValue = c ? "true" : "false";
+            } else if (typeof c === "number") {
+                typeShow = "数字"; displayValue = c.toString();
+            } else if (typeof c === "string") {
+                typeShow = "字符串";
+                displayValue = c.length > 80
+                    ? `"${c.slice(0, 80)}…"`
+                    : `"${c}"`;
+            } else {
+                displayValue = String(c);
+            }
+            return `<tr>
+                <td>${idx}</td>
+                <td>${typeShow}</td>
+                <td style="word-break:break-all;">${escapeHtml(displayValue)}</td>
+            </tr>`;
         });
+        constBody.innerHTML = rows.join("");
+    }
 
+    // 变量表
+    const varsBody = document.getElementById("varsBody");
+    varsBody.innerHTML = "";
+    if (varNames.length) {
+        varsBody.innerHTML = varNames.map((v, idx) =>
+            `<tr><td><span class="var-name">${escapeHtml(v)}</span></td>
+                 <td style="color:#666;">槽位 ${idx}</td></tr>`
+        ).join("");
+    } else {
+        varsBody.innerHTML = '<tr><td colspan="2" style="text-align:center;color:#888;">无变量</td></tr>';
+    }
 
-        document.querySelectorAll(".tab-btn").forEach(btn => {
-            btn.addEventListener("click", () => {
-                const tabId = btn.getAttribute("data-tab");
-                if (!tabId) return;
-                document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-                btn.classList.add("active");
-                document.querySelectorAll(".tab-content").forEach(tab => tab.classList.remove("active"));
-                const targetTab = document.getElementById(`tab${tabId.charAt(0).toUpperCase() + tabId.slice(1)}`);
-                if (targetTab) targetTab.classList.add("active");
-            });
-        });
+    // 函数表
+    const funcsBody = document.getElementById("funcsBody");
+    funcsBody.innerHTML = "";
+    if (funcNames.length) {
+        funcsBody.innerHTML = funcNames.map((f, idx) =>
+            `<tr><td><span style="background:#eef2ff;padding:2px 10px;border-radius:20px;">${escapeHtml(f)}</span></td>
+                 <td style="color:#666;">索引 ${idx}</td></tr>`
+        ).join("");
+    } else {
+        funcsBody.innerHTML = '<tr><td colspan="2" style="text-align:center;color:#888;">无函数</td></tr>';
+    }
+
+    // 概览
+    const metadataDiv = document.getElementById("metadataView");
+    const metaObj = {
+        "版本": version !== "未知" ? version : "标准格式",
+        "指令数": instructions.length,
+        "常量数": constants.length,
+        "变量数": varNames.length,
+        "函数数": funcNames.length,
+        "文件大小(字节)": rawSize
+    };
+    metadataDiv.innerHTML =
+        `<pre style="margin:0;font-family:monospace;">${JSON.stringify(metaObj, null, 2)}</pre>`;
+}
+
+function escapeHtml(str) {
+    if (str === undefined || str === null) return "";
+    return String(str).replace(/[&<>"']/g, function (m) {
+        switch (m) {
+            case '&': return '&amp;';
+            case '<': return '&lt;';
+            case '>': return '&gt;';
+            case '"': return '&quot;';
+            case "'": return '&#39;';
+        }
+        return m;
+    });
+}
+
+// ---------------------- 事件绑定 ----------------------
+
+const fileInput = document.getElementById("fileInput");
+const uploadArea = document.getElementById("uploadArea");
+const analysisPanel = document.getElementById("analysisPanel");
+const globalErrorDiv = document.getElementById("globalError");
+
+function resetError() { globalErrorDiv.innerHTML = ""; }
+
+function showError(msg) {
+    globalErrorDiv.innerHTML =
+        `<div class="error-message"> ${escapeHtml(msg)}</div>`;
+    analysisPanel.style.display = "none";
+}
+
+async function handleFile(file) {
+    if (!file) return;
+    resetError();
+    analysisPanel.style.display = "none";
+
+    if (!file.name.match(/\.qtc$/i)) {
+        showError("请选择 .qtc 格式的字节码文件");
+        return;
+    }
+
+    try {
+        const arrayBuffer = await file.arrayBuffer();
+        const parsed = await analyzeQTCFile(arrayBuffer);
+        renderAnalysis(parsed);
+        analysisPanel.style.display = "block";
+
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+        document.querySelector('.tab-btn[data-tab="instructions"]').classList.add('active');
+        document.getElementById("tabInstructions").classList.add("active");
+    } catch (err) {
+        console.warn(err);
+        showError(`无法解析文件：${err.message || "格式不支持"}`);
+    }
+}
+
+uploadArea.addEventListener("click", () => fileInput.click());
+fileInput.addEventListener("change", (e) => {
+    if (e.target.files.length) handleFile(e.target.files[0]);
+});
+
+uploadArea.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    uploadArea.style.borderColor = "#3b82f6";
+});
+uploadArea.addEventListener("dragleave", () => {
+    uploadArea.style.borderColor = "#cbd5e1";
+});
+uploadArea.addEventListener("drop", (e) => {
+    e.preventDefault();
+    uploadArea.style.borderColor = "#cbd5e1";
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+});
+
+document.querySelectorAll(".tab-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+        const tabId = btn.getAttribute("data-tab");
+        if (!tabId) return;
+        document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        document.querySelectorAll(".tab-content").forEach(tab => tab.classList.remove("active"));
+        const target = document.getElementById(
+            `tab${tabId.charAt(0).toUpperCase() + tabId.slice(1)}`
+        );
+        if (target) target.classList.add("active");
+    });
+});
     </script>
 </body>
 

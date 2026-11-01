@@ -1,0 +1,1 @@
+{"name": "clo_recursion", "runs_on": "native", "compile": {"args": [], "expect_ok": true}, "expect": {"exit": 0, "stderr_empty": true}, "tags": ["closure", "recursion", "f1"], "note": "闭包自引用（fib(15)=610）：解释器经 env 自绑定、native 经静态符号，两侧同语义"}

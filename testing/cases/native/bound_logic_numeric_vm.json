@@ -1,0 +1,11 @@
+{
+  "name": "bound_logic_numeric_vm",
+  "runs_on": "vm",
+  "expect": {
+    "exit": 0,
+    "stdout": ["null", "null", "true", "false", "false", "true"],
+    "stderr_empty": true
+  },
+  "tags": ["logic", "numeric", "vm-only", "pricing"],
+  "note": "VM 定价钉：数值×数值的 && / || 落入 vm_executor case 10 数字 switch 的 default → null（vm_executor.cpp:344-426）。任一侧非数值（bool/string）才走 isTruthy 合取分支返回 bool（true && 1 → true、0 && true → false）。解释器一律返回 bool，见 interp/bound_logic_numeric_interp。既定分歧（fuzz 白名单 KNOWN-LOGIC-NUMERIC）。"
+}

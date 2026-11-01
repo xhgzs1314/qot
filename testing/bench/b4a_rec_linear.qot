@@ -1,0 +1,12 @@
+// B4a 深层递归 · 线性递归（和累积）
+// 负载：sumdown(n) = n + sumdown(n-1)，递归深度 = ITER。
+// units(n) = n + 1（调用次数），per_unit = 每层栈帧 + 调用 + 返回的成本。
+// 稳定性拷问（§6.3.4，优先级高于性能）：native 的函数是真 C 栈帧，
+// 深度 1e5~1e6 会直接爆栈 → 进程死，违反宪法 6「跑飞的用户代码不许带崩宿主」。
+// 台架对 b4a 配置了 3 个档位：safe(1e4) / deep(1e5) / danger(1e6)，
+// 其中 danger 档允许「明确退出码 + 诊断」但**不允许**访问违例崩溃。
+number_t func sumdown(n) {
+    if (n <= 0) { return 0; }
+    return n + sumdown(n - 1);
+}
+output(sumdown(87654321));

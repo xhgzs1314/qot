@@ -1,0 +1,9 @@
+// 【M4 负例 】class 声明仅限顶层：函数体内的 class 是静态可判
+// 错误 → 编译期致命（G-10 律）。
+any_t func f() {
+    class Inner {
+        var x = 0;
+    }
+    return 1;
+}
+output(f());

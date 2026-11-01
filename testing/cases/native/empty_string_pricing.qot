@@ -1,0 +1,21 @@
+// 空串定价钉（ 裁决反转）：AOT 常量池的 "" = 空字符串（不再是
+// null）。历史：D-10 时代裁判=VM，AOT 跟随 VM 折叠 ""→null（分歧登记
+// KNOWN-EMPTY-STR）；转向后解释器是唯一 oracle 且 interp 侧 "" 是合法
+// 字符串值 —— std.text 的 `field = ""` 引爆分歧（宪法 6），现 AOT 向
+// interp 对齐。VM 侧冻结原状（bound_empty_string_vm 只跑 --suite vm）。
+// 本钉 = native 套件硬断言（expect.stdout），重录 golden 不豁免。
+var s = "";
+output(str_len(s));
+output(str_len("") == 0);
+output(s == "");
+output(s == null);
+output(is_null(s));
+output(str_empty(s));
+var acc = "";
+var i = 0;
+loop (i < 3) {
+    acc = acc + "x";
+    i += 1;
+}
+output(acc);
+output(str_len(acc));

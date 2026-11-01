@@ -1,0 +1,46 @@
+// E3（常量键哈希折叠）的回归钉：**常量键路径与非常量键路径必须逐值一致**。
+//
+// 为什么必须钉：E3 会把 `d["alpha"]` 这种编译期常量键的哈希在 cgen 侧算好
+// 再传下去（省掉运行期 qotrt_vhash 的读缓存 + 判 0 + 可能的重算）。这条路径
+// 与「运行期算出来的键」是两条代码路径，一旦 Python 侧复刻的哈希与 C 的
+// qotrt_hash 有任何一位不同，**不会报错，只会静默查不到键（返回 null）** ——
+// 这是最坏的失败形态（不崩、不报、结果错）。本用例把两条路径放在同一个程序
+// 里对拍，并且**只用 d["alpha"] 一个字面量下标键**（其余键一律走运行期拼接），
+// 保证折叠路径确实被走到（否则这个钉子会空转）。
+//
+// 三组对拍：
+//   ① 字面量常量键 d["alpha"] ×5（E3 折叠的直接目标）
+//   ② 运行期拼出的同值键 d["alph" + "a"] ×4（非常量路径）
+//   ③ dict_set / dict_get 内置路径（键走 Value::toString）+ 缺键得 null
+//
+// 口径说明（R5）：本用例 runs_on='native' —— E3 折叠是 AOT 特有的编译期能力，
+// VM 与解释器没有这条路径。哈希逐位一致性另由
+// testing/unit/test_constkey_hash.py（Python 复刻 vs C 金值）钉住。
+var d = &< "alpha": 1, "beta": 2, "gamma": 3, "delta": 4, "omega": 5 >&;
+
+output(d["alpha"]);
+output(d["alpha"]);
+var t = 0;
+loop (t < 3) {
+    output(d["alpha"]);
+    t = t + 1;
+}
+
+var k = "alph" + "a";
+output(d[k]);
+var u = 0;
+loop (u < 3) {
+    var kk = "alph" + "a";
+    output(d[kk]);
+    u = u + 1;
+}
+
+var kb = "bet" + "a";
+output(d[kb]);
+var kg = "gam" + "ma";
+output(d[kg]);
+
+dict_set(d, "zeta", 60);
+output(dict_get(d, "zeta"));
+output(dict_get(d, "omega"));
+output(dict_get(d, "nope"));

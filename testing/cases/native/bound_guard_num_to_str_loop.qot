@@ -1,0 +1,9 @@
+var s = 0;
+var t = 5;
+for (i in 3) {
+    s = s + t;
+    t = "x";
+    t = 2;
+}
+output(s == 9);
+output(t == 2);

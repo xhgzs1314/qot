@@ -88,3 +88,18 @@ VM_API void vm_destroy(VMHandle handle) {
         delete static_cast<VMContext*>(handle);
     }
 }
+
+//  T-32：剖析数据导出（生产构建里为空操作 / 返回 NULL）
+VM_API void vm_profile_reset(void) {
+    qot::profile_reset();
+}
+
+VM_API char* vm_profile_dump(void) {
+    return qot::profile_dump_json();
+}
+
+VM_API void vm_profile_free(char* p) {
+    if (p) {
+        free(p);
+    }
+}

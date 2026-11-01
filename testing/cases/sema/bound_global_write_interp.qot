@@ -1,0 +1,6 @@
+var g = 10;
+any_t func setIt() {
+    g = 15;
+}
+setIt();
+output(g);

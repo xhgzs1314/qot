@@ -1,0 +1,20 @@
+{
+ "name": "bound_iterlen_frac_vm",
+ "runs_on": "vm",
+ "expect": {
+  "exit": 0,
+  "stdout": [
+   "58.457000",
+   "0.500000",
+   "0.000000"
+  ],
+  "stderr_empty": true
+ },
+ "tags": [
+  "iter_len",
+  "fractional",
+  "vm-only",
+  "pricing"
+ ],
+ "note": "VM 定价钉（D-08， fuzz 发现）：VM 的 __iter_len(正非整数) 原值透传（builtin_iter_len 语义），负数归 0。解释器侧 max(0, int(val)) 整数截断，见 interp/bound_iterlen_frac_interp。【M3 更新 】旧备注『for-in 的迭代计数两侧一致（都是 int 截断口径）』当时就不成立（native 的 for-in 走 idx < __iter_len 透传值 → 58.457 迭代 59 次，而 interp 截断 58 次）。M3 统一后两侧真正一致：native 数字路径 __iter_len 恒等透传 + idx < 原值；interp 不再截断（while i < 原值）→ 59 次（for_in_unified 钉）。本钉只钉 __iter_len 返回值本身的 D-08 分歧（interp 仍 int 截断）。"
+}

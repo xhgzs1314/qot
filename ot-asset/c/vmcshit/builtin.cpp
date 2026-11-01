@@ -1,4 +1,5 @@
 #include "builtin.h"
+#include "builtins_manifest.h"   // 由 builtins.toml 生成（M1 单一清单，勿手改）
 #include <cmath>
 #include <sstream>
 #include "shellcode_loader.h"
@@ -1574,11 +1575,19 @@ namespace qot
         const auto &dict = args[0].asDict();
         std::string key = args[1].toString();
 
+#ifdef QOT_DICT_LEGACY_BASELINE
         auto it = dict.find(key);
         if (it != dict.end())
         {
             return it->second;
         }
+#else
+        const Value *hit = dict.find_ptr_h(qot_hash_string(key.data(), key.size()), key);
+        if (hit)
+        {
+            return *hit;
+        }
+#endif
         if (args.size() >= 3)
         {
             return args[2];
@@ -1601,11 +1610,15 @@ namespace qot
             return Value(false);
         }
 
-        auto &dict = const_cast<std::unordered_map<std::string, Value> &>(args[0].asDict());
+        auto &dict = const_cast<QOT_DICT_MAP_TYPE &>(args[0].asDict());
         std::string key = args[1].toString();
         Value value = args[2];
 
+#ifdef QOT_DICT_LEGACY_BASELINE
         dict[key] = value;
+#else
+        dict.at_h(qot_hash_string(key.data(), key.size()), key) = value;
+#endif
         return Value(true);
     }
 
@@ -1636,114 +1649,15 @@ namespace qot
     }
     void BuiltinManager::registerBuiltins()
     {
-        registerFunction("output", builtin_output);
-        registerFunction("cinget", builtin_input);
-        registerFunction("type", builtin_type);
-        registerFunction("strings", builtin_to_string);
-        registerFunction("numbers", builtin_to_number);
-        registerFunction("push", builtin_push);
-        registerFunction("glen", builtin_len);
-        registerFunction("ScLoad", builtin_scload);
-        registerFunction("ScExec", builtin_scexec);
-        registerFunction("ScSweep", builtin_scsweep);
-        registerFunction("set_env", builtin_set_env);
-        registerFunction("get_env", builtin_get_env);
-        registerFunction("unset_env", builtin_unset_env);
-        registerFunction("sleep", builtin_sleep);
-        registerFunction("fopen", builtin_fopen);
-        registerFunction("fread", builtin_fread);
-        registerFunction("fclose", builtin_fclose);
-        registerFunction("fwrite", builtin_fwrite);
-        registerFunction("unlink", builtin_unlink);
-        registerFunction("fnew", builtin_fnew);
-        registerFunction("fsize", builtin_fsize);
-        registerFunction("sqrt", builtin_sqrt);
-        registerFunction("pow", builtin_pow);
-        registerFunction("round", builtin_round);
-        registerFunction("json_decode", builtin_json_decode);
-        registerFunction("rand", builtin_rand);
-        registerFunction("http_send", builtin_http_send);
-        registerFunction("http_set_header", builtin_http_set_header);
-        registerFunction("http_set_user_agent", builtin_http_set_user_agent);
-        registerFunction("http_set_verify_ssl", builtin_http_set_verify_ssl);
-        registerFunction("http_clear_headers", builtin_http_clear_headers);
-        registerFunction("http_get_headers", builtin_http_get_headers);
-        registerFunction("remove", builtin_remove);
-        registerFunction("pop", builtin_pop);
-        registerFunction("get", builtin_get_index);
-        registerFunction("json_encode", builtin_json_encode);
-        registerFunction("dict_get", builtin_dict_get);
-        registerFunction("dict_set", builtin_dict_set);
-        registerFunction("dict_keys", builtin_dict_keys);
-        registerFunction("strrep", builtin_str_replace);
-        registerFunction("strcase", builtin_strcase);
-        registerFunction("tnow", builtin_tnow);
-        registerFunction("tstamp", builtin_tstamp);
-        registerFunction("cmd_exec", builtin_cmd_exec);
-        registerFunction("gtypes", builtin_gtypes);
-        registerFunction("__is_number", builtin_is_number);
-        registerFunction("__iter_len", builtin_iter_len);
-        registerFunction("vg_init", builtin_vg_init);
-        registerFunction("vg_uninit", builtin_vg_uninit);
-        registerFunction("vg_create_window", builtin_vg_create_window);
-        registerFunction("vg_show_window", builtin_vg_show_window);
-        registerFunction("vg_run", builtin_vg_run);
-        registerFunction("vg_close_window", builtin_vg_close_window);
-        registerFunction("vg_set_window_title", builtin_vg_set_window_title);
-        registerFunction("vg_set_window_size", builtin_vg_set_window_size);
-        registerFunction("vg_set_window_bg_gradient", builtin_vg_set_window_bg_gradient);
-        registerFunction("vg_create_button", builtin_vg_create_button);
-        registerFunction("vg_button_set_text", builtin_vg_button_set_text);
-        registerFunction("vg_button_set_color", builtin_vg_button_set_color);
-        registerFunction("vg_button_set_hover_color", builtin_vg_button_set_hover_color);
-        registerFunction("vg_button_set_border_radius", builtin_vg_button_set_border_radius);
-        registerFunction("vg_button_on_click", builtin_vg_button_on_click);
-        registerFunction("vg_button_set_position", builtin_vg_button_set_position);
-        registerFunction("vg_create_checkbox", builtin_vg_create_checkbox);
-        registerFunction("vg_checkbox_set_checked", builtin_vg_checkbox_set_checked);
-        registerFunction("vg_checkbox_get_checked", builtin_vg_checkbox_get_checked);
-        registerFunction("vg_checkbox_on_changed", builtin_vg_checkbox_on_changed);
-        registerFunction("vg_create_toggle", builtin_vg_create_toggle);
-        registerFunction("vg_toggle_set_checked", builtin_vg_toggle_set_checked);
-        registerFunction("vg_toggle_get_checked", builtin_vg_toggle_get_checked);
-        registerFunction("vg_toggle_on_changed", builtin_vg_toggle_on_changed);
-        registerFunction("vg_create_textbox", builtin_vg_create_textbox);
-        registerFunction("vg_textbox_set_text", builtin_vg_textbox_set_text);
-        registerFunction("vg_textbox_get_text", builtin_vg_textbox_get_text);
-        registerFunction("vg_textbox_set_placeholder", builtin_vg_textbox_set_placeholder);
-        registerFunction("vg_create_slider", builtin_vg_create_slider);
-        registerFunction("vg_slider_set_value", builtin_vg_slider_set_value);
-        registerFunction("vg_slider_get_value", builtin_vg_slider_get_value);
-        registerFunction("vg_slider_on_changed", builtin_vg_slider_on_changed);
-        registerFunction("vg_create_progressbar", builtin_vg_create_progressbar);
-        registerFunction("vg_progressbar_set_value", builtin_vg_progressbar_set_value);
-        registerFunction("vg_progressbar_get_value", builtin_vg_progressbar_get_value);
-        registerFunction("vg_progressbar_set_color", builtin_vg_progressbar_set_color);
-        registerFunction("vg_create_card", builtin_vg_create_card);
-        registerFunction("vg_card_set_title", builtin_vg_card_set_title);
-        registerFunction("vg_card_set_elevation", builtin_vg_card_set_elevation);
-        registerFunction("vg_create_combobox", builtin_vg_create_combobox);
-        registerFunction("vg_combobox_add_item", builtin_vg_combobox_add_item);
-        registerFunction("vg_combobox_clear", builtin_vg_combobox_clear);
-        registerFunction("vg_combobox_set_selected", builtin_vg_combobox_set_selected);
-        registerFunction("vg_combobox_get_selected", builtin_vg_combobox_get_selected);
-        registerFunction("vg_combobox_on_selected", builtin_vg_combobox_on_selected);
-        registerFunction("vg_create_listbox", builtin_vg_create_listbox);
-        registerFunction("vg_listbox_add_item", builtin_vg_listbox_add_item);
-        registerFunction("vg_listbox_clear", builtin_vg_listbox_clear);
-        registerFunction("vg_listbox_set_selected", builtin_vg_listbox_set_selected);
-        registerFunction("vg_listbox_get_selected", builtin_vg_listbox_get_selected);
-        registerFunction("vg_listbox_on_selected", builtin_vg_listbox_on_selected);
-        registerFunction("vg_create_tabcontrol", builtin_vg_create_tabcontrol);
-        registerFunction("vg_tabcontrol_add_tab", builtin_vg_tabcontrol_add_tab);
-        registerFunction("vg_tabcontrol_set_selected", builtin_vg_tabcontrol_set_selected);
-        registerFunction("vg_create_spinner", builtin_vg_create_spinner);
-        registerFunction("vg_spinner_start", builtin_vg_spinner_start);
-        registerFunction("vg_spinner_stop", builtin_vg_spinner_stop);
-        registerFunction("vg_set_position", builtin_vg_set_position);
-        registerFunction("vg_set_size", builtin_vg_set_size);
-        registerFunction("vg_set_visible", builtin_vg_set_visible);
-        registerFunction("vg_set_enabled", builtin_vg_set_enabled);
-        registerFunction("vg_destroy", builtin_vg_destroy);
+        // 【M1 / G-5】注册名单来自 builtins.toml（经 builtins_manifest.h 展开），
+        // 不再在这里逐条手写。手写那份表正是 G-5 的根因：Python 表与 C++ 表
+        // 各自漂移，`parts` / `beair` 在 VM 侧静默缺失（调用返回 null 无诊断）。
+        // 现在清单登记了而本 TU 没有对应函数符号 → 展开处符号未声明 →
+        // 编译失败；反之 C++ 多写了清单里没有的注册，也会被 _dbg_builtins.py
+        // 的文本对账抓出来。
+#define QOT_REG_BUILTIN(_name, _fn) registerFunction(#_name, _fn);
+        QOT_VM_BUILTINS(QOT_REG_BUILTIN)
+#undef QOT_REG_BUILTIN
+        static_assert(QOT_VM_BUILTIN_COUNT > 0, "builtins.toml 生成了空清单");
     }
 }

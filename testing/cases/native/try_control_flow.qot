@@ -1,0 +1,37 @@
+// F2 控制流交叉：stop 穿透 try、深层调用链 throw、catch 内再 throw
+var i = 0;
+loop (i < 10) {
+    try {
+        if (i == 2) { stop; }
+        output(i);
+    } catch (e) {
+        output("never");
+    }
+    i = i + 1;
+}
+output("stopped");
+number_t func level3() {
+    throw "deep";
+    return 0;
+}
+number_t func level2() {
+    return level3();
+}
+number_t func level1() {
+    return level2();
+}
+try {
+    output(level1());
+} catch (e) {
+    output("caught-deep");
+    output(e);
+}
+try {
+    throw "first";
+} catch (e) {
+    try {
+        throw "second";
+    } catch (e2) {
+        output(e2);
+    }
+}

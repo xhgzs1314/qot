@@ -1,0 +1,1 @@
+{"name": "try_control_flow", "runs_on": "native", "compile": {"args": [], "expect_ok": true}, "expect": {"exit": 0, "stderr_empty": true}, "tags": ["try", "stop", "unwind", "f2"], "note": "stop 穿透 try（着陆点摘除）、三层调用链 throw（跨帧 longjmp）、catch 内再 throw 传播"}

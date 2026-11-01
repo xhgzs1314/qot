@@ -1,0 +1,21 @@
+{
+ "name": "bound_call_extra_args",
+ "runs_on": "vm",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stdout": [
+   "2.000000",
+   "3.000000"
+  ],
+  "stderr_empty": true
+ },
+ "tags": [
+  "func",
+  "args"
+ ],
+ "note": "README 7.1：多给参数丢的是前面的，取最后 N 个"
+}

@@ -1,0 +1,130 @@
+// 【GOD-SELF-G1 钉 】协议元语开放（dunder 面）——11 个协议方法的
+// 编译期静态绑定 + 回落定价。绑定语义（ §8.24-B）：
+//   * 类型已知（构造点推断）→ 编译期静态绑定：a+b → a->__add__(b)、
+//     a==b → a->__eq__(b)、a[i] → a->__index_get(i)、a[i]=v →
+//     a->__index_set(i,v)、for k in obj → __for_keys/__iter_len 协议、
+//     output(obj)/拼接 → __to_str；
+//   * 类型未知 → 运行期现行为不变（不建动态查找表）；
+//   * 协议方法不存在 → 既有静默定价（本例的 Plain 类演示三类回落：
+//     output 走 <类名>、== 走同一性、for-in 零次）。
+// 数字串化一律走 int_to_str（两侧拼接口径的确定性面）。
+class Vec2 {
+    var x = 0;
+    var y = 0;
+    func init(ax, ay) { this->x = ax; this->y = ay; }
+    func __add__(o) { return Vec2(this->x + o->x, this->y + o->y); }
+    func __sub__(o) { return Vec2(this->x - o->x, this->y - o->y); }
+    func __mul__(o) { return Vec2(this->x * o->x, this->y * o->y); }
+    func __div__(o) { return Vec2(this->x / o->x, this->y / o->y); }
+    func __mod__(o) { return Vec2(this->x % o->x, this->y % o->y); }
+    func __eq__(o) {
+        if (this->x == o->x && this->y == o->y) { return 1; }
+        return 0;
+    }
+    func __index_get(i) {
+        if (i == 0) { return this->x; }
+        if (i == 1) { return this->y; }
+        return null;
+    }
+    func __index_set(i, v) {
+        if (i == 0) { this->x = v; }
+        if (i == 1) { this->y = v; }
+    }
+    func __to_str() {
+        return "(" + int_to_str(this->x) + "," + int_to_str(this->y) + ")";
+    }
+}
+
+var a = Vec2(12, 8);
+var b = Vec2(3, 5);
+// —— 五则（单层 + 链式：协议方法的返回类型按惯例 = 接收者类型）——
+var s = a + b;
+output(int_to_str(s->x) + "," + int_to_str(s->y));
+var d = a - b;
+output(int_to_str(d->x) + "," + int_to_str(d->y));
+var m = a * b;
+output(int_to_str(m->x) + "," + int_to_str(m->y));
+var q = a / b;
+output(int_to_str(q->x) + "," + int_to_str(q->y));
+var r = a % b;
+output(int_to_str(r->x) + "," + int_to_str(r->y));
+var chain = (a + b) * b - a;
+output(int_to_str(chain->x) + "," + int_to_str(chain->y));
+// 复合赋值走同一协议（+= 脱糖为 a = a + b）
+a += b;
+output(int_to_str(a->x) + "," + int_to_str(a->y));
+// —— __eq__（结构相等；原生 == 无协议类走同一性，见 Plain 段）——
+output(a == a);
+output(a == b);
+output(a == Vec2(15, 13));
+output(a == Vec2(1, 1));
+// —— 下标读写 ——
+output(a[0]);
+output(a[1]);
+output(a[9]);
+a[0] = 100;
+a[1] = 200;
+output(a[0]);
+output(a[1]);
+// —— __to_str：output 参数 + 拼接两侧 ——
+output(a);
+output("v=" + a);
+output(a + b);
+// —— for-in：__for_keys（键协议，优先）——
+class Bag {
+    var tag = 0;
+    func init() { }
+    func __for_keys() { return ["ax", "by", "cz"]; }
+}
+var bag = Bag();
+var joined = "";
+for (k in bag) {
+    joined = joined + k + ";";
+}
+output(joined);
+// for-in：__iter_len + __index_get（序列协议：元素）
+class Row {
+    var n = 0;
+    func init(n0) { this->n = n0; }
+    func __iter_len() { return this->n; }
+    func __index_get(i) { return i * 2; }
+}
+var row = Row(4);
+var acc = 0;
+for (v in row) {
+    acc = acc + v;
+}
+output(int_to_str(acc));
+// for-in：仅 __iter_len（数字协议：0..len-1）
+class Ticker {
+    var top = 0;
+    func init(t) { this->top = t; }
+    func __iter_len() { return this->top; }
+}
+var tk = Ticker(3);
+var cnt = 0;
+for (i in tk) {
+    cnt = cnt + 1;
+}
+output(int_to_str(cnt));
+// —— 类型未知回落（函数形参推断不出来 → 运行期现行为不变）——
+any_t func probe(p) {
+    output(p);
+    return p->x;
+}
+output(int_to_str(probe(Vec2(7, 9))));
+// —— 未定义协议回落（Plain 类没有任何协议方法）——
+class Plain {
+    var x = 0;
+    func init() { }
+}
+var pl = Plain();
+output(pl);
+output(pl == Plain());
+output(pl == pl);
+var z = 0;
+for (e in pl) {
+    z = z + 1;
+}
+output(int_to_str(z));
+output("GS1-END");

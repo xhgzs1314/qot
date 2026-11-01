@@ -1,0 +1,10 @@
+// F1 lambda：字面量 + 捕获形参 + 全局函数值调用
+number_t func make_adder(k) {
+    return func(x) -> x + k;
+}
+var add7 = make_adder(7);
+var add3 = make_adder(3);
+output(add7(1));
+output(add3(1));
+var add = func(a, b) -> a + b;
+output(add(3, 4));

@@ -1,0 +1,19 @@
+{
+ "name": "bound_string_index",
+ "runs_on": "vm",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stdout": [
+   "e"
+  ],
+  "stderr_empty": true
+ },
+ "tags": [
+  "string"
+ ],
+ "note": "README 3.2：字符串按下标取字符"
+}

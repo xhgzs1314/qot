@@ -1,0 +1,11 @@
+{
+  "name": "bound_mod_negative_interp",
+  "runs_on": "interp",
+  "expect": {
+    "exit": 0,
+    "stdout": ["2", "-1", "2"],
+    "stderr_empty": true
+  },
+  "tags": ["modulo", "negative", "interp-only", "pricing"],
+  "note": "解释器定价钉：取模走 Python % 语义（符号随除数）。-7 % 3 = 2、-10 % 4 = 2。VM 走 C fmod（符号随被除数，得 -1 / -2），见 vm/bound_mod_negative_vm。第 2 行 0 - 7 % 3 = -1 是 % 高于 - 的优先级钉。两运行时既定分歧（fuzz 白名单 KNOWN-MOD-SIGN）。"
+}

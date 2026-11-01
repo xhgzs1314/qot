@@ -1,0 +1,5 @@
+var s = "";
+output(s == "");
+output(s == null);
+output("" == null);
+output(glen("") == 0);

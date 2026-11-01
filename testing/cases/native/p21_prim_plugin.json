@@ -1,0 +1,9 @@
+{
+ "name": "p21_prim_plugin",
+ "runs_on": "native",
+ "compile": { "args": [], "expect_ok": true },
+ "expect": { "exit": 0, "stderr_empty": true },
+ "prerun": ["python testing/tools/build_demo_plugin.py"],
+ "tags": ["ffi", "plugin", "m7"],
+ "note": "M7：原生插件 ABI 差分。prerun 同步构建 demo 插件（testing/tools/qot_demo_plugin.c → testing/.artifacts/qot_demo_plugin.dll，Windows 名称；POSIX 套件需 .so 变体）。同一 DLL 双宿主（native qotrt / interp ctypes）零分歧：值面（num/str/arr/dict 往返）、错误通道（set_error → null + ffi_last_error 非空）、失败面（未知函数/arity/坏参数）、卸载语义与坏句柄。句柄不打印裸值；错误文本只断非空（S-13）。冻结契约 = docs/。"
+}

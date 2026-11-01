@@ -1,0 +1,8 @@
+var n1 = 0;
+var n2 = 1;
+output(n1 && n2);
+output(n1 || n2);
+output(true && n2);
+output(n1 && true);
+output("" && n2);
+output(n1 || "x");

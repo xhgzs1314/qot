@@ -1,0 +1,11 @@
+{
+  "name": "bound_dict_literal_decl",
+  "runs_on": "both",
+  "expect": {
+    "exit": 0,
+    "stdout": ["true", "true", "true", "true"],
+    "stderr_empty": true
+  },
+  "tags": ["dict", "literal", "decl", "regression"],
+  "note": "D-05 回归钉（ 修复）：visit_dict_declaration 曾把 ('dict', entries) 二元组传给 visit_dict 导致解释器解包崩溃（错误 2005），任何字典字面量声明在解释器上都失败而 VM 正常。正确性用布尔断言表达（数字输出格式两边不同，见 D-04）。附带定价记录：解释器 glen() 不支持字典（2010），glen(d) 见 vm/bound_dict_glen。"
+}

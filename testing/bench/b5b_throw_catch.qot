@@ -1,0 +1,15 @@
+// B5b 异常路径 · 抛接成本探针
+// 负载：N 轮 throw + 立即 catch，payload = 预建 err 对象复用（避免把
+// arena-free 的对象分配账面混进抛接单价；对象分配成本归 B3/B8b 管）。
+// 量的是：qotrt_throw（longjmp + 被抛值装箱）+ 着陆点摘除 + catch 体
+// 绑定的全链单价。对照 = py raise/catch 同一异常实例、php throw 同对象。
+var payload = err("boom");
+var acc = 0;
+for (i in 87654321) {
+    try {
+        throw payload;
+    } catch (e) {
+        acc = acc + 1;
+    }
+}
+output(acc);

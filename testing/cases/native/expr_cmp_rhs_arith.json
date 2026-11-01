@@ -1,0 +1,26 @@
+{
+ "name": "expr_cmp_rhs_arith",
+ "runs_on": "native",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stderr_empty": true,
+  "stdout": [
+   "A ok",
+   "B ok",
+   "C ok",
+   "D ok",
+   "E ok",
+   "F ok",
+   "pow: 16",
+   "uminus: -2",
+   "loop: 2",
+   "pin-end"
+  ]
+ },
+ "tags": ["expression", "precedence", "G-00", "grammar"],
+ "note": "G-00 比较右侧算术钉（，语料线三个样本当场踩中）。根因 = PLY precedence 表把比较组排在 PLUS/MINUS 之上 → `relational EQUALS additive .` 遇 MINUS 判 REDUCE → 语法错误。修复只把比较组降到加减之下（POW/UMINUS/ARROW/DCOLON 位置不动 → `2 ^ 3 * 2` = 16 的既有定价保持）。"
+}

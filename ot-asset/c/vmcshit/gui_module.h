@@ -1,5 +1,7 @@
 #pragma once
-#include "assets/wingui/gui_api.h"
+// wingui 已独立到 ot-asset/c/wingui（VM 侧经相对路径引用；VM 已冻结弃管，
+// 当前活跃的两条执行路径各自通过 qotgui ABI 接入同一套实现）
+#include "../wingui/gui_api.h"
 #include "vm_types.h"
 #include <unordered_map>
 #include <memory>

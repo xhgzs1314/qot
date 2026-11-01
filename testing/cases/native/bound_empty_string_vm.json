@@ -1,0 +1,11 @@
+{
+  "name": "bound_empty_string_vm",
+  "runs_on": "vm",
+  "expect": {
+    "exit": 0,
+    "stdout": ["true", "true", "true", "true"],
+    "stderr_empty": true
+  },
+  "tags": ["string", "empty", "vm-only", "pricing"],
+  "note": "VM 定价钉（D-10 ·  fuzz 发现）：空串字面量在 VM 常量装载层是 null——s == null 与 \"\" == null 均为 true。 裁决反转：裁判已换解释器（S-13 口径），AOT 常量池向 interp 对齐（\"\"=空字符串，见 empty_string_pricing 钉）；VM 冻结维持 null 原状（§8.7 不要求零分歧）。fuzz 生成器维持空串原子禁令（三方仍有 VM 分歧）。本钉只跑 --suite vm，固定 VM 行为防回退。"
+}

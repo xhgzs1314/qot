@@ -1,0 +1,12 @@
+{
+ "name": "err_class_dup_field",
+ "runs_on": "none",
+ "compile": { "args": [], "expect_ok": false },
+ "expect": {
+  "exit_not": 0,
+  "stderr_contains": ["[错误]", "重复声明"],
+  "artifact": null
+ },
+ "tags": ["syntax", "negative", "M4"],
+ "note": "M4 立法（）：类成员（字段/方法）重名 → 编译期致命。"
+}

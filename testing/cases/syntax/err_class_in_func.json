@@ -1,0 +1,12 @@
+{
+ "name": "err_class_in_func",
+ "runs_on": "none",
+ "compile": { "args": [], "expect_ok": false },
+ "expect": {
+  "exit_not": 0,
+  "stderr_contains": ["[错误]", "仅限顶层"],
+  "artifact": null
+ },
+ "tags": ["syntax", "negative", "M4"],
+ "note": "M4 立法（）：class 声明仅限顶层（函数体内 → 编译期致命）。"
+}

@@ -1,0 +1,28 @@
+var acc = 0.0;
+for (i in 100) {
+    acc = acc + i % 7;
+}
+output(acc);
+
+output(-5 % 5);
+output(0 - 5 % 5);
+output(7 % 3);
+output(0 - 7 % 3);
+output(2.5 % 5);
+output(7 % 0);
+output(7 % 0 - 1);
+output(2147483647 % 0 - 3);
+var big = 0 - 2147483648;
+output(big % 3);
+output(big % 0 - 7);
+var huge = 123456789.0;
+for (k in 60) {
+    huge = huge * 10.0;
+}
+output(huge % 7);
+var x = 1000003;
+var y = 977;
+output(x % y);
+for (i in 10) {
+    output(i % 4);
+}

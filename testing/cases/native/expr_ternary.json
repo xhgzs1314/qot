@@ -1,0 +1,27 @@
+{
+ "name": "expr_ternary",
+ "runs_on": "native",
+ "compile": { "args": [], "expect_ok": true },
+ "expect": {
+  "exit": 0,
+  "stderr_empty": true,
+  "stdout": [
+   "pos",
+   "big",
+   "C",
+   "11.000000",
+   "5.000000",
+   "yes",
+   "5.000000",
+   "in-range",
+   "42.000000",
+   "42.000000",
+   "2.000000",
+   "-1.000000",
+   "0.000000",
+   "1.000000"
+  ]
+ },
+ "tags": ["expression", "ternary", "G-03", "grammar"],
+ "note": "G-03 三元 ?: 钉（）。右结合（a?b:c?d:e = a?b:(c?d:e)）；分支惰性求值（boom() 不得执行）；语义 = if/else 的表达式形态。与 dict 的 COLON 共存裁决：{\"k\": a?b:c} 的值位贪心吃完整三元（reduce/reduce 由规则序裁决，三元先归约）。"
+}

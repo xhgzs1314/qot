@@ -1,0 +1,19 @@
+{
+ "name": "bound_dict_missing_key",
+ "runs_on": "both",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stdout": [
+   "null"
+  ],
+  "stderr_empty": true
+ },
+ "tags": [
+  "dict"
+ ],
+ "note": "README 8.7：字典缺键两边一致返回 null"
+}

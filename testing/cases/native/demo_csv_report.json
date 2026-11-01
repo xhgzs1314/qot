@@ -1,0 +1,18 @@
+{
+ "name": "demo_csv_report",
+ "runs_on": "native",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stderr_empty": true
+ },
+ "tags": [
+  "stdlib",
+  "demo",
+  "require"
+ ],
+ "note": "CP-3 端到端验收 ✓（）：require examples/csv_report.qot（CSV→统计→报表）native 全绿。csv_parse 重写为 str_find 扫描后，P0-POOL-1 池缺陷未咬住本形态（std_text 多字段形态仍挂钉）。"
+}

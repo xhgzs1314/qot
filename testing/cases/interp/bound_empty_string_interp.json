@@ -1,0 +1,11 @@
+{
+  "name": "bound_empty_string_interp",
+  "runs_on": "interp",
+  "expect": {
+    "exit": 0,
+    "stdout": ["true", "false", "false", "true"],
+    "stderr_empty": true
+  },
+  "tags": ["string", "empty", "interp-only", "pricing"],
+  "note": "解释器定价钉（D-10）：空串是合法字符串值——output(s) 打空行（归一化后不可见，用 == 断言），s == null 为 false。VM 侧空串字面量即 null，见 vm/bound_empty_string_vm。既定分歧（KNOWN-EMPTY-STR）。"
+}

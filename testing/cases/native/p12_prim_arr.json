@@ -1,0 +1,17 @@
+{
+ "name": "p12_prim_arr",
+ "runs_on": "native",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stderr_empty": true
+ },
+ "tags": [
+  "primitive",
+  "array"
+ ],
+ "note": "P0.1 CP-2：数组原语差分（P0-E）。arr_map/filter/reduce/sort_by 同时是 F1 闭包回调的首个用户。"
+}

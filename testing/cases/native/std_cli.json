@@ -1,0 +1,8 @@
+{
+ "name": "std_cli",
+ "runs_on": "native",
+ "compile": { "args": [], "expect_ok": true },
+ "expect": { "exit": 0, "stderr_empty": true },
+ "tags": ["stdlib", "m5"],
+ "note": "M5：std.cli（parse_flags/usage）差分。口径（std/cli.qot 头注登记）：--k=v 值恒为字符串；-abc 短簇逐字符布尔化（-5 → 旗标 \"5\"）；裸 \"-\" 为位置参数、裸 \"--\" 无操作；重复旗标后写覆盖。prompt 按 R7 不进差分；die 缓议（native 无正常退出非零 API，登记于 std/cli.qot）。"
+}

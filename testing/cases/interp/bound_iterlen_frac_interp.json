@@ -1,0 +1,11 @@
+{
+  "name": "bound_iterlen_frac_interp",
+  "runs_on": "interp",
+  "expect": {
+    "exit": 0,
+    "stdout": ["58", "0", "0"],
+    "stderr_empty": true
+  },
+  "tags": ["iter_len", "fractional", "interp-only", "pricing"],
+  "note": "解释器定价钉（D-08）：__iter_len(非整数) 走 max(0, int(val)) 整数截断（builtin_func.py:834）。VM 原值透传，见 vm/bound_iterlen_frac_vm。fuzz 白名单 KNOWN-ITERLEN-FRAC。"
+}

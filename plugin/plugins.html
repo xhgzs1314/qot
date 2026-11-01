@@ -80,47 +80,54 @@
     <div class="plugins-container">
         <h1 class="plugins-title"> 插件列表</h1>
         <p class="plugins-subtitle">扩展 QOT 功能的工具集合</p>
+        <p style="padding:0 2rem 1rem;margin:0;color:#64748b;font-size:.9rem;max-width:900px;">下面是站点提供的辅助工具。它们各自独立运行，与语言本身没有耦合；其中与旧字节码 VM 相关的工具仅在维护历史项目时才会用到。</p>
         <div class="plugin-cards">
-            <a href="qotcommandbuild/" class="plugin-card">
+            <a href="qotcommandbuild/index.html" class="plugin-card">
                 <div class="plugin-icon"><i class="fas fa-hammer"></i></div>
-                <h3>Qot-Building-Command</h3>
-                <p>QOT编译命令构建</p>
+                <h3>QOT 打包命令</h3>
+                <p>可视化打包：选源码、选编译模式、生成可执行文件</p>
                 <span class="plugin-btn">访问 →</span>
             </a>
-            <a href="pycodetoqotcode/" class="plugin-card">
+            <a href="pycodetoqotcode/index.html" class="plugin-card">
                 <div class="plugin-icon"><i class="fas fa-code-branch"></i></div>
-                <h3>PyCode-QotCode</h3>
-                <p>Python代码转QOT代码</p>
+                <h3>Python → QOT</h3>
+                <p>把 Python 脚本转换成等价的 QOT 源码</p>
                 <span class="plugin-btn">访问 →</span>
             </a>
-            <a href="qtcodeanalysis/" class="plugin-card">
+            <a href="qtcodeanalysis/index.html" class="plugin-card">
                 <div class="plugin-icon"><i class="fas fa-chart-simple"></i></div>
-                <h3>QTC字节码分析器</h3>
-                <p>QTC字节码分析器</p>
+                <h3>QTC 字节码分析器</h3>
+                <p>反汇编 .qtc 字节码，查看函数、常量与指令分布</p>
                 <span class="plugin-btn">访问 →</span>
             </a>
-            <a href="shellcode/" class="plugin-card">
+            <a href="shellcode/index.html" class="plugin-card">
                 <div class="plugin-icon"><i class="fas fa-shield"></i></div>
-                <h3>ShellCode签名</h3>
-                <p>ShellCode签名工具</p>
+                <h3>ShellCode 签名</h3>
+                <p>为 .bin 机器码附加追责签名，便于分发与溯源</p>
                 <span class="plugin-btn">访问 →</span>
             </a>
-            <a href="vsgds/" class="plugin-card">
+            <a href="vsgds/index.html" class="plugin-card">
                 <div class="plugin-icon"><i class="fas fa-palette"></i></div>
-                <h3>GUI-Design</h3>
-                <p>可视化GUI设计</p>
+                <h3>GUI 可视化设计</h3>
+                <p>可视化搭建界面，导出界面参数</p>
                 <span class="plugin-btn">访问 →</span>
             </a>
-            <a href="signpack/" class="plugin-card">
+            <a href="signpack/index.html" class="plugin-card">
                 <div class="plugin-icon"><i class="fas fa-signature"></i></div>
-                <h3>外部库签名工具</h3>
-                <p>外部库签名工具</p>
+                <h3>库签名工具</h3>
+                <p>给动态库附加签名，供 QOT 侧加载时校验</p>
                 <span class="plugin-btn">访问 →</span>
             </a>
-            <a href="packfuncauto/" class="plugin-card">
+            <a href="myconsole/index.html" class="plugin-card">
+                <div class="plugin-icon"><i class="fas fa-terminal"></i></div>
+                <h3>Qot 脚本运行台</h3>
+                <p>在浏览器里直接运行 QOT 脚本，查看输出</p>
+                <span class="plugin-btn">访问 →</span>
+            </a>
+            <a href="packfuncauto/index.html" class="plugin-card">
                 <div class="plugin-icon"><i class="fas fa-file-alt"></i></div>
-                <h3>外部库FUNC文件生成</h3>
-                <p>无需手写FUNC配置</p>
+                <h3>外部库 FUNC 生成</h3>
+                <p>分析 DLL 导出函数，自动生成 FUNC 描述文件</p>
                 <span class="plugin-btn">访问 →</span>
             </a>
         </div>

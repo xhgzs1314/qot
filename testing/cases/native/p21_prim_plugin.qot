@@ -1,0 +1,50 @@
+// ============================================================================
+// p21_prim_plugin —— M7 原生插件 ABI 差分（，docs/）
+//
+// 同一份 demo 插件（testing/tools/qot_demo_plugin.c，prerun 同步构建到
+// testing/.artifacts/qot_demo_plugin.dll）喂给两个宿主：
+//   * native = AOT exe 的 qotrt 宿主；oracle = 解释器的 ctypes 宿主；
+//   * 插件只经公共头 api 访问值（可移植契约）→ 两侧零分歧面。
+// 纪律：
+//   * 句柄两侧各自计数 —— 不打印裸句柄，只打印派生结果；
+//   * 错误文本两侧各自持有 —— 只断言非空（str_len > 0）；
+//   * 插件返回的浮点两侧同源（同一 DLL 同一代码路径）→ 位级一致。
+// ============================================================================
+
+// ---- 装载与注册面 ----
+var h = plugin_load("testing/.artifacts/qot_demo_plugin.dll");
+output(is_null(h));                                    // false：装载成功
+for (name in plugin_names(h)) {
+    output(name);                                      // 注册序 5 个名字
+}
+
+// ---- 值面：数字 / 字符串 / 容器 ----
+output(plugin_call(h, "add", [2.0, 3.0]));             // 5.000000
+output(plugin_call(h, "add", [-1.5, 0.25]));           // -1.250000
+output(plugin_call(h, "hypot3", [3.0, 4.0, 12.0]));    // 13.000000
+output(plugin_call(h, "sjoin", ["-", ["a", "b", "c"]]));  // a-b-c
+output(plugin_call(h, "sjoin", ["", ["x", "y"]]));        // xy
+var st = plugin_call(h, "stats", [[1.0, 2.0, 3.5]]);
+output(st["sum"]);                                     // 6.500000
+output(st["n"]);                                       // 3.000000
+output(st["min"]);                                     // 1.000000
+output(st["max"]);                                     // 3.500000
+
+// ---- 错误通道（api->set_error → null + ffi_last_error 非空）----
+output(is_null(plugin_call(h, "fail_if_negative", [-5.0])));  // true
+output(str_len(ffi_last_error()) > 0);                        // true
+output(is_null(plugin_call(h, "sjoin", [1, ["a"]])));         // true：sep 非字符串
+output(str_len(ffi_last_error()) > 0);                        // true
+
+// ---- 失败面：未知函数 / arity 不符 / 坏参数形状 ----
+output(is_null(plugin_call(h, "no_such_fn", [])));     // true
+output(is_null(plugin_call(h, "add", [1.0])));         // true：arity mismatch
+output(is_null(plugin_call(h, "add", 7)));             // true：args 非数组
+
+// ---- 卸载语义与坏句柄 ----
+output(plugin_free(h));                                // true
+output(is_null(plugin_call(h, "add", [1.0, 2.0])));    // true：句柄已失效
+output(is_null(plugin_names(h)));                      // true
+output(plugin_free(h));                                // false：重复释放
+output(is_null(plugin_load("testing/.artifacts/no_such_plugin.dll")));  // true
+output(str_len(ffi_last_error()) > 0);                 // true

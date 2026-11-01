@@ -1,0 +1,110 @@
+// ============================================================================
+// std.data —— 统计与分组标准库
+// ----------------------------------------------------------------------------
+// ============================================================================
+
+// 私有：数字数组校验（非数组/空/含非数字 → false）
+boolean_t func _sdt_ok(nums) {
+    if (type_is(nums, "array") == false) { return false; }
+    var i = 0;
+    var n = arr_len(nums);
+    loop (i < n) {
+        if (type_is(arr_get(nums, i), "number") == false) { return false; }
+        i += 1;
+    }
+    return n > 0;
+}
+
+// ---- 算术平均（Σ/n）；空/非数组/含非数字 → null ----
+any_t func mean(nums) {
+    if (_sdt_ok(nums) == false) { return null; }
+    var s = 0;
+    var i = 0;
+    var n = arr_len(nums);
+    loop (i < n) {
+        s = s + arr_get(nums, i);
+        i += 1;
+    }
+    return s / n;
+}
+
+// ---- 中位数（副本排序，不改输入；偶数个取中间两数平均）----
+any_t func median(nums) {
+    if (_sdt_ok(nums) == false) { return null; }
+    var copy = arr_copy(nums);
+    arr_sort(copy);
+    var n = arr_len(copy);
+    if (int_mod(n, 2) == 1) {
+        return arr_get(copy, int_div(n, 2));
+    }
+    var a = arr_get(copy, int_div(n, 2) - 1);
+    var b = arr_get(copy, int_div(n, 2));
+    return (a + b) / 2;
+}
+
+// ---- 总体标准差 sqrt(Σ(x-μ)²/n)；平方根 = 语言幂运算 x ^ 0.5 ----
+any_t func stddev(nums) {
+    if (_sdt_ok(nums) == false) { return null; }
+    var mu = mean(nums);
+    var acc = 0;
+    var i = 0;
+    var n = arr_len(nums);
+    loop (i < n) {
+        var d = arr_get(nums, i) - mu;
+        acc = acc + d * d;
+        i += 1;
+    }
+    return (acc / n) ^ 0.5;
+}
+
+// 私有：行的分组键（trim + strings 化）
+string_t func _sdt_key(cell) {
+    return str_trim(strings(cell));
+}
+
+// ---- 按列分组计数 → dict{key: count}；rows 非数组 → null ----
+any_t func group_count(rows, col) {
+    if (type_is(rows, "array") == false) { return null; }
+    var out = dict_new();
+    var i = 0;
+    var n = arr_len(rows);
+    loop (i < n) {
+        var row = arr_get(rows, i);
+        if (type_is(row, "array")) {
+            var k = _sdt_key(arr_get(row, col));
+            if (dict_has(out, k)) {
+                dict_set(out, k, dict_get(out, k) + 1);
+            } else {
+                dict_set(out, k, 1);
+            }
+        }
+        i += 1;
+    }
+    return out;
+}
+
+// ---- 按列分组求和 → dict{key: Σ valcol}；非数值单元格跳过（num_is_valid
+// 预判 —— str_to_num 的失败哨兵 -1 与合法值 -1 同形，不能当失败用）----
+any_t func group_sum(rows, col, valcol) {
+    if (type_is(rows, "array") == false) { return null; }
+    var out = dict_new();
+    var i = 0;
+    var n = arr_len(rows);
+    loop (i < n) {
+        var row = arr_get(rows, i);
+        if (type_is(row, "array")) {
+            var cell = arr_get(row, valcol);
+            if (num_is_valid(cell)) {
+                var k = _sdt_key(arr_get(row, col));
+                var v = str_to_num(cell);
+                if (dict_has(out, k)) {
+                    dict_set(out, k, dict_get(out, k) + v);
+                } else {
+                    dict_set(out, k, v);
+                }
+            }
+        }
+        i += 1;
+    }
+    return out;
+}

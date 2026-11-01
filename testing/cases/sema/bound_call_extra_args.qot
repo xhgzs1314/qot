@@ -1,0 +1,5 @@
+any_t func f(a, b) {
+    output(a);
+    output(b);
+}
+f(1, 2, 3);

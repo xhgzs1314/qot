@@ -1,0 +1,12 @@
+any_t func id(x) {
+    return x;
+}
+var a = 1;
+output(glen(id(null) + a) == 1);
+output(glen(a + id(null)) == 1);
+output(glen(id(true) + a) == 5);
+output(id(2) + a == 3);
+output(id(1.5) * 2 == 3);
+var f = 2.5;
+f = f * 2;
+output(f == 5);

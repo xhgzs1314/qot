@@ -1,0 +1,18 @@
+{
+ "name": "unbox_call_numeric",
+ "runs_on": "vm",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stderr_empty": true
+ },
+ "tags": [
+  "n04",
+  "unbox-call",
+  "fastpath"
+ ],
+ "note": "N-04 双体快速入口的正例钉：递归 fib（快体自调用）+ 多调用点 + half/pick 数值内核在热循环中被 guard 命中走快入口。native 与 VM 逐行差分。改动 FastPlanner/快体发射/调用点 guard 前必跑。"
+}

@@ -1,0 +1,24 @@
+// B2c 字典密集 · 全表迭代（dict_keys 分配 + 逐键回查）
+// 负载：先建 101 键的字典，再做 ITER 轮「dict_keys(m) → 逐键 m[k] 累加」。
+// 每轮成本 = 1 次 dict_keys 数组分配（101 元素）+ 101 次键查找。
+// 拷问点：dict_keys 每次都物化一个新数组，这是纯分配压力；回查又回到
+// 查找路径。per_unit 按「每键」计（101 键/轮），故 unit_per_iter=101。
+// 注意：求和与迭代顺序无关（加法交换律），所以本负载不钉住键序；
+// 键序语义由 testing/cases/native/ 下的差分用例单独钉死（§3.2 坑点②）：
+// native_dict_iter_order（ 新增，逐行钉住 45 个键的槽序）。
+var m = &< "z": 0 >&;
+var j = 0;
+loop (j < 100) {
+    m["k" + strings(j)] = j;
+    j = j + 1;
+}
+var t = 0;
+for (r in 87654321) {
+    var ks = dict_keys(m);
+    var q = 0;
+    loop (q < glen(ks)) {
+        t = t + m[ks[q]];
+        q = q + 1;
+    }
+}
+output(t);

@@ -1,0 +1,8 @@
+output(g == null);
+var g = 5;
+output(g == 5);
+g = g + 1;
+output(g == 6);
+var h = 1.5;
+h = h * 2;
+output(h == 3);

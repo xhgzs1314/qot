@@ -1,0 +1,18 @@
+// 【反转钉 】一元逻辑非 `!` 曾不存在（旧钉期望编译失败，
+// §8.23-C 实证 token 层未定义）。GOD-SELF 收尾把 `!` 实现为正式一元
+// 运算符（前缀位 = 逻辑非；标识符后紧跟 `!(` = 宏调用，文法零冲突），
+// 本钉反转：必须编译成功且 truthy 取反语义正确。
+// truthy 表（interp is_truthy ≡ native qotrt_truthy_str）：
+//   null/false/0/空串/空容器 = 假；非零数/非空串/非空容器/对象 = 真。
+var a = true;
+if (!a) { output("BAD1"); } else { output("not-true-ok"); }
+if (!false) { output("not-false-ok"); }
+output(!0);
+output(!1);
+output(!"");
+output(!"x");
+output(!null);
+var arr = [1];
+output(!arr);
+var empty = [];
+output(!empty);

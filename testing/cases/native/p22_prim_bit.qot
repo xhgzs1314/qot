@@ -1,0 +1,51 @@
+// ============================================================================
+// p22_prim_bit —— P0-D 补：位运算差分（）
+// 纪律：位型结果一律 int_to_str 输出（逐字节，避开 %.6f 口径噪声）；
+// golden 按 native 口径；oracle 裁判零分歧对账。
+// 黄金值含：补码语义（-1 = 全 1 掩码）、shl 的 uint64 承载回绕（1<<63 =
+// INT64_MIN）、算术右移符号跟随、掩码工作流、失败哨兵 -1（非整/越移位）。
+// ============================================================================
+
+// ---- 基本门（正数域）----
+output(int_to_str(bit_and(12, 10)));      // 8
+output(int_to_str(bit_or(12, 10)));       // 14
+output(int_to_str(bit_xor(5, 3)));        // 6
+output(int_to_str(bit_not(0)));           // -1
+output(int_to_str(bit_not(5)));           // -6
+
+// ---- 补码语义（负数域）----
+output(int_to_str(bit_and(-1, 255)));     // 255（-1 = 全 1 掩码）
+output(int_to_str(bit_xor(-1, 5)));       // -6（等价 bit_not(5)）
+output(int_to_str(bit_or(-8, 7)));        // -1
+
+// ---- 移位（shl = uint64 承载；shr = 算术右移符号跟随）----
+output(int_to_str(bit_shl(1, 10)));       // 1024
+output(int_to_str(bit_shr(-8, 1)));       // -4（算术右移，-4 的补码再 >> 补 1）
+output(int_to_str(bit_shr(255, 4)));      // 15
+output(int_to_str(bit_shl(3, 62)));       // -4611686018427387904（回绕）
+
+// ---- 边界黄金值（uint64 承载的回绕语义钉）----
+// 注意：1<<63 = INT64_MIN（-9.2234e18）越出 int_to_str 的 9.2e18 域检查线
+// （int_div 族既有定价，非本轮缺陷）——用位恒等自证，不用 int_to_str 观察。
+output(int_to_str(bit_shl(1, 62)));       // 4611686018427387904
+output(bit_shl(1, 63) < 0);               // true（回绕成负 = 符号位在）
+output(bit_and(bit_shl(1, 63), bit_shl(1, 63)) != 0);  // true（位恒等自证）
+output(bit_and(bit_or(bit_shl(1, 63), 1), 1));  // 1（最低位在）
+output(int_to_str(bit_shr(bit_shl(1, 62), 60))); // 4
+
+// ---- 掩码工作流（标志位场景）----
+var flags = bit_or(bit_shl(1, 0), bit_shl(1, 3));   // 0b1001 = 9
+output(int_to_str(flags));                          // 9
+output(bit_and(flags, bit_shl(1, 3)) != 0);         // true（第 3 位在）
+output(bit_and(flags, bit_shl(1, 1)) != 0);         // false（第 1 位不在）
+var cleared = bit_and(flags, bit_not(bit_shl(1, 0))); // 清第 0 位
+output(int_to_str(cleared));                        // 8
+output(int_to_str(bit_xor(flags, cleared)));        // 1（差集 = 被清的位）
+
+// ---- 失败面（哨兵 -1：非整 / 越移位；同 int_div 族定价）----
+output(int_to_str(bit_and(1.5, 2)));      // -1
+output(int_to_str(bit_or("x", 1)));       // -1
+output(int_to_str(bit_not("s")));         // -1（非数字拒绝）
+output(int_to_str(bit_shl(1, 64)));       // -1（s 越域）
+output(int_to_str(bit_shr(1, -1)));       // -1
+output(int_to_str(bit_shl(1, 63) == -9223372036854775808));  // true（哨兵区分靠位型判断，不在失败面）

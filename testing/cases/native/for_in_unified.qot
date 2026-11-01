@@ -1,0 +1,65 @@
+// 【M3 钉 】for-in 统一：字符串 / 字典 / null / 布尔 / 小数计数。
+// 统一前（三侧分歧矩阵， §2.5 调研）：
+//   for (c in str)：interp 报 2021 / native 单字节迭代 → 统一为可迭代
+//   for (k in dict)：interp 报 2021 / native 静默零次 → 统一为键迭代（__for_keys）
+//   for (x in null)：interp 报 2021 / native 零次 → 统一为零次
+//   for (x in true)：interp 报 2021 / native 零次 → 统一为零次
+//   for (i in 58.457)：interp int 截断 58 次 / native 原值比较 59 次 → 对齐 native
+//   for (i in -5)：interp 报 2020 / native 零次 → 对齐 native（零次）
+// 旧错误码 2020/2021 保留定义，for 不再使用（M3 定价，README/SPEC 同步）。
+// 注意：本钉全部用 ASCII 字符串与确定性顺序（避免字节/字符与槽序/插入序
+// 两个登记分歧族）。
+var acc = "";
+for (c in "abc") { acc = acc + c + "-"; }
+output(acc);
+// 字符串长度（iter_len = 字节数；ASCII 下两侧同律）
+var n = 0;
+for (c in "hello") { n += 1; }
+output(n);
+// 字典：键迭代（native 槽序，确定性；值经 d[k] 取）
+var d = &< "x": 1, "y": 2, "z": 3 >&;
+var total = 0;
+var keys = "";
+for (k in d) {
+    total += d[k];
+    keys = keys + k;
+}
+output(total);
+output(keys);
+// 空容器 / null / bool：零次
+var cnt = 0;
+for (x in null) { cnt += 1; }
+for (x in true) { cnt += 1; }
+for (x in false) { cnt += 1; }
+for (x in &< >&) { cnt += 1; }
+for (x in []) { cnt += 1; }
+for (x in "") { cnt += 1; }
+output(cnt);
+// 小数计数（58.457 → 0..58 共 59 次，native 原值比较口径）
+cnt = 0;
+for (x in 58.457) { cnt += 1; }
+output(cnt);
+// 负数 / 零计数
+cnt = 0;
+for (x in -5) { cnt += 1; }
+for (x in 0) { cnt += 1; }
+output(cnt);
+// for-in 与 continue/stop 的组合（字符串）
+acc = "";
+for (c in "abcdef") {
+    if (c == "c") { continue; }
+    if (c == "e") { stop; }
+    acc = acc + c;
+}
+output(acc);
+// 函数内的字符串 for-in（局部路径）
+string_t func vowels(s) {
+    var out = "";
+    for (ch in s) {
+        if (ch == "a" || ch == "e" || ch == "i" || ch == "o" || ch == "u") {
+            out = out + ch;
+        }
+    }
+    return out;
+}
+output(vowels("quick brown fox"));

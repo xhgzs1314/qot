@@ -1,0 +1,21 @@
+true
+true
+true
+result.txt
+true
+2.000000
+in1.dat
+in2.dat
+0.000000
+0.000000
+true
+1.000000
+true
+2
+true
+usage: tool [options] files...
+  --verbose  打印一切
+true
+single line
+true
+false

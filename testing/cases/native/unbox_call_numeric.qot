@@ -1,0 +1,30 @@
+number_t func fib(n) {
+    if (n < 2) { return n; }
+    return fib(n - 1) + fib(n - 2);
+}
+
+number_t func half(x) {
+    return x / 2;
+}
+
+number_t func pick(x) {
+    if (x > 0) { return x; }
+    return 0 - x;
+}
+
+var acc = 0.0;
+for (i in 14) {
+    acc = acc + fib(i);
+}
+output(acc);
+output(fib(16));
+output(half(9));
+output(half(10));
+output(pick(7));
+output(pick(0 - 7));
+output(pick(0));
+var s = 0.0;
+for (i in 60) {
+    s = s + half(i) + pick(i - 30);
+}
+output(s);

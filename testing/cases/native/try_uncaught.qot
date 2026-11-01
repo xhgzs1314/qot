@@ -1,0 +1,11 @@
+// F2 契约：未捕获 throw = 确定性致命（stderr [2001] + exit 124，两引擎一致）
+output("start");
+number_t func level3() {
+    throw "uncaught-value";
+    return 0;
+}
+number_t func level2() {
+    return level3();
+}
+output(level2());
+output("never");

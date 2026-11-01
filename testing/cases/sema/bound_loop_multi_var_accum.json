@@ -1,0 +1,21 @@
+{
+ "name": "bound_loop_multi_var_accum",
+ "runs_on": "both",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stdout": [
+   "true",
+   "true"
+  ]
+ },
+ "tags": [
+  "loop",
+  "rpn",
+  "runtime-diff"
+ ],
+ "note": "sum(0..999)=499500、n 最终 1000。RPN 超指令语义地雷探测器（SPEC D-03）。用布尔断言规避两边数字格式差异"
+}

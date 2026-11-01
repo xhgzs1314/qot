@@ -1,0 +1,20 @@
+{
+ "name": "err_decrement",
+ "runs_on": "none",
+ "compile": {
+  "args": [],
+  "expect_ok": false
+ },
+ "expect": {
+  "exit_not": 0,
+  "stderr_contains": [
+   "[错误]"
+  ],
+  "artifact": null
+ },
+ "tags": [
+  "syntax",
+  "negative"
+ ],
+ "note": "没有 --"
+}

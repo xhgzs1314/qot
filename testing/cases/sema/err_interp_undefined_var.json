@@ -1,0 +1,19 @@
+{
+ "name": "err_interp_undefined_var",
+ "runs_on": "interp",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 1,
+  "stdout": [],
+  "stderr_contains": [
+   "[2001]"
+  ]
+ },
+ "tags": [
+  "scope"
+ ],
+ "note": "README 21.1：解释器报 2001 退出"
+}

@@ -1,0 +1,22 @@
+// T-33 字典密集。段 A：常量键查找 100 万次（热表 + 哈希缓存路径主导）。
+// 段 B：2 万插入 + 2 万动态键查找。
+var d = &< "a": 1, "b": 2, "c": 3 >&;
+var s = 0;
+for (i in 1000000) {
+    s = s + d["a"];
+}
+output(s == 1000000);
+
+var keys = [];
+for (i in 20000) {
+    push(keys, strings(i));
+}
+var m = &< "z": 0 >&;
+for (i in 20000) {
+    m[keys[i]] = i;
+}
+var t = 0;
+for (i in 20000) {
+    t = t + m[keys[i]];
+}
+output(t == 199990000);

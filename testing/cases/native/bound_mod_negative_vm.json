@@ -1,0 +1,11 @@
+{
+  "name": "bound_mod_negative_vm",
+  "runs_on": "vm",
+  "expect": {
+    "exit": 0,
+    "stdout": ["-1.000000", "-1.000000", "-2.000000"],
+    "stderr_empty": true
+  },
+  "tags": ["modulo", "negative", "vm-only", "pricing"],
+  "note": "VM 定价钉：取模走 C fmod（符号随被除数）。-7 % 3 = -1、-10 % 4 = -2。解释器走 Python % 语义（符号随除数，得 2 / 2），见 interp/bound_mod_negative_interp。这是两运行时的既定分歧（fuzz 白名单 KNOWN-MOD-SIGN），任何一侧改动都会被本钉与对侧钉同时抓住。"
+}

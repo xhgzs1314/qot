@@ -1,0 +1,16 @@
+// B5a 异常路径 · try 热路径成本探针
+// 负载：N 轮小算术全部包在 try/catch 里、零 throw —— 量的是「进 try 区」
+// 的单价（着陆点入栈 + setjmp + 出区摘除）。硬验收的另一面：
+// 【无 try 的程序零开销】是结构性成立（不触碰 landing 栈），本负载量化
+// 「有 try 的区间」定价，给 F2 的成本账单一个数字。
+// py/php 对照：同样的 try 包裹循环（Python try/except、PHP try/catch 的
+// 零 throw 快路径成本）。
+var acc = 0;
+for (i in 87654321) {
+    try {
+        acc = acc + 3;
+    } catch (e) {
+        acc = acc - 1;
+    }
+}
+output(acc);

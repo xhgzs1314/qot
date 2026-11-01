@@ -1,0 +1,23 @@
+{
+ "name": "gs3_emergent",
+ "runs_on": "native",
+ "compile": { "args": [], "expect_ok": true },
+ "expect": {
+  "exit": 0,
+  "stderr_empty": true,
+  "stdout": [
+   "(7,10)",
+   "1.000000",
+   "(3,4)",
+   "Rex: woof",
+   "R7: beep/ion-hum",
+   "Max: woof",
+   "9",
+   "1",
+   "0;1;4;9;16;",
+   "GS3-END"
+  ]
+ },
+ "tags": ["GOD-SELF", "emergence", "G3-judge"],
+ "note": "GOD-SELF 涌现验收钉（， §8.24-D0 过关主判据）：纯 .qot（宏 + 协议）把 C 档缺口长出来，内核零依赖（require 为空，只用 G1/G2 机制面 + M4 对象模型）。C4 运算符重载：Vec2 的 + - ==（__add__/__sub__/__eq__ + __to_str）；C1 接口与多态：协议约定（实现者提供 speak()）+ any 调用点运行期方法表分派（describe(obj)，无类层级）+ speak! 宏改写面 + 组合委托（Robot 组合 Engine）；C6 引用语义：官方 swap!；C3 加分原型：yield! → 回调改写（_m_emit(v)，序列由闭包累积；_m_ 前缀 = 宏库约定，__ 前缀为编译器隐藏临时保留）。"
+}

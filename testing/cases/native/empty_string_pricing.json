@@ -1,0 +1,28 @@
+{
+ "name": "empty_string_pricing",
+ "runs_on": "native",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stderr_empty": true,
+  "stdout": [
+   "0.000000",
+   "true",
+   "true",
+   "false",
+   "false",
+   "true",
+   "xxx",
+   "3.000000"
+  ]
+ },
+ "tags": [
+  "primitive",
+  "pricing",
+  "string"
+ ],
+ "note": "空串定价钉（ AOT 向 interp 对齐：\"\"=空字符串非 null）；expect.stdout 硬断言。interp 侧同语义由 cases/interp/bound_empty_string_interp 承担。"
+}

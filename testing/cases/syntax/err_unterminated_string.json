@@ -1,0 +1,20 @@
+{
+ "name": "err_unterminated_string",
+ "runs_on": "none",
+ "compile": {
+  "args": [],
+  "expect_ok": false
+ },
+ "expect": {
+  "exit_not": 0,
+  "stderr_contains": [
+   "[错误]"
+  ],
+  "artifact": null
+ },
+ "tags": [
+  "syntax",
+  "negative"
+ ],
+ "note": "字符串未闭合 【P1030-4 修复摘钉】词法器 t_UNTERMINATED_STRING 硬错 1008（LexerError → parse_oning_gram → 编译失败）。"
+}

@@ -1,0 +1,15 @@
+var total = 0;
+for (i in 3) {
+    for (j in 3) {
+        var k = 4;
+        loop (k > 0) {
+            k = k - 1;
+            total = total + i + j;
+            if (total > 20) {
+                total = total - 5;
+            }
+        }
+        total = total / 2;
+    }
+}
+output(total == 9.390625);

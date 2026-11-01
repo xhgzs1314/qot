@@ -1,0 +1,102 @@
+// 【M4 钉 】最小对象模型：class / 字段 / 方法 / 构造。
+// 语义定价（README §6.4 / SPEC）：
+//   * 对象 = 固定布局（字段按声明序偏移）+ 类型表方法分派 —— 不是字典；
+//   * 构造 = 类名调用（字段初始化器按声明序 → init 体 → 恒返回实例）；
+//   * this 在方法体内恒指接收者（遮蔽外层同名）；init 内禁 return（编译期致命）；
+//   * 未声明字段：读 null / 写忽略；对象缺席方法调用得 null；
+//     非对象接收者走既有「receiver 前置」-> 调用定价（零迁移）；
+//   * 对象相等 = 同一实例（引用同一性）；
+//   * gtypes(obj)="object"、str(obj)="<类名>"（确定性，无地址）。
+// LIR 面：FIELD_GET/FIELD_SET/CALL_OMETHOD（42/43/44，号段只增）；
+// 字段访问 = 类型表偏移 + 直接下标（内联快路径，无调用帧）。
+class Point {
+    var x = 0;
+    var y = 0;
+    func init(a, b) { this->x = a; this->y = b; }
+    number_t func dist2() {
+        return this->x * this->x + this->y * this->y;
+    }
+    string_t func show() {
+        return "(" + this->x + "," + this->y + ")";
+    }
+}
+var p = Point(3, 4);
+output(p->x);
+output(p->y);
+output(p->dist2());
+output(p->show());
+p->x = 5;
+p->y += 10;
+output(p->show());
+output(p->dist2());
+// 宽松定价：未声明字段 / 缺席方法
+output(p->z);
+output(p->nosuch());
+// 引用同一性
+var q = Point(1, 1);
+output(p == q);
+output(p == p);
+q = p;
+output(p == q);
+// gtypes / str
+output(gtypes(p));
+output(str(p));
+// 对象在容器里（数组/字典）+ for-in 组合
+var arr = [Point(1,0), Point(0,1)];
+var total = 0;
+for (pt in arr) {
+    total += pt->dist2();
+}
+output(total);
+var d = &< "k": Point(2,2) >&;
+output(d["k"]->dist2());
+// 方法链（方法返回对象）
+class Counter {
+    var n = 0;
+    func init() { }
+    any_t func inc() { this->n = this->n + 1; return this; }
+    number_t func value() { return this->n; }
+}
+var c = Counter();
+c->inc()->inc()->inc();
+output(c->value());
+// 闭包捕获方法局部（含字段读取的值）
+class Adder {
+    var base = 0;
+    func init(b) { this->base = b; }
+    any_t func make() {
+        var b = this->base;
+        return func(x) -> x + b;
+    }
+}
+var add5 = Adder(5)->make();
+output(add5(10));
+// 无 init 的类 + 字段默认值先于 init
+class Default {
+    var a = 7;
+    var b;
+}
+var df = Default();
+output(df->a);
+output(df->b);
+class Over {
+    var v = 1;
+    func init() { this->v = this->v + 41; }
+}
+output(Over()->v);
+// 方法里的循环 + continue（this 与控制流组合）
+class Summer {
+    var acc = 0;
+    func init() { }
+    any_t func add_odd(n) {
+        var i = 0;
+        for (i in n) {
+            if (i % 2 == 0) { continue; }
+            this->acc += i;
+        }
+        return this;
+    }
+    number_t func value() { return this->acc; }
+}
+output(Summer()->add_odd(10)->value());
+output("M4-END");

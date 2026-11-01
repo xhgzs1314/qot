@@ -1,0 +1,7 @@
+var w = vg_create_window("QOT 原生窗口", 640, 420);
+vg_set_window_bg_gradient(w, [0.05, 0.05, 0.12, 1], [0.12, 0.08, 0.22, 1]);
+var lb = vg_create_label(w, "你好，原生界面", 40, 40, 300, 32);
+var btn = vg_create_button(w, "点我", 40, 100, 160, 40);
+vg_button_set_text(btn, "点我 (AOT)");
+vg_show_window(w);
+output("gui-ok " + gtypes(lb) + " " + gtypes(w));

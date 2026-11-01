@@ -1,0 +1,1 @@
+{"name": "try_basic", "runs_on": "native", "compile": {"args": [], "expect_ok": true}, "expect": {"exit": 0, "stderr_empty": true}, "tags": ["try", "throw", "f2"], "note": "try/catch 主路径：throw 字符串/数字、嵌套重抛、try 内 return（F2 交付钉）"}

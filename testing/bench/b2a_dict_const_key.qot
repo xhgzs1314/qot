@@ -1,0 +1,11 @@
+// B2a 字典密集 · 常量键查找（哈希缓存路径）
+// 负载：5 键热表，ITER 次 d["alpha"]，累加防消除。
+// 拷问点：键为编译期常量时，哈希是否只算一次（现状：qotrt_vhash 缓存了
+// 字符串的哈希，但每次下标仍要走 qotrt_dict_find 的完整探测序列）。
+// 与 B2b 的分工：这里隔离「探测成本」，B2b 隔离「键构造 + 插入/rehash」。
+var d = &< "alpha": 1, "beta": 2, "gamma": 3, "delta": 4, "omega": 5 >&;
+var s = 0;
+for (i in 87654321) {
+    s = s + d["alpha"];
+}
+output(s);

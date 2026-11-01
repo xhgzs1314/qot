@@ -1,0 +1,7 @@
+number_t func add(a, b) {
+    return a + b;
+}
+number_t func add(a, b) {
+    return a + b + 1;
+}
+output(add(1, 2));

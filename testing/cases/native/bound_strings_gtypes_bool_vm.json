@@ -1,0 +1,11 @@
+{
+  "name": "bound_strings_gtypes_bool_vm",
+  "runs_on": "vm",
+  "expect": {
+    "exit": 0,
+    "stdout": ["true", "boolean", "false"],
+    "stderr_empty": true
+  },
+  "tags": ["strings", "gtypes", "bool", "vm-only", "pricing"],
+  "note": "VM 定价钉（D-07a/D-07b， fuzz 前哨探针发现）：VM 的 strings(布尔) 走 Value::toString → true/false；gtypes(布尔) → boolean。解释器侧 strings(布尔)=str(True)='True'、gtypes(布尔)='any'，见 interp/bound_strings_gtypes_bool_interp。两运行时既定分歧，fuzz 白名单 KNOWN-STRINGS-BOOL / KNOWN-GTYPES-BOOL，生成器规避。"
+}

@@ -1,0 +1,23 @@
+// S-02 负例矩阵 ⑥（D-11 回归钉）：字符串流入算术结果后，该结果不得被判为 F64。
+//
+// 原缺陷：infer_f64 把「ARITH_GEN 子码 1..6」无条件记成数值源，于是
+//   b = a + 1（a 是字符串）→ b 被判 F64 → c = b + 2 被改写成裸 double 运算
+//   → AOT 得 2.0，VM 得 "x12"（拼接语义）。同一根因下 -b 也得走通用语义。
+// 差分断言：native 输出逐行 == VM 输出。
+var a = "x";
+var one = 1;
+var b = a + one;
+var c = b + 2;
+output(c);
+var d = -b;
+var e = d + 1;
+output(e);
+// 循环形态：累加器首轮是数字，第二轮的加数是字符串 → 全链路不得特化
+var s = 0;
+var k = 1;
+for (i in 3) {
+    s = s + k;
+    k = "y";
+}
+output(s);
+output(k);

@@ -1,0 +1,27 @@
+{
+ "name": "gs2_macro",
+ "runs_on": "native",
+ "compile": { "args": [], "expect_ok": true },
+ "expect": {
+  "exit": 0,
+  "stderr_empty": true,
+  "stdout": [
+   "42",
+   "12",
+   "7",
+   "80",
+   "2",
+   "1",
+   "200",
+   "100",
+   "20",
+   "t-not-1",
+   "5",
+   "unless-skip-ok",
+   "30",
+   "GS2-END"
+  ]
+ },
+ "tags": ["GOD-SELF", "G2", "macro"],
+ "note": "GOD-SELF-G2 钉（， §8.24-C）：编译期宏（AST→AST）。官方宏 swap!（C6 引用语义涌现：真实交换变量，含函数体内形态）与 unless!(cond){...}（控制流涌现 = if(cond){}else{...}，含条件为真时跳过体）；用户宏三形态：表达式宏 twice!、体内调宏 inc2!（体执行期值语义：实参先求值自底向上展开）、块形态宏 repeat!(n){...}（块语句列表绑到最后形参）；嵌套调用 twice!(twice!(3))（实参先展开再展开外层）。展开 = 手写等价：双引擎共用同一份展开后 AST，逐字节同果由构造成立。上限（depth/limit）与往返无损见 testing/unit/test_macro.py。"
+}

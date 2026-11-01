@@ -1,0 +1,11 @@
+{
+  "name": "bound_guard_global_rw",
+  "runs_on": "vm",
+  "expect": {
+    "exit": 0,
+    "stdout": ["true", "true", "true", "true"],
+    "stderr_empty": true
+  },
+  "tags": ["guard", "global", "undefined-read", "native-matrix"],
+  "note": "S-02 负例矩阵 ③：全局槽先读后写——声明前的读取必须是 VT_NONE→null 语义（VT_NONE vs VT_NULL 的相等比较为 true），写后恢复正常。native 侧全局槽初始化与相等语义必须逐字节一致。"
+}

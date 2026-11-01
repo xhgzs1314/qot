@@ -1,0 +1,20 @@
+{
+ "name": "bound_pow_right_assoc",
+ "runs_on": "vm",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stdout": [
+   "512.000000"
+  ],
+  "stderr_empty": true
+ },
+ "tags": [
+  "arith",
+  "precedence"
+ ],
+ "note": "README 5.1：^ 右结合，2^(3^2)=512"
+}

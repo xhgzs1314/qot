@@ -1,0 +1,17 @@
+{
+ "name": "p17_prim_sys",
+ "runs_on": "native",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stderr_empty": true
+ },
+ "tags": [
+  "primitive",
+  "process"
+ ],
+ "note": "P0.2：系统与进程原语差分（P0-H）。机器相关值只打布尔；kill 后退出码是平台定价差异面（Windows=1 / POSIX=128+sig / interp subprocess=-9）→ 只验证能拿到 code 字段不打印值。"
+}

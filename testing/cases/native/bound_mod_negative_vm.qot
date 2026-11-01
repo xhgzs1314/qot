@@ -1,0 +1,7 @@
+var a = 0 - 7;
+var b = 3;
+output(a % b);
+output(0 - 7 % 3);
+var x = 0 - 10;
+var y = 4;
+output(x % y);

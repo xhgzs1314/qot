@@ -1,0 +1,10 @@
+{
+  "name": "native_dict_const_vs_dyn_key",
+  "runs_on": "native",
+  "expect": {
+    "exit": 0,
+    "stderr_empty": true
+  },
+  "tags": ["dict", "const-key", "hash-fold", "native", "e3"],
+  "note": "E3 回归钉：常量键路径（编译期折叠哈希）与非常量键路径（运行期算哈希）必须逐值一致。折叠哈希算错不会报错、只会静默返回 null，是最坏的失败形态，因此必须在同一程序内对拍两条路径；并钉住 dict_get/dict_set 的数字键 tostring 口径（5 → \"5.000000\"）与缺键得 null 的发布面定价。口径（R5）：native-only —— E3 折叠是 AOT 特有的编译期能力，VM/解释器无此路径。"
+}

@@ -1,0 +1,12 @@
+{
+ "name": "err_for_step_zero",
+ "runs_on": "none",
+ "compile": { "args": [], "expect_ok": false },
+ "expect": {
+  "exit_not": 0,
+  "stderr_contains": ["[错误]", "步长不能为 0"],
+  "artifact": null
+ },
+ "tags": ["syntax", "negative", "G-04"],
+ "note": "G-04 静态步长立法（）：by 0 → 编译期致命（G-10 律：静态可判错误 = 编译失败，绝不放行警告+静默错跑）。"
+}

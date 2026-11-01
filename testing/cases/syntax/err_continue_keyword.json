@@ -1,0 +1,15 @@
+{
+ "name": "err_continue_keyword",
+ "runs_on": "interp",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stdout": ["acc=12"],
+  "stderr_empty": true
+ },
+ "tags": ["syntax", "continue", "G-01", "reversed-pin"],
+ "note": "【反转钉 】旧钉断言 `continue` 是不支持的关键字（期望编译失败）。G-01 已把 continue 实现为正式语句（for 的步进移到『继续点』，_compile_loop），本钉反转：必须编译成功且 0+1+2+4+5=12（跳过 3，步进照常 —— 否则死循环）。"
+}

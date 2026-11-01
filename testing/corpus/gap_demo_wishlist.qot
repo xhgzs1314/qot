@@ -1,0 +1,38 @@
+// 语料线 · 24 【缺口演示集】用户"顺手会写"但语言还没有的形态（仅注释，不可运行）
+// 任务画像：来自真实任务书写的自然形态。每条 =  的一个条目。
+// 状态：❌ 故意不可运行 —— 这是需求标本，不是程序。
+
+// G-01 continue：循环内"跳过本轮"
+// var i = 0;
+// loop (i < 10) {
+//     i += 1;
+//     if (i % 2 == 0) { continue; }
+//     output(i);
+// }
+
+// G-02 字符串插值：f-string / ${} 形态（当前必须 str_format 或 + 拼接）
+// var name = "Ada";
+// output(f"hello {name}, order #{1000 + 24}");
+
+// G-03 复合赋值算子族（+= 存在；%= <<= 等缺失）与三元
+// var x = 10;
+// x %= 3;
+// var sign = x > 0 ? "pos" : "neg";
+
+// G-04 for-in 反向/步长（当前只有 for (i in N) 正向步长 1）
+// for (i in 10..0 by -2) { output(i); }
+
+// G-05 多返回值/解构（闭包容器化受阻的同源需求）
+// var (ok, value) = try_parse("12.5");
+
+// G-06 字符串切片负索引（当前 slice 越界静默 null）
+// var s = "hello";
+// output(s[-1]);   // 期望 "o"
+
+// G-07 正则匹配（日志聚合任务的天然形态；当前用 find/slice 手工切）
+// var m = regex_find(log_line, "(\\w+) (\\d+)ms");
+
+// G-08 错误值的分支消费（err 模型已有 err/is_err；缺 try 表达式形态）
+// var v = try risky() catch (e) { 0 };
+
+output("this file is a requirements specimen; see ");

@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>编译期宏 · QOT</title>
+    <link rel="stylesheet" href="assets/doc.css">
+</head>
+
+<body>
+    <div class="doc">
+        <div class="doc-head">
+            <span class="eyebrow">QOT 语言手册</span>
+            <h1>编译期宏</h1>
+            <p>
+                宏在<strong>编译期</strong>把一段代码改写成另一段代码。写宏的语言就是 QOT 本身：
+                宏体是普通 QOT 函数，参数收到的是<strong>实参的语法树节点</strong>，返回值就是改写产物。
+                展开发生在字节码生成之前，因此产物与手写等价代码同价——没有运行期开销，也没有新的解释层。
+            </p>
+        </div>
+
+        <div class="doc-body">
+            <h2>1. 声明与调用</h2>
+            <pre><code>macro twice(x) {
+    return &lt; "kind": "binary_op", "op": "+", "left": x, "right": x &gt;&amp;;
+}
+
+var n = twice!(21);        // 展开一次 → 21 + 21
+output(n);                 // 42</code></pre>
+            <ul>
+                <li><code>macro</code> 声明只能写在<strong>顶层</strong>（函数体内声明 = 编译期致命）。</li>
+                <li>调用写作 <code>名字!(实参…)</code>。<code>!</code> 是宏调用与逻辑非的分界：
+                    标识符后紧跟 <code>!(</code> 是宏调用，表达式前缀位是逻辑非。</li>
+                <li>宏名与变量名、函数名<strong>互不干扰</strong>（不同命名面）；同名宏重复声明 = 编译期致命。</li>
+            </ul>
+
+            <h2>2. 两种形态</h2>
+            <h3>2.1 表达式宏</h3>
+            <p>宏返回一个节点 → 用在表达式位置。</p>
+            <pre><code>macro inc(x) {
+    return &lt; "kind": "binary_op", "op": "+",
+              "left": x, "right": &lt; "kind": "literal", "value": 1 &gt;&amp; &gt;&amp;;
+}
+var v = inc!(41);          // 42</code></pre>
+
+            <h3>2.2 语句块宏</h3>
+            <p>宏返回一个<strong>数组</strong> → 产物是一串语句，用在语句位置。调用点还可以直接带一个块，
+                块内容以语句列表绑定到<strong>最后一个形参</strong>。</p>
+            <pre><code>macro repeat(n, body) {
+    var out = [];
+    var i = 0;
+    loop (i &lt; n) {
+        out = arr_concat(out, body);
+        i += 1;
+    }
+    return out;
+}
+
+repeat!(3) {
+    output("hi");          // 输出三次
+}</code></pre>
+            <p>控制流宏也走这个形态——下面的官方宏 <code>unless!</code> 就是「条件 + 块」：</p>
+            <pre><code>unless!(n &gt; 5) {
+    output("不大于 5");
+}</code></pre>
+
+            <h2>3. 参数收到的是什么</h2>
+            <p>形参不是值，而是<strong>实参的语法树节点</strong>，以字典形式交给宏体：</p>
+            <pre><code>&lt; "kind": "节点类型", "字段名": ..., "line": 行号 &gt;&amp;</code></pre>
+            <p>常见节点的字段：</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>kind</th>
+                        <th>字段</th>
+                        <th>说明</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>literal</code></td>
+                        <td><code>value</code></td>
+                        <td>字面量（数字/字符串/布尔/null）</td>
+                    </tr>
+                    <tr>
+                        <td><code>identifier</code></td>
+                        <td><code>name</code></td>
+                        <td>变量名</td>
+                    </tr>
+                    <tr>
+                        <td><code>binary_op</code></td>
+                        <td><code>op</code>、<code>left</code>、<code>right</code></td>
+                        <td>二元运算</td>
+                    </tr>
+                    <tr>
+                        <td><code>unary_op</code></td>
+                        <td><code>op</code>、<code>operand</code></td>
+                        <td>一元运算（<code>UMINUS</code> / <code>NOT</code>）</td>
+                    </tr>
+                    <tr>
+                        <td><code>function_call</code></td>
+                        <td><code>name</code>、<code>args</code></td>
+                        <td>函数调用（<code>args</code> 是数组）</td>
+                    </tr>
+                    <tr>
+                        <td><code>method_call</code></td>
+                        <td><code>receiver</code>、<code>name</code>、<code>args</code></td>
+                        <td>方法调用</td>
+                    </tr>
+                    <tr>
+                        <td><code>array</code></td>
+                        <td><code>elements</code></td>
+                        <td>数组字面量</td>
+                    </tr>
+                    <tr>
+                        <td><code>dict</code></td>
+                        <td><code>entries</code></td>
+                        <td>字典字面量；每个 entry 是数组 <code>[键值, 值值]</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>var_declaration</code></td>
+                        <td><code>name</code>、<code>value</code></td>
+                        <td>变量声明</td>
+                    </tr>
+                    <tr>
+                        <td><code>assignment</code></td>
+                        <td><code>name</code>、<code>value</code></td>
+                        <td>赋值</td>
+                    </tr>
+                    <tr>
+                        <td><code>if_statement</code></td>
+                        <td><code>condition</code>、<code>then_body</code>、<code>else_body</code></td>
+                        <td>条件语句</td>
+                    </tr>
+                    <tr>
+                        <td><code>return_statement</code></td>
+                        <td><code>value</code></td>
+                        <td>返回语句</td>
+                    </tr>
+                    <tr>
+                        <td><code>block</code></td>
+                        <td><code>body</code></td>
+                        <td>语句块</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p>宏自己造节点时，<strong>不需要</strong>写 <code>line</code>——展开器会自动补上<strong>调用点</strong>的行号，
+                于是宏体内的报错能精确定位到调用位置。</p>
+            <p>造字典字面量节点时，entry 写成数组：<code>&lt; "kind": "dict", "entries": [[k, v], [k2, v2]] &gt;&amp;</code>。</p>
+
+            <h2>4. 嵌套与语义</h2>
+            <h3>4.1 实参先展开</h3>
+            <pre><code>macro quad(x) {
+    return twice!(twice!(x));      // 内层先展开
+}
+var v = quad!(3);                 // 3 → 6 → 12</code></pre>
+
+            <h3>4.2 宏体内调用其它宏 = 值语义</h3>
+            <p>宏体里写 <code>other!(x)</code> 时，<code>x</code> 先被<strong>求值成节点</strong>，再展开
+                <code>other</code>——等价于把 <code>other</code> 的展开结果代入 <code>x</code>。</p>
+            <pre><code>macro inc(x)  { return &lt; "kind": "binary_op", "op": "+", "left": x, "right": &lt; "kind": "literal", "value": 1 &gt;&amp; &gt;&amp;; }
+macro inc2(x) { return inc!(inc!(x)); }
+var v = inc2!(40);                // 42</code></pre>
+
+            <h2>5. 官方宏</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>宏</th>
+                        <th>作用</th>
+                        <th>限制</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>swap!(a, b)</code></td>
+                        <td>交换两个变量的值（真交换，不是返回元组）</td>
+                        <td>实参必须是标识符</td>
+                    </tr>
+                    <tr>
+                        <td><code>unless!(cond) { … }</code></td>
+                        <td>条件为<strong>假</strong>时执行块（等价 <code>if (cond) { } else { … }</code>）</td>
+                        <td>块绑定到最后一个形参</td>
+                    </tr>
+                </tbody>
+            </table>
+            <pre><code>var lo = 1;
+var hi = 9;
+swap!(lo, hi);
+output(lo);        // 9
+output(hi);        // 1</code></pre>
+
+            <h2>6. 错误契约</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>情形</th>
+                        <th>结果</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>调用未定义的宏</td>
+                        <td>编译期致命：<code>宏 'x' 未定义</code></td>
+                    </tr>
+                    <tr>
+                        <td>重复定义同名宏</td>
+                        <td>编译期致命：<code>宏 'x' 已定义</code></td>
+                    </tr>
+                    <tr>
+                        <td>宏体执行出错</td>
+                        <td>编译期致命，定位到<strong>调用点</strong>行号</td>
+                    </tr>
+                    <tr>
+                        <td>宏返回了语言不认识的节点</td>
+                        <td>编译期致命（会明确告诉你缺哪个字段）</td>
+                    </tr>
+                    <tr>
+                        <td>表达式宏被用在语句位置</td>
+                        <td>编译期致命（除非它返回的是调用节点，此时自动包成语句）</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>7. 上限</h2>
+            <p>展开有上限，防止宏把自己写递归后无限膨胀：</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>限制</th>
+                        <th>默认值</th>
+                        <th>环境变量</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>展开深度</td>
+                        <td>64</td>
+                        <td><code>QOT_MACRO_DEPTH</code>（<code>0</code> = 不限）</td>
+                    </tr>
+                    <tr>
+                        <td>单次编译总步数</td>
+                        <td>1,000,000</td>
+                        <td><code>QOT_MACRO_LIMIT</code>（<code>0</code> = 不限）</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p>超限同样是编译期致命，错误信息里会写明是深度还是步数超限。</p>
+
+            <h2>8. 卫生（重要）</h2>
+            <blockquote class="warn">
+                <strong>QOT 宏不做卫生处理。</strong>宏体引入的名字与调用点是<strong>共享作用域</strong>的——
+                宏里生成的临时变量可能捕获调用点的同名变量，调用点也可能覆盖宏里的临时变量。
+                这是刻意的取舍：简单、可预测，代价由写宏的人负责。
+            </blockquote>
+            <p>约定做法：</p>
+            <ul>
+                <li>宏体里的临时名用 <code>_m_</code> 前缀（如 <code>_m_i</code>、<code>_m_tmp</code>）——下划线开头但不是双下划线。</li>
+                <li>双下划线前缀 <code>__</code> 是编译器保留的（隐藏临时变量、协议绑定产物、方法接收者改写），
+                    不要在用户代码里使用。</li>
+                <li>尽量让宏体只使用形参与自己的临时名，不依赖外部变量。</li>
+            </ul>
+
+            <h2>9. 什么时候用宏</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>需求</th>
+                        <th>推荐手段</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>复用一段固定代码形状</td>
+                        <td>宏（<code>macro</code>）</td>
+                    </tr>
+                    <tr>
+                        <td>给对象加运算/迭代/输出</td>
+                        <td>协议方法（见<a href="protocols.html">协议元语</a>）</td>
+                    </tr>
+                    <tr>
+                        <td>一次性的重复代码</td>
+                        <td>普通函数（更简单、更安全）</td>
+                    </tr>
+                    <tr>
+                        <td>运行时才需要的行为差异</td>
+                        <td>函数 + 字典分派，不要用宏</td>
+                    </tr>
+                </tbody>
+            </table>
+            <blockquote class="ok">
+                <strong>一个完整例子。</strong>用「协议 + 宏」在纯 .qot 里长出接口与多态：
+                <pre><code>macro speak(x) {
+    return &lt; "kind": "method_call", "receiver": x, "name": "speak", "args": [] &gt;&amp;;
+}
+class Dog { func speak() { return "woof"; } }
+output(speak!(Dog()));</code></pre>
+            </blockquote>
+        </div>
+
+        <div class="doc-foot">
+            <span>QOT 文档中心</span>
+            <span>
+                <a href="index.html">返回目录</a> ·
+                <a href="doc.html">语言总述</a> ·
+                <a href="objects.html">类与对象</a> ·
+                <a href="protocols.html">协议元语</a>
+            </span>
+        </div>
+    </div>
+</body>
+
+</html>

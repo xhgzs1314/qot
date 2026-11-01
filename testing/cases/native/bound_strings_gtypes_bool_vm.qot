@@ -1,0 +1,3 @@
+output(strings(true));
+output(gtypes(true));
+output(strings(false));

@@ -1,0 +1,17 @@
+{
+ "name": "p10_prim_str",
+ "runs_on": "native",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stderr_empty": true
+ },
+ "tags": [
+  "primitive",
+  "string"
+ ],
+ "note": "P0.1 CP-2：字符串原语差分（P0-B）。oracle 对比 = test_primitive_oracle_diff.py（token 级数字归一，规则在该测试 docstring）。"
+}

@@ -1,0 +1,17 @@
+{
+ "name": "p13_prim_dict",
+ "runs_on": "native",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stderr_empty": true
+ },
+ "tags": [
+  "primitive",
+  "dict"
+ ],
+ "note": "P0.1 CP-2：字典原语差分（P0-F）。已登记差异：del 后新键的物理槽位（native 墓碑复用 vs 解释器追加序）—— 差分不打印整字典。"
+}

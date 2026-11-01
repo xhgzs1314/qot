@@ -1,0 +1,11 @@
+{
+  "name": "bound_dict_glen",
+  "runs_on": "vm",
+  "expect": {
+    "exit": 0,
+    "stdout": ["true"],
+    "stderr_empty": true
+  },
+  "tags": ["dict", "glen", "vm-only"],
+  "note": "VM-only 定价钉（README §21.3）：VM 的 glen() 支持字典（返回 size）；解释器侧 glen() 仅接受 string/array（传字典报 2010）。这是两份内置表的既定差异，必须有测试防止未来单侧悄悄变化。"
+}

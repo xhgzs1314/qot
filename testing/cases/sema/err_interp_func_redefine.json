@@ -1,0 +1,19 @@
+{
+ "name": "err_interp_func_redefine",
+ "runs_on": "interp",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 1,
+  "stdout": [],
+  "stderr_contains": [
+   "[2014]"
+  ]
+ },
+ "tags": [
+  "func"
+ ],
+ "note": "README 21.1：解释器报 2014 退出"
+}

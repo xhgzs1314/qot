@@ -1,0 +1,11 @@
+{
+  "name": "bound_guard_num_to_str_loop",
+  "runs_on": "vm",
+  "expect": {
+    "exit": 0,
+    "stdout": ["true", "true"],
+    "stderr_empty": true
+  },
+  "tags": ["guard", "f64", "fallback", "native-matrix"],
+  "note": "S-02 负例矩阵 ①：F64 特化槽在循环中途退化为字符串再复原。t=5 贡献首轮，之后 t 恒为 2（s=5+2+2=9）。guard 失败必须走该指令的通用语义且结果与 VM 逐字节一致——验证 guard 是每指令生效而非入口一次性。"
+}

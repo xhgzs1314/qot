@@ -1,0 +1,11 @@
+{
+  "name": "bound_strings_gtypes_bool_interp",
+  "runs_on": "interp",
+  "expect": {
+    "exit": 0,
+    "stdout": ["true", "boolean", "false"],
+    "stderr_empty": true
+  },
+  "tags": ["strings", "gtypes", "bool", "interp-only", "pricing"],
+  "note": "解释器定价钉（D-07 家族 · P1030 两阶段修订）：① strings(布尔) 原为 str(True)='True'——demo_csv_report 的 oracle 裁判实证其与 native 分歧后按 CP-N4 修订为 'true'/'false'（D-07a 'True' 口径作废）；② gtypes(布尔) 原为 'any'——P1030-4 按 CP-N4 对齐 native 的 'boolean'（Python 类型面渗漏）。两条 fuzz 白名单 KNOWN-STRINGS-BOOL / KNOWN-GTYPES-BOOL 均已收敛，生成规避约束保守保留。"
+}

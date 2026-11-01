@@ -1,0 +1,19 @@
+{
+ "name": "bound_string_immutable",
+ "runs_on": "vm",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stdout": [
+   "hello"
+  ],
+  "stderr_empty": true
+ },
+ "tags": [
+  "string"
+ ],
+ "note": "README 3.2：字符串不可变，写入不报错也不生效"
+}

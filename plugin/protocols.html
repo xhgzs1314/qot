@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>协议元语 · QOT</title>
+    <link rel="stylesheet" href="assets/doc.css">
+</head>
+
+<body>
+    <div class="doc">
+        <div class="doc-head">
+            <span class="eyebrow">QOT 语言手册</span>
+            <h1>协议元语</h1>
+            <p>
+                类可以用一组固定名字的<strong>协议方法</strong>接管语言内建运算：<code>+</code>、<code>==</code>、
+                下标、for-in、字符串化。类型可知时，编译器在<strong>编译期</strong>把它们改写成普通方法直调——
+                产物里没有任何运行期查找表，性能与手写代码等价。
+            </p>
+        </div>
+
+        <div class="doc-body">
+            <h2>1. 协议方法清单</h2>
+            <p>协议集合是<strong>固定</strong>的，共 11 个：</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>协议方法</th>
+                        <th>接管什么</th>
+                        <th>约定</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>__add__</code></td>
+                        <td><code>a + b</code>、<code>a += b</code></td>
+                        <td>通常返回同型对象</td>
+                    </tr>
+                    <tr>
+                        <td><code>__sub__</code></td>
+                        <td><code>a - b</code>、<code>a -= b</code></td>
+                        <td>同上</td>
+                    </tr>
+                    <tr>
+                        <td><code>__mul__</code></td>
+                        <td><code>a * b</code>、<code>a *= b</code></td>
+                        <td>同上</td>
+                    </tr>
+                    <tr>
+                        <td><code>__div__</code></td>
+                        <td><code>a / b</code>、<code>a /= b</code></td>
+                        <td>同上</td>
+                    </tr>
+                    <tr>
+                        <td><code>__mod__</code></td>
+                        <td><code>a % b</code>、<code>a %= b</code></td>
+                        <td>同上</td>
+                    </tr>
+                    <tr>
+                        <td><code>__eq__</code></td>
+                        <td><code>a == b</code></td>
+                        <td>返回真值（惯例 <code>1</code>/<code>0</code>）；结果是布尔，不参与链式推断</td>
+                    </tr>
+                    <tr>
+                        <td><code>__index_get</code></td>
+                        <td><code>a[i]</code></td>
+                        <td>越界行为自定（建议返回 <code>null</code>）</td>
+                    </tr>
+                    <tr>
+                        <td><code>__index_set</code></td>
+                        <td><code>a[i] = v</code></td>
+                        <td>同上</td>
+                    </tr>
+                    <tr>
+                        <td><code>__for_keys</code></td>
+                        <td><code>for k in obj</code></td>
+                        <td>返回键数组；<strong>优先于</strong> <code>__iter_len</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>__iter_len</code></td>
+                        <td><code>for i in obj</code></td>
+                        <td>返回长度；配合 <code>__index_get</code> 即元素序列协议</td>
+                    </tr>
+                    <tr>
+                        <td><code>__to_str</code></td>
+                        <td><code>output(obj)</code>、<code>"s" + obj</code>、<code>obj + "s"</code></td>
+                        <td>返回字符串</td>
+                    </tr>
+                </tbody>
+            </table>
+            <blockquote class="note">
+                <strong><code>!=</code> 不在协议集里。</strong>需要不等语义时，自己实现一个函数或宏调用，不要指望
+                <code>__ne__</code>。
+            </blockquote>
+
+            <h2>2. 绑定规则</h2>
+            <h3>2.1 类型可知 → 编译期静态绑定</h3>
+            <p>当接收者的类型在编译期可确定时，运算/下标/迭代/输出会被<strong>直接改写成方法调用</strong>：</p>
+            <pre><code>class Money {
+    var cents = 0;
+    func init(c) { this->cents = c; }
+    func __add__(o) { return Money(this->cents + o->cents); }
+    func __to_str() { return "$" + int_to_str(this->cents / 100); }
+}
+
+var a = Money(150);
+var b = Money(250);
+output(a + b);        // 改写为 a->__add__(b)</code></pre>
+            <p>改写发生在<strong>编译期</strong>：产物里是一次普通方法调用，没有反射、没有字典查找、没有运行期类型判断。
+                解释器与原生可执行文件拿到的是<strong>同一份</strong>改写后的程序，因此两边的行为逐位一致。</p>
+
+            <h3>2.2 类型未知 → 走运行期既有行为</h3>
+            <p>接收者类型推断不出来时（例如函数参数、数组元素），运算不会报错，也不会走协议——它保持语言原本的运行期定价
+                （数字相加、字典取键、数组下标等）。</p>
+            <pre><code>any_t func add_all(a, b) {
+    return a + b;        // a/b 类型未知 → 运行期既有定价，不绑定协议
+}</code></pre>
+            <blockquote>
+                <strong>如何让类型可推断？</strong>让对象从<strong>构造点</strong>出发：<code>var v = Vec2(1, 2)</code>、
+                直接把构造结果赋给变量、经括号或同型三元分支传递、作为字段初始化器、方法体内通过 <code>this</code> 传递。
+                推断不出来就写显式函数，或在调用点手动调用协议方法（<code>v->__add__(other)</code>）。
+            </blockquote>
+
+            <h3>2.3 协议未定义 → 保持既有静默定价</h3>
+            <p>类没写对应协议方法时，行为与普通值完全一致（例如普通对象相加会得到运行期错误提示，而不是协议调用）。
+                这意味着<strong>加协议是纯增量</strong>：同一份代码，写不写协议都能跑，只是语义面不同。</p>
+
+            <h2>3. 链式与复合赋值</h2>
+            <p>五个算术协议方法按惯例返回<strong>接收者同型</strong>的对象，因此链式表达式可以继续静态绑定：</p>
+            <pre><code>var s = Vec2(1, 2) + Vec2(3, 4) + Vec2(5, 6);   // 每次 + 都绑定 __add__</code></pre>
+            <p><code>__eq__</code> 是例外：它的结果是布尔，不参与链式推断——<code>a + b == c</code> 里的 <code>==</code>
+                不会自动变成协议调用。</p>
+
+            <h2>4. 容器协议：让对象可迭代</h2>
+            <p>for-in 有两种协议形态，编译器按优先级选择：</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>形态</th>
+                        <th>需要的方法</th>
+                        <th>循环变量</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>键协议（优先）</td>
+                        <td><code>__for_keys()</code></td>
+                        <td>键</td>
+                    </tr>
+                    <tr>
+                        <td>序列协议</td>
+                        <td><code>__iter_len()</code> + <code>__index_get(i)</code></td>
+                        <td>下标 <code>0 .. len-1</code></td>
+                    </tr>
+                    <tr>
+                        <td>缺省</td>
+                        <td>两者都没写</td>
+                        <td>循环零次</td>
+                    </tr>
+                </tbody>
+            </table>
+            <pre><code>class Stack {
+    var items = [];
+    func init(vals) { this->items = vals; }
+    func __iter_len() { return arr_len(this->items); }
+    func __index_get(i) { return arr_get(this->items, i); }
+}
+
+var s = Stack([10, 20, 30]);
+for (v in s) {
+    output(v);        // 10 / 20 / 30
+}</code></pre>
+
+            <h2>5. 协议 + 宏 = 完整面向对象能力</h2>
+            <p>协议解决「行为」，宏解决「语法」。两者组合即可在<strong>纯 .qot</strong> 里长出接口与多态：</p>
+            <pre><code>// 协议约定：任何实现者只要提供 speak() 就算满足
+class Dog { func speak() { return "woof"; } }
+class Cat { func speak() { return "meow"; } }
+
+// any 调用点 = 运行期方法表分派（多态本体）
+any_t func describe(obj) {
+    return obj->speak();
+}
+output(describe(Dog()));
+output(describe(Cat()));</code></pre>
+            <p>把 <code>obj->speak()</code> 写成宏（如 <code>speak!(obj)</code>）就得到可复用的接口调用面，
+                见 <a href="macros.html">编译期宏</a>。</p>
+
+            <h2>6. 命名与边界</h2>
+            <ul>
+                <li>协议方法名固定为 <code>__xxx__</code> 形式；其它 <code>__</code> 开头的方法名<strong>不会</strong>被语言识别，
+                    它们就是普通方法（但请避免使用该前缀，见<a href="objects.html">类与对象</a>的保留名说明）。</li>
+                <li>协议只在<strong>类</strong>上生效：给普通值（数字、数组、字典）加同名方法没有意义。</li>
+                <li>协议绑定不改变运行期错误契约：该报错的地方仍然报错，只是错误信息更贴近对象语义。</li>
+            </ul>
+        </div>
+
+        <div class="doc-foot">
+            <span>QOT 文档中心</span>
+            <span>
+                <a href="index.html">返回目录</a> ·
+                <a href="doc.html">语言总述</a> ·
+                <a href="objects.html">类与对象</a> ·
+                <a href="macros.html">编译期宏</a>
+            </span>
+        </div>
+    </div>
+</body>
+
+</html>

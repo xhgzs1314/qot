@@ -1,0 +1,49 @@
+// std.cli 差分用例（M5）：parse_flags / usage（prompt 按 R7 不进差分）。
+// golden 按 native 口径；oracle 裁判做零分歧对账。
+require "../../../std/cli.qot";
+
+// ---- parse_flags：长旗标 / 短簇 / =值 / 位置参数 ----
+var argv = arr_new();
+arr_push(argv, "--verbose");
+arr_push(argv, "-ab");
+arr_push(argv, "--out=result.txt");
+arr_push(argv, "in1.dat");
+arr_push(argv, "in2.dat");
+var parsed = cli##parse_flags(argv);
+var flags = dict_get(parsed, "flags");
+var pos = dict_get(parsed, "args");
+output(dict_get(flags, "verbose"));                    // true
+output(dict_get(flags, "a"));                          // true（短簇拆分）
+output(dict_get(flags, "b"));                          // true
+output(dict_get(flags, "out"));                        // result.txt（值恒为字符串）
+output(dict_get(flags, "out") == "result.txt");        // true
+output(arr_len(pos));                                  // 2
+output(arr_get(pos, 0));                               // in1.dat
+output(arr_get(pos, 1));                               // in2.dat
+
+// ---- 边界口径（全登记于 std/cli.qot 头注）----
+var empty = cli##parse_flags(arr_new());
+output(dict_len(dict_get(empty, "flags")));            // 0
+output(arr_len(dict_get(empty, "args")));              // 0
+var dash = arr_new();
+arr_push(dash, "-");
+arr_push(dash, "--");
+arr_push(dash, "-5");
+var pd = cli##parse_flags(dash);
+output(is_null(dict_get(dict_get(pd, "flags"), "nope")));  // null：缺键
+output(arr_len(dict_get(pd, "args")));                 // 1（裸 "-" 是位置参数）
+output(dict_get(dict_get(pd, "flags"), "5"));          // true（-5 按短簇口径 = 旗标 "5"）
+var dup = arr_new();
+arr_push(dup, "--k=1");
+arr_push(dup, "--k=2");
+var pdup = cli##parse_flags(dup);
+output(dict_get(dict_get(pdup, "flags"), "k"));        // 2（后写覆盖）
+output(is_null(cli##parse_flags(null)));               // null：非数组
+
+// ---- usage（stdout 打印；返回 boolean）----
+var lines = arr_new();
+arr_push(lines, "usage: tool [options] files...");
+arr_push(lines, "  --verbose  打印一切");
+output(cli##usage(lines));                             // true（两行 usage 已打印）
+output(cli##usage("single line"));                     // true
+output(cli##usage(123));                               // false

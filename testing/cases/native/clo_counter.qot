@@ -1,0 +1,14 @@
+// F1 闭包：独立实例 + 按引用捕获
+number_t func make_counter() {
+    var n = 0;
+    number_t func step() {
+        n = n + 1;
+        return n;
+    }
+    return step;
+}
+var c1 = make_counter();
+var c2 = make_counter();
+output(c1());
+output(c1());
+output(c2());

@@ -1,0 +1,1 @@
+{"name": "clo_loop_capture", "runs_on": "native", "compile": {"args": [], "expect_ok": true}, "expect": {"exit": 0, "stderr_empty": true}, "tags": ["closure", "loop", "f1"], "note": "循环内创建闭包捕获循环变量：读的是变量本身（最终值 3），非每迭代快照"}

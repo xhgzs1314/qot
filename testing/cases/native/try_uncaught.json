@@ -1,0 +1,1 @@
+{"name": "try_uncaught", "runs_on": "native", "compile": {"args": [], "expect_ok": true}, "expect": {"exit": 124, "stderr_empty": false, "stderr_contains": ["[错误] [2001] 未捕获的 throw: uncaught-value"]}, "tags": ["try", "contract", "f2"], "note": "未捕获 throw 的确定性契约：stderr [2001] + exit 124（与解释器逐字节一致，差分裁判 test_closure_try 钉住两引擎）"}

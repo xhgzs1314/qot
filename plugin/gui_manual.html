@@ -326,19 +326,14 @@
 
    
     <div class="note" style="border-left:4px solid #f87171;background:rgba(248,113,113,.10);">
-        <strong>先看这一条：GUI 只在字节码 VM 上有</strong><br>
-        所有 <code>vg_*</code> 函数都实现在 C++ 虚拟机里（<code>ot-asset/c/vmcshit/gui_module.cpp</code>），
-        Python 解释器<strong>一个都没有</strong>。所以下面的代码必须走 VM 这条路：
-        <div class="code-block" style="margin:.6rem 0;">
-            <pre>python index.py bstrust compile app.qot app.qtc
-python index.py bstrust run app.qtc</pre>
-        </div>
-        用 <code>python index.py run app.qot</code>（解释器）跑，会得到
-        「GUI 函数 vg_init() 只在编译执行下可用」这句报错——解释器里注册的只是一批占位存根。
-        解释器自己那套 GUI 是完全不同的 <code>window_*</code> 系列函数（见
-        <a href="function_inside.html">内置函数手册V1</a>），两套不能混用。
-        两个运行时的完整差异见 <a href="doc.html#runtime-diff">语言文档 §21</a>，
-        VM 内置函数总表见 <a href="function_inside2.html">内置函数手册V2</a>。
+        <p><strong></strong><code>vg_*</code> 已<strong>复活为 QOT 的官方图形界面</strong>——实现迁移到
+            <code>ot-asset/c/wingui</code>（Direct2D），解释器经 <code>build/qotgui.dll</code> 驱动、原生程序编译期直接链接，
+            双引擎行为一致。<strong>事件模型已改为轮询</strong>（<code>vg_wait_event</code> / <code>vg_poll_event</code>，
+            见 <a href="doc.html">语言总述</a> 22.1），旧 <code>*_on_*</code> 回调注册已移除——本手册中涉及
+            <code>*_on_*</code> 的段落仅作历史参考，其余 API 形态（创建 / 属性 / 取值）仍然适用。</p>
+        <p>历史背景：这套界面早期只实现在已弃管的旧字节码 VM 里
+        （<code>ot-asset/c/vmcshit/gui_module.cpp</code>），解释器侧曾是占位存根，须走
+        <code>bstrust compile / run</code> 历史路径——以下运行命令均为历史形态，现行跑法见上文。
     </div>
 
     <div class="quick-start">

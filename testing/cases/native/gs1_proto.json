@@ -1,0 +1,42 @@
+{
+ "name": "gs1_proto",
+ "runs_on": "native",
+ "compile": { "args": [], "expect_ok": true },
+ "expect": {
+  "exit": 0,
+  "stderr_empty": true,
+  "stdout": [
+   "15,13",
+   "9,3",
+   "36,40",
+   "4,1",
+   "0,3",
+   "33,57",
+   "15,13",
+   "1.000000",
+   "0.000000",
+   "1.000000",
+   "0.000000",
+   "15.000000",
+   "13.000000",
+   "null",
+   "100.000000",
+   "200.000000",
+   "(100,200)",
+   "v=(100,200)",
+   "(103,205)",
+   "ax;by;cz;",
+   "12",
+   "3",
+   "<Vec2>",
+   "7",
+   "<Plain>",
+   "false",
+   "true",
+   "0",
+   "GS1-END"
+  ]
+ },
+ "tags": ["GOD-SELF", "G1", "protocol", "dunder"],
+ "note": "GOD-SELF-G1 钉（， §8.24-B）：11 个协议方法的编译期静态绑定 —— 五则(__add__/__sub__/__mul__/__div__/__mod__，含链式 (a+b)*b-a 与复合赋值 +=)、__eq__(结构相等)、__index_get/__index_set(下标读写)、__for_keys(键协议，优先)/__iter_len(数字协议；+__index_get=元素序列协议)、__to_str(output 参数+拼接两侧)。回落定价：类型未知(函数形参)→运行期现行为(output 走 <类名>/字段读)；协议未定义(Plain 类)→output <类名>、== 同一性、for-in 零次。绑定产物=普通 method_call 节点，双引擎共用同一份改写 AST，oracle 零分歧由构造成立。"
+}

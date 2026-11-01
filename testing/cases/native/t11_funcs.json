@@ -1,0 +1,16 @@
+{
+ "name": "t11_funcs",
+ "runs_on": "vm",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stderr_empty": true
+ },
+ "tags": [
+  "func"
+ ],
+ "note": ""
+}

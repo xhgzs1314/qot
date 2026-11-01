@@ -1,0 +1,22 @@
+{
+ "name": "for_in_unified",
+ "runs_on": "native",
+ "compile": { "args": [], "expect_ok": true },
+ "expect": {
+  "exit": 0,
+  "stderr_empty": true,
+  "stdout": [
+   "a-b-c-",
+   "5.000000",
+   "6.000000",
+   "yzx",
+   "0.000000",
+   "59.000000",
+   "0.000000",
+   "abd",
+   "uioo"
+  ]
+ },
+ "tags": ["control-flow", "for", "iteration", "M3", "unification"],
+ "note": "M3 统一钉（）：str/dict/null/bool 成为正式 for-in 迭代面。旧定价（interp 2021/2020 硬错、int 截断计数）对齐 native 发布面（CP-N4 方向）：null/bool/空容器零次；58.457 → 59 次（原值比较）；-5/0 → 零次。字典键序 = native 槽序（yzx，确定性），interp 为插入序（xyz）—— D-JSON-ORDER 登记分歧族，oracle 差分按该族归一。"
+}

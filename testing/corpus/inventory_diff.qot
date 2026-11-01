@@ -1,0 +1,41 @@
+// 语料线 · 08 库存对账（两份清单 diff：缺失/新增/数量变化）
+// 任务画像：仓库实物 vs 系统记录。状态：✅ 可运行。
+var system = &< "SKU-A": 12, "SKU-B": 0, "SKU-C": 7 >&;
+var actual = &< "SKU-A": 12, "SKU-C": 9, "SKU-D": 2 >&;
+
+var missing = arr_new();
+var added = arr_new();
+var changed = arr_new();
+
+var sk = arr_sort(dict_keys(system));
+var i = 0;
+loop (i < arr_len(sk)) {
+    var k = arr_get(sk, i);
+    if (dict_has(actual, k) == false) {
+        arr_push(missing, k + " (system=" + int_to_str(dict_get(system, k)) + ")");
+    } else {
+        if (dict_get(system, k) != dict_get(actual, k)) {
+            arr_push(changed, k + " " + int_to_str(dict_get(system, k)) + " -> " + int_to_str(dict_get(actual, k)));
+        }
+    }
+    i += 1;
+}
+var ak = arr_sort(dict_keys(actual));
+i = 0;
+loop (i < arr_len(ak)) {
+    var k = arr_get(ak, i);
+    if (dict_has(system, k) == false) {
+        arr_push(added, k + " (actual=" + int_to_str(dict_get(actual, k)) + ")");
+    }
+    i += 1;
+}
+
+output("missing in actual: " + int_to_str(arr_len(missing)));
+i = 0;
+loop (i < arr_len(missing)) { output("  " + arr_get(missing, i)); i += 1; }
+output("added in actual  : " + int_to_str(arr_len(added)));
+i = 0;
+loop (i < arr_len(added)) { output("  " + arr_get(added, i)); i += 1; }
+output("count mismatch   : " + int_to_str(arr_len(changed)));
+i = 0;
+loop (i < arr_len(changed)) { output("  " + arr_get(changed, i)); i += 1; }

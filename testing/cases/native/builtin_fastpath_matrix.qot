@@ -1,0 +1,55 @@
+var arr = [10, 20, 30];
+var d = &< "a": 1 >&;
+dict_set(d, "b", 2);
+
+output(__iter_len(arr));
+output(__iter_len("hello"));
+output(__iter_len(5));
+output(__iter_len(0 - 3));
+output(__iter_len(d));
+output(__iter_len(null));
+
+output(glen(arr));
+output(glen("hello"));
+output(glen(d));
+output(glen(5));
+output(glen(null));
+
+output(__is_number(1));
+output(__is_number(0));
+output(__is_number("x"));
+output(__is_number(null));
+output(__is_number(arr));
+
+output(type(1));
+output(type("s"));
+output(type(arr));
+output(type(d));
+output(type(null));
+output(type(true));
+
+output(gtypes(1));
+output(gtypes("s"));
+output(gtypes(true));
+output(gtypes(arr));
+output(gtypes(d));
+output(gtypes(null));
+
+output(strings(42));
+output(strings(null));
+
+var arr2 = [];
+output(push(arr2, 1));
+output(push(arr2, 2));
+output(glen(arr2));
+output(arr2[0]);
+output(arr2[1]);
+
+var acc = 0.0;
+for (i in 50) {
+    var a2 = [i, i, i];
+    acc = acc + __iter_len(a2) + glen("abcd") + __is_number(i);
+}
+output(acc);
+
+output(output(7));

@@ -1,0 +1,10 @@
+// F0 模块夹具：模块顶层名 = 全量导出（与解释器 .qot 模块语义同源）
+number_t func square(x) {
+    return x * x;
+}
+
+string_t func shout(s) {
+    return s + "!";
+}
+
+const MOD_CONST = 41;

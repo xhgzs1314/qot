@@ -1,0 +1,24 @@
+{
+ "name": "prim_json_native",
+ "runs_on": "native",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stderr_empty": true,
+  "stdout": [
+   "{\"age\": 7, \"name\": \"ada\", \"nope\": null, \"ok\": true, \"score\": 99.5}",
+   "[1, 2.5, \"x\\ty\", false, null]",
+   "a=1",
+   "b1=2.500",
+   "c=hi",
+   "valid=true",
+   "valid_bad=false",
+   "pin-end"
+  ]
+ },
+ "tags": ["json", "primitive", "native", "parity"],
+ "note": "json_encode/decode/valid/pretty 的 native 化钉（，G-09）。数字走 f64 规范形（整数值无小数 —— 解释器侧同步归一，消除 Python int/float 渗漏）；解码失败 native 得 null（解释器抛错，登记定价）。键序见 D-JSON-ORDER：需要稳定序须显式 dict_keys+arr_sort。"
+}

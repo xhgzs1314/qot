@@ -1,0 +1,34 @@
+{
+ "name": "bool_eq_pricing",
+ "runs_on": "native",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stderr_empty": true,
+  "stdout": [
+   "true",
+   "true",
+   "false",
+   "true",
+   "true",
+   "true",
+   "false",
+   "true",
+   "false",
+   "true",
+   "true",
+   "true",
+   "false",
+   "pin-end"
+  ]
+ },
+ "tags": [
+  "primitive",
+  "pricing",
+  "equality"
+ ],
+ "note": "op11/op12 BOOL/BOOL 分支修复的硬断言钉（解释器 oracle 同值）；expect.stdout 写死，重录 golden 也不豁免。"
+}

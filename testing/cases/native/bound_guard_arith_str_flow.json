@@ -1,0 +1,11 @@
+{
+  "name": "bound_guard_arith_str_flow",
+  "runs_on": "vm",
+  "expect": {
+    "exit": 0,
+    "stdout": ["x12", "1", "1yy", "y"],
+    "stderr_empty": true
+  },
+  "tags": ["guard", "f64", "fallback", "native-matrix", "d11"],
+  "note": "S-02 负例矩阵 ⑥（D-11 回归钉）：字符串经 ARITH_GEN 流入结果槽后，该槽不得被 F64 推断判为数值源。原缺陷下 b=\"x\"+1 被判 F64，c=b+2 被改写为裸 double（AOT 2.0 vs VM \"x12\"）；-b 同样必须走通用语义（null+1→\"1\"）。循环形态（s=0;k=1;三轮后 k 变 \"y\"）钉住累加器的同类退化。差分断言 native == VM。"
+}

@@ -1,0 +1,10 @@
+// 【M4 负例 】init 体内禁 return：构造语义 = 恒返回实例本身
+//（两侧同律），静态可判 → 编译期致命。
+class C {
+    var v = 0;
+    func init(x) {
+        if (x > 0) { return; }
+        this->v = x;
+    }
+}
+output(C(1)->v);

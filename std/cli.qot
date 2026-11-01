@@ -1,0 +1,68 @@
+// ============================================================================
+// std.cli —— 命令行解析标准库
+// ============================================================================
+any_t func parse_flags(argv) {
+    if (type_is(argv, "array") == false) { return null; }
+    var flags = dict_new();
+    var pos = arr_new();
+    var i = 0;
+    var n = arr_len(argv);
+    loop (i < n) {
+        var a = strings(arr_get(argv, i));
+        var alen = str_len(a);
+        var is_long = alen >= 2 && str_byte_at(a, 0) == 45 && str_byte_at(a, 1) == 45; // "--"
+        if (is_long) {
+            var body = str_slice(a, 2, alen);
+            var eq = str_find(body, "=", 0);
+            if (eq >= 0) {
+                dict_set(flags, str_slice(body, 0, eq), str_slice(body, eq + 1, str_len(body)));
+            } else {
+                if (str_len(body) > 0) {
+                    dict_set(flags, body, true);
+                }
+                // 裸 "--"（body 空）= 惯例上的参数终止符，这里按无操作处理
+            }
+        } else {
+            var is_short = alen >= 2 && str_byte_at(a, 0) == 45 && str_byte_at(a, 1) != 45;
+            if (is_short) {
+                var j = 1;
+                loop (j < alen) {
+                    var ch = str_slice(a, j, j + 1);
+                    dict_set(flags, ch, true);
+                    j += 1;
+                }
+            } else {
+                arr_push(pos, a);
+            }
+        }
+        i += 1;
+    }
+    var out = dict_new();
+    dict_set(out, "flags", flags);
+    dict_set(out, "args", pos);
+    return out;
+}
+
+// ---- 用法文本打印（数组 = 每元素一行；字符串 = 单行；返回是否打印）----
+boolean_t func usage(lines) {
+    if (type_is(lines, "array")) {
+        var i = 0;
+        var n = arr_len(lines);
+        loop (i < n) {
+            output(arr_get(lines, i));
+            i += 1;
+        }
+        return true;
+    }
+    if (type_is(lines, "string")) {
+        output(lines);
+        return true;
+    }
+    return false;
+}
+
+// ---- 交互式输入提示（打印 text 后读一行 stdin；EOF 得 ""）----
+string_t func prompt(text) {
+    stdout_write(text);
+    return stdin_read_line();
+}

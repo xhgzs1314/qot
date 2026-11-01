@@ -1,0 +1,68 @@
+// P15 · P0-C 编码与字节原语差分（CP-3 前 · P0.2）。
+// 口径备注：QOT 串即 UTF-8 字节；非法字节经 url_decode("%FF") 构造；
+// hex 小写、base64 标准字母表、url RFC3986 —— 三张字母表两侧逐位镜像。
+// S-14 纪律：空串字面量是 null、纯数字样字面量会被定价吃掉 ——
+// 「空串 / 数字样串」一律在运行时构造（str_slice / str_replace）。
+var s = "abcdefgh";
+var emp = str_slice(s, 1, 1);
+var hexok = str_replace("4142-4344", "-", "");
+output(bytes_len(s));
+output(bytes_len(emp));
+output(bytes_len(123));
+output(bytes_slice(s, 2, 5));
+output(bytes_slice(s, 0, 100));
+output(bytes_slice(s, 5, 2));
+output(bytes_byte_at(s, 0));
+output(bytes_byte_at(s, 7));
+output(bytes_byte_at(s, 8));
+output(bytes_find(s, "def", 0));
+output(bytes_find(s, "def", 4));
+output(bytes_find(s, "zz", 0));
+output(bytes_find("aaa", emp, 1));
+output(bytes_concat("ab", "cd"));
+output(bytes_eq("ab", "ab"));
+output(bytes_eq("ab", "abc"));
+output(bytes_eq(emp, emp));
+output(bytes_to_hex("AB"));
+output(bytes_to_hex(emp));
+output(bytes_from_hex(hexok));
+output(bytes_from_hex("41 42"));
+output(bytes_from_hex("41 4"));
+output(bytes_from_hex("zz"));
+var rt = bytes_from_hex(bytes_to_hex("wxyz-payload"));
+output(bytes_eq(rt, "wxyz-payload"));
+output(bytes_to_base64("hello"));
+output(bytes_to_base64("ab"));
+output(bytes_to_base64("a"));
+output(bytes_to_base64(emp));
+output(bytes_from_base64("aGVsbG8="));
+output(bytes_from_base64("  aGVs\r\nbG8= "));
+output(bytes_from_base64("aGVs"));
+output(bytes_from_base64("A"));
+output(bytes_from_base64("@@@@"));
+output(bytes_from_base64("===="));
+output(bytes_eq(bytes_from_base64(bytes_to_base64("round-trip:*.qot")), "round-trip:*.qot"));
+output(url_encode("a b/c?d=1&x"));
+output(url_encode("AZaz09-_.~"));
+output(url_decode("a%20b%2Fc"));
+output(url_decode("bad%ZZseq"));
+output(url_decode("plain"));
+output(bytes_eq(url_decode(url_encode("qot+url")), "qot+url"));
+var zh = url_decode("%E4%B8%AD");
+output(str_len(zh));
+output(char_len(zh));
+var emo = url_decode("%F0%9F%98%80");
+output(str_len(emo));
+output(char_len(emo));
+output(utf8_char_count(emo));
+var bad = url_decode("%FF");
+output(utf8_char_count(bad));
+var fixed = utf8_decode(bad);
+output(str_len(fixed));
+output(char_len(fixed));
+output(str_utf8_valid(bad));
+output(str_utf8_valid(zh));
+var valid2 = utf8_decode(zh);
+output(bytes_eq(valid2, zh));
+output(bytes_eq(utf8_encode(zh), zh));
+output(utf8_char_count("abc"));

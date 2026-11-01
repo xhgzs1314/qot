@@ -1,0 +1,36 @@
+// 语料线 · 17 LRU 缓存（dict + 数组序 + 命中/淘汰）
+// 任务画像：给下游 API 加一层小缓存。状态：✅ 可运行。
+var cache = dict_new();
+var order = arr_new();
+var cap = 3;
+
+number_t func cache_get(k) {
+    if (dict_has(cache, k) == false) { return null; }
+    return dict_get(cache, k);
+}
+
+number_t func cache_put(k, v) {
+    if (dict_has(cache, k) == false) {
+        arr_push(order, k);
+        if (arr_len(order) > cap) {
+            var evict = arr_get(order, 0);
+            dict_del(cache, evict);
+            // 原地删除而非重绑定（KNOWN-GLOBAL-SCOPE：函数内对全局的
+            // **重绑定**在 native 落局部槽 —— 登记定价；原地变异两侧同律）。
+            arr_remove_at(order, 0);
+            output("  evict: " + evict);
+        }
+    }
+    dict_set(cache, k, v);
+    return 0;
+}
+
+cache_put("a", 1);
+cache_put("b", 2);
+cache_put("c", 3);
+cache_put("d", 4);
+cache_put("e", 5);
+output("keys now: " + arr_join(order, ","));
+output("has a: " + strings(dict_has(cache, "a")));
+output("has d: " + strings(dict_has(cache, "d")));
+output("has e: " + strings(dict_has(cache, "e")));

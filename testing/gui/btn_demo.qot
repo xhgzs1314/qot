@@ -1,0 +1,63 @@
+// 【GUI 按钮回调演示 】按钮点击 → 事件轮询分派（解释器与原生
+// 程序同一份源码、同一份 wingui 实现、同一套行为）。
+//
+// 事件模型：vg_wait_event(ms) 是主循环的心跳——内部泵 Windows 消息并把
+// 控件事件排队，空闲时小睡，CPU 近零。事件 = [控件id, kind, value]：
+//   kind 1 = 点击   2 = 改变（勾选/滑块）   3 = 选中（下拉/列表）
+//   kind 9 = 窗口已关闭（点 X 或全部窗口销毁）
+
+var w = vg_create_window("QOT 按钮回调演示", 560, 380);
+vg_set_window_bg_gradient(w, [0.05, 0.05, 0.12, 1], [0.12, 0.08, 0.22, 1]);
+
+var title = vg_create_label(w, "按钮回调 · 事件轮询演示", 40, 28, 480, 30);
+vg_label_set_font_size(title, 19);
+
+var state = vg_create_label(w, "按钮还没被点过", 40, 78, 480, 26);
+vg_label_set_text_color(state, [0.55, 0.85, 1, 1]);
+
+var btn = vg_create_button(w, "点我", 40, 130, 180, 46);
+vg_button_set_border_radius(btn, 10);
+
+var btn2 = vg_create_button(w, "换个说法", 240, 130, 180, 46);
+vg_button_set_border_radius(btn2, 10);
+
+var btn_quit = vg_create_button(w, "关闭窗口", 40, 196, 180, 40);
+
+vg_show_window(w);
+
+var clicks = 0;
+var quits = 0;
+var running = 1;
+
+loop (running == 1) {
+    var ev = vg_wait_event(15);
+    if (ev == null) {
+        continue;                       // 超时无事件 → 下一轮（内部已泵消息）
+    }
+    var id = ev[0];
+    var kind = ev[1];
+
+    if (kind == 9) {                    // 窗口被 X 掉
+        quits = quits + 1;
+        running = 0;
+    } else {
+        if (kind == 1 && id == btn) {   // ← 这就是按钮的“回调”
+            clicks = clicks + 1;
+            if (clicks == 1) {
+                vg_label_set_text(state, "点了一下，手感如何？");
+            } else {
+                vg_label_set_text(state, "已经点了 " + clicks + " 下");
+            }
+            vg_button_set_text(btn, "再点 (" + clicks + ")");
+        }
+        if (kind == 1 && id == btn2) {
+            vg_button_set_text(btn, clicks > 0 ? "继续点" : "点我");
+            vg_label_set_text(state, "文案已切换");
+        }
+        if (kind == 1 && id == btn_quit) {
+            vg_close_window(w);
+        }
+    }
+}
+
+output("demo-done clicks=" + clicks);

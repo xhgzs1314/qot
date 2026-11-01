@@ -1,0 +1,11 @@
+{
+  "name": "bound_numeric_str_literal_vm",
+  "runs_on": "vm",
+  "expect": {
+    "exit": 0,
+    "stdout": ["9a"],
+    "stderr_empty": true
+  },
+  "tags": ["string", "literal", "concat", "pricing"],
+  "note": "S-14 终审（）：字面量保持字符串，'9'+'a' 三引擎一致拼接 '9a'。旧 D-09 分歧（interp 报 2002 / VM 拼接）已解除，两侧钉同价。"
+}

@@ -1,0 +1,60 @@
+// std.data 差分用例（M5）：mean / median / stddev / group_count / group_sum。
+// golden 按 native 口径；oracle 裁判做零分歧对账。
+// 黄金值：stddev([2,4,4,4,5,5,7,9]) = 2（μ=5, Σd²=32, 32/8=4, √4=2 经典口径钉）。
+require "../../../std/data.qot";
+
+// ---- mean ----
+output(data##mean(arr_new()));                         // null：空数组
+var ns = arr_new();
+arr_push(ns, 1); arr_push(ns, 2); arr_push(ns, 3); arr_push(ns, 4);
+output(data##mean(ns));                                // 2.500000
+output(is_null(data##mean("nope")));                   // true：非数组
+var mixed = arr_new();
+arr_push(mixed, 1); arr_push(mixed, true);
+output(is_null(data##mean(mixed)));                    // true：布尔不是数字（严格口径）
+
+// ---- median（副本排序，不改输入）----
+var m1 = arr_new();
+arr_push(m1, 3); arr_push(m1, 1); arr_push(m1, 2);
+output(data##median(m1));                              // 2.000000
+output(arr_get(m1, 0));                                // 3.000000（原数组未被排序）
+var m2 = arr_new();
+arr_push(m2, 4); arr_push(m2, 1); arr_push(m2, 3); arr_push(m2, 2);
+output(data##median(m2));                              // 2.500000（偶数取平均）
+var m3 = arr_new();
+arr_push(m3, 7);
+output(data##median(m3));                              // 7.000000
+output(is_null(data##median(arr_new())));              // null
+
+// ---- stddev（总体口径）----
+var sd = arr_new();
+arr_push(sd, 2); arr_push(sd, 4); arr_push(sd, 4); arr_push(sd, 4);
+arr_push(sd, 5); arr_push(sd, 5); arr_push(sd, 7); arr_push(sd, 9);
+output(data##stddev(sd));                              // 2.000000
+var sd1 = arr_new();
+arr_push(sd1, 42);
+output(data##stddev(sd1));                             // 0.000000
+output(is_null(data##stddev(arr_new())));              // null
+
+// ---- group_count / group_sum ----
+var rows = arr_new();
+var r = arr_new();
+arr_push(r, "fruit"); arr_push(r, "120.5"); arr_push(rows, r);
+r = arr_new();
+arr_push(r, "veg"); arr_push(r, "77.75"); arr_push(rows, r);
+r = arr_new();
+arr_push(r, "fruit"); arr_push(r, "43.25"); arr_push(rows, r);
+r = arr_new();
+arr_push(r, "dairy"); arr_push(r, "oops"); arr_push(rows, r);   // 非数值：group_sum 跳过
+r = arr_new();
+arr_push(r, "dairy"); arr_push(r, "58"); arr_push(rows, r);
+
+var gc = data##group_count(rows, 0);
+output(dict_get(gc, "fruit"));                         // 2.000000
+output(dict_get(gc, "veg"));                           // 1.000000
+output(dict_get(gc, "dairy"));                         // 2.000000
+var gs = data##group_sum(rows, 0, 1);
+output(dict_get(gs, "fruit"));                         // 163.750000
+output(dict_get(gs, "dairy"));                         // 58.000000（oops 被跳过）
+output(is_null(dict_get(gs, "nope")));                 // null：无此键
+output(is_null(data##group_count(null, 0)));           // null

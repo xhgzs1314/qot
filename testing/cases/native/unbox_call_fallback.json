@@ -1,0 +1,18 @@
+{
+ "name": "unbox_call_fallback",
+ "runs_on": "vm",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stderr_empty": true
+ },
+ "tags": [
+  "n04",
+  "unbox-call",
+  "fallback"
+ ],
+ "note": "N-04 的负例/回退钉：mix 的 0-1 分支与负实参、noisy（含 output 副作用→不资格）、container_sum（下标/数组→不资格）。无资格的函数全部走通用入口，行为与 VM 逐位一致；mix 在同程序内既有数字实参（guard 命中）也有负实参路径。native 与 VM 逐行差分。"
+}

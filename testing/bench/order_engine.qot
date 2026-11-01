@@ -1,0 +1,30 @@
+number_t func discount(level, price){
+    if (level == 1) { return price * 0.95; }
+    if (level == 2) { return price * 0.90; }
+    if (level == 3) { return price * 0.85; }
+    if (level == 4) { return price * 0.80; }
+    return price * 0.70;
+}
+number_t func classify(amount){
+    if (amount > 1000) { return 3; }
+    if (amount > 500) { return 2; }
+    if (amount > 100) { return 1; }
+    return 0;
+}
+var buckets = [0, 0, 0, 0];
+var total = 0.0;
+for (order in 87654321) {
+    var level = order % 5 + 1;
+    var qty = order % 9 + 1;
+    var price = (order % 977) * 1.5 + 10;
+    var d = discount(level, price);
+    var amount = d * qty * 1.13;
+    var cat = classify(amount);
+    buckets[cat] = buckets[cat] + 1;
+    total = total + amount;
+}
+output(total);
+output(buckets[0]);
+output(buckets[1]);
+output(buckets[2]);
+output(buckets[3]);

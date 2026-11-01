@@ -1,0 +1,12 @@
+{
+ "name": "err_init_return",
+ "runs_on": "none",
+ "compile": { "args": [], "expect_ok": false },
+ "expect": {
+  "exit_not": 0,
+  "stderr_contains": ["[错误]", "return"],
+  "artifact": null
+ },
+ "tags": ["syntax", "negative", "M4"],
+ "note": "M4 立法（）：init（构造器）体内禁止 return —— 构造恒返回对象本身（静态可判 → G-10 致命通道）。"
+}

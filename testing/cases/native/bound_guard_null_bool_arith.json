@@ -1,0 +1,11 @@
+{
+  "name": "bound_guard_null_bool_arith",
+  "runs_on": "vm",
+  "expect": {
+    "exit": 0,
+    "stdout": ["true", "true", "true", "true", "true", "true"],
+    "stderr_empty": true
+  },
+  "tags": ["guard", "f64", "null-bool", "native-matrix"],
+  "note": "S-02 负例矩阵 ④：null/bool 经 any_t 函数注入（绕过静态分析器警告污染 stderr）参与算术，guard 回退必须得到 VM 同款值。VM 实证：null+1 与 1+null 均得 \"1\"（null 在拼接中归空串），故两条 glen 均为 1。长度断言代替串相等（D-11：VM 串 == 对拼接产物 vs 字面量返回 false——对象语义，待深查）。f=2.5*2 验证纯 F64 槽。每例断言 native == VM。"
+}

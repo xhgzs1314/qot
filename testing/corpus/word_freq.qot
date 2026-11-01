@@ -1,0 +1,28 @@
+// 语料线 · 05 词频统计 top-N（split + dict 计数 + 排序输出）
+// 任务画像：统计一段文本的高频词。状态：✅ 可运行。
+var text = "the quick brown fox jumps over the lazy dog";
+text = text + " the dog barks and the fox runs and the cat sleeps";
+
+var words = str_split(text, " ");
+var freq = dict_new();
+var order = arr_new();
+var i = 0;
+loop (i < arr_len(words)) {
+    var w = arr_get(words, i);
+    if (dict_has(freq, w) == false) {
+        dict_set(freq, w, 0);
+        arr_push(order, w);
+    }
+    dict_set(freq, w, dict_get(freq, w) + 1);
+    i += 1;
+}
+
+// 按 (词) 排序后输出计数（计数排序需要排序键函数 —— arr_sort_by 支持）
+arr_sort(order);
+var keys = order;
+i = 0;
+loop (i < arr_len(keys)) {
+    var w = arr_get(keys, i);
+    output(str_pad_right(w, 8, " ") + " x" + int_to_str(dict_get(freq, w)));
+    i += 1;
+}

@@ -3,772 +3,219 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>QOT语言扩展 · 外部库使用说明</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: #f1f1f1;
-            border-radius: 8px;
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: #cbd5e0;
-            border-radius: 8px;
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8;
-        }
-
-        body {
-            font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Microsoft YaHei', 'PingFang SC', 'Noto Sans', sans-serif;
-            background: #f0f4f8;
-            color: #1e2a3e;
-            line-height: 1.55;
-            padding: 2rem 1.5rem;
-        }
-
-        .doc-container {
-            max-width: 1280px;
-            margin: 0 auto;
-            background: #ffffff;
-            border-radius: 1.5rem;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-            overflow: hidden;
-        }
-
-        .hero-header {
-            background: #1a4a5f;
-            padding: 1.8rem 2.5rem;
-            color: white;
-        }
-
-        .hero-header h1 {
-            font-size: 1.8rem;
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-        }
-
-        .hero-header p {
-            font-size: 0.95rem;
-            opacity: 0.85;
-        }
-
-        .tabs {
-            display: flex;
-            border-bottom: 1px solid #e2e8f0;
-            background: #fafcfd;
-            padding: 0 2rem;
-            gap: 1rem;
-        }
-
-        .tab-btn {
-            background: none;
-            border: none;
-            font-size: 0.95rem;
-            font-weight: 500;
-            padding: 0.9rem 0.25rem 0.7rem;
-            cursor: pointer;
-            color: #5a6e7c;
-            border-bottom: 2px solid transparent;
-            font-family: inherit;
-        }
-
-        .tab-btn.active {
-            color: #1a5c6e;
-            border-bottom-color: #2c9b8e;
-        }
-
-        .tab-btn:hover:not(.active) {
-            color: #2c7a6e;
-        }
-
-        .tab-content {
-            display: none;
-            padding: 2rem 2.5rem;
-        }
-
-        .tab-content.active {
-            display: block;
-        }
-
-        .section {
-            margin-bottom: 2rem;
-        }
-
-        h2 {
-            font-size: 1.35rem;
-            font-weight: 600;
-            color: #1a4a5f;
-            border-left: 4px solid #2c9b8e;
-            padding-left: 0.9rem;
-            margin-bottom: 1rem;
-        }
-
-        h3 {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: #2c5a6e;
-            margin: 1rem 0 0.5rem 0;
-        }
-
-        .desc-text {
-            font-size: 0.95rem;
-            color: #2d3e48;
-            background: #f8fafc;
-            padding: 0.7rem 1.2rem;
-            border-radius: 0.75rem;
-            border-left: 3px solid #8bc6c1;
-            margin: 0.7rem 0 0.9rem 0;
-        }
-
-        .code-block {
-            background-color: #0e1e2a;
-            color: #e2e8f0;
-            border-radius: 0.75rem;
-            padding: 1rem 1.2rem;
-            margin: 0.8rem 0 1rem;
-            font-family: 'SF Mono', 'JetBrains Mono', monospace;
-            font-size: 0.85rem;
-            line-height: 1.5;
-            overflow-x: auto;
-            position: relative;
-        }
-
-        .copy-btn {
-            position: absolute;
-            top: 8px;
-            right: 10px;
-            background: #2d4f5c;
-            border: none;
-            color: white;
-            font-size: 0.7rem;
-            padding: 3px 10px;
-            border-radius: 20px;
-            cursor: pointer;
-            font-family: system-ui;
-        }
-
-        .copy-btn:hover {
-            background: #3d6f7e;
-        }
-
-        .table-container {
-            margin: 1rem 0;
-            border-radius: 0.75rem;
-            overflow: hidden;
-            border: 1px solid #e2edf2;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.85rem;
-        }
-
-        th {
-            background: #eef3f6;
-            color: #1a5c6e;
-            font-weight: 600;
-            padding: 0.6rem 0.9rem;
-            text-align: left;
-        }
-
-        td {
-            padding: 0.6rem 0.9rem;
-            border-bottom: 1px solid #ecf1f4;
-            background: white;
-        }
-
-        tr:last-child td {
-            border-bottom: none;
-        }
-
-        .inline-code {
-            font-family: monospace;
-            background: #eef2f5;
-            padding: 0.15rem 0.4rem;
-            border-radius: 0.3rem;
-            color: #1b6b6b;
-            font-size: 0.85rem;
-        }
-
-        .badge {
-            display: inline-block;
-            background: #e6f4f0;
-            border-radius: 20px;
-            padding: 0.2rem 0.7rem;
-            font-size: 0.75rem;
-            color: #1e6f5c;
-            margin-left: 0.5rem;
-        }
-
-        .feature-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.7rem;
-            margin: 0.8rem 0;
-        }
-
-        .feature-tag {
-            background: #eff5f2;
-            padding: 0.3rem 0.9rem;
-            border-radius: 2rem;
-            font-size: 0.85rem;
-        }
-
-        @media (max-width: 700px) {
-
-            .tab-content,
-            .tabs {
-                padding-left: 1rem;
-                padding-right: 1rem;
-            }
-
-            .tab-content {
-                padding: 1.2rem;
-            }
-
-            h2 {
-                font-size: 1.2rem;
-            }
-        }
-
-        .footer {
-            padding: 1rem 2rem;
-            background: #f7fafc;
-            border-top: 1px solid #e2e8f0;
-            text-align: center;
-            font-size: 0.75rem;
-            color: #6c8b9a;
-        }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>原生插件开发 · QOT</title>
+    <link rel="stylesheet" href="assets/doc.css">
 </head>
 
 <body>
-    <div class="doc-container">
-        <div class="hero-header">
-            <h1>QOT语言扩展 · 外部库集成</h1>
-            <p>两种接入方式：标准 FUNC 配置 ｜ QTC</p>
+    <div class="doc">
+        <div class="doc-head">
+            <span class="eyebrow">QOT 扩展开发</span>
+            <h1>原生插件开发</h1>
+            <p>
+                QOT 与原生代码之间有两条通路：<strong>通用 FFI</strong> 直接调用 C 符号，
+                <strong>原生插件 ABI</strong> 用固定契约注册函数。两者在解释器与原生程序上行为一致。
+            </p>
         </div>
 
-        <div class="tabs">
-            <button class="tab-btn active" data-tab="tab1">方案一 · FUNC 配置文件</button>
-            <button class="tab-btn" data-tab="tab2">方案二 · QTC</button>
-        </div>
-        <div id="tab1" class="tab-content active">
-            <div class="section">
-                <h2>📌 扩展概述</h2>
-                <div class="desc-text">
-                    QOT语言原生方法可能无法满足您的全部使用需求，如需扩展功能，您可通过导入外部库来便捷地使用更多能力！在开始扩展前，您需要提前准备好该库对应的DLL文件，以及<strong
-                        class="inline-code">FUNC格式</strong>的配置文件。
-                    <br><br>
-                    <strong>📄 FUNC配置文件</strong>
-                    用于存储库的核心必要信息，例如导出的函数名称、各函数的参数类型及返回类型。完成FUNC配置文件编写后，<strong>需使用我们提供的签名工具进行签名</strong>，再将签名后的配置文件与库的DLL文件一同放置到指定的库文件夹中。
-                    <span class="badge-note">✓ 安全签名校验机制</span>
-                </div>
-            </div>
+        <div class="doc-body">
+            <h2>1. 两条通路怎么选</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>通路</th>
+                        <th>适合</th>
+                        <th>QOT 侧接口</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>通用 FFI</td>
+                        <td>调用现成的系统库（<code>user32.dll</code>、<code>libm</code> 等），无需自己写 DLL</td>
+                        <td><code>ffi_load</code> / <code>ffi_sym</code> / <code>ffi_call</code> / <code>ffi_call_v</code></td>
+                    </tr>
+                    <tr>
+                        <td>原生插件 ABI</td>
+                        <td>自己写库，需要结构化的入参/出参、容器读写、错误上报</td>
+                        <td><code>plugin_load</code> / <code>plugin_call</code> / <code>plugin_names</code> / <code>plugin_free</code></td>
+                    </tr>
+                </tbody>
+            </table>
 
+            <h2>2. 通用 FFI</h2>
+            <pre><code>var lib = ffi_load("user32.dll");        // 失败返回 null
+var sym = ffi_sym(lib, "MessageBoxA");    // 失败返回 null
 
-            <div class="section">
-                <h2>✍️ FUNC配置文件编写规范</h2>
-                <div class="code-block">导出函数名|参数类型|返回类型</div>
-                <div class="desc-text" style="background: #f0f9f0; border-left-color: #2c9b8e;">
-                    💡 <strong>格式说明：</strong> 参数类型需用英文逗号（<code
-                        class="inline-code">,</code>）分隔多个参数；每个导出函数需<strong>单独占一行</strong>。签名工具会将配置文件转换为受信任的库描述。
-                </div>
-            </div>
+ffi_call(sym, 0, 0.0, 0.0, 0.0, 0.0);    // 推断调用：参数与返回值按 f64
+ffi_call_v(sym, types, ...);             // 显式类型调用</code></pre>
+            <table>
+                <thead>
+                    <tr>
+                        <th>类型码</th>
+                        <th>含义</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>void</code></td>
+                        <td>无返回值</td>
+                    </tr>
+                    <tr>
+                        <td><code>i32</code> / <code>i64</code></td>
+                        <td>32 / 64 位整数</td>
+                    </tr>
+                    <tr>
+                        <td><code>f64</code></td>
+                        <td>双精度浮点</td>
+                    </tr>
+                    <tr>
+                        <td><code>str</code></td>
+                        <td>字符串</td>
+                    </tr>
+                    <tr>
+                        <td><code>ptr</code></td>
+                        <td>指针</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p>辅助函数：<code>ffi_str(ptr)</code> 读指针处的 C 字符串（有界 1MB）；
+                <code>ffi_ptr(x)</code> 把字符串转成 NUL 结尾副本地址；
+                <code>ffi_free(lib)</code> 卸载动态库；
+                <code>ffi_last_error()</code> 取上一次错误文本。</p>
+            <blockquote class="note">
+                <strong>参数上限</strong>：一次调用最多 8 个参数（含返回值位）。
+            </blockquote>
+            <h2>3. 原生插件 ABI</h2>
+            <p>插件是一个动态库，唯一依赖是公共头文件
+                <code>ot-asset/c/plugin/qot_plugin_abi.h</code>。它导出唯一入口
+                <code>qot_plugin_init</code>，在初始化时通过 <code>api-&gt;reg</code> 注册函数。</p>
 
+            <h3>3.1 值模型</h3>
+            <p>QOT 的值是 16 字节：1 字节标签 + 8 字节载荷。插件<strong>只能通过 <code>api</code> 访问值</strong>，
+                不要直接解引用载荷指针——那是宿主私有布局。</p>
+            <pre><code>typedef struct qot_value {
+    uint8_t t;          /* QOT_VT_NONE / NULL / BOOL / NUM / STR / ARR / DICT */
+    uint8_t pad[7];
+    union { double d; void *p; } u;
+} qot_value;</code></pre>
 
-            <div class="section">
-                <h2>🔁 参数类型映射表</h2>
-                <p style="margin-bottom: 0.5rem; font-size: 0.9rem;">下表展示了原生C/C++数据类型与QOT语言内部类型的对应关系，确保跨语言调用时参数准确传递。</p>
+            <h3>3.2 宿主能力面（api）</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>类别</th>
+                        <th>成员</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>构造</td>
+                        <td><code>set_null</code> / <code>set_bool</code> / <code>set_num</code> / <code>set_str</code> / <code>arr_new</code> / <code>arr_push</code> / <code>dict_new</code> / <code>dict_set</code></td>
+                    </tr>
+                    <tr>
+                        <td>读取</td>
+                        <td><code>tag_of</code> / <code>num_of</code> / <code>bool_of</code> / <code>str_of</code> / <code>arr_len</code> / <code>arr_at</code> / <code>dict_get</code></td>
+                    </tr>
+                    <tr>
+                        <td>错误</td>
+                        <td><code>set_error</code>（文本挂到 QOT 侧的 <code>ffi_last_error()</code>，本次 <code>plugin_call</code> 返回 <code>null</code>）</td>
+                    </tr>
+                    <tr>
+                        <td>注册</td>
+                        <td><code>reg(name, fn, argc, doc)</code>——仅在 <code>qot_plugin_init</code> 内调用；名字全局唯一</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p>字符串内容是<strong>借用引用</strong>（非 NUL 结尾，以长度为准），只在本次调用内有效；
+                <code>set_str</code> 是拷贝。容器由宿主持有，值可自由拷贝。</p>
 
-                <!-- 新增：变参函数说明 -->
-                <div class="desc-text" style="background: #eef2ff; border-left-color: #3b82f6; margin-bottom: 1rem;">
-                    ⚡ <strong>变参函数（可变参数）</strong><br>
-                    若函数参数数量不固定，请在 FUNC 配置文件中将参数类型写为 <code class="inline-code">...</code><br>
-                    例如：<code class="inline-code">printf|...|int</code> 或 <code
-                        class="inline-code">call_address|...|dword</code><br>
-                    调用时可按需传入任意数量的参数，QOT 会自动处理参数传递。
-                </div>
+            <h3>3.3 写一个插件</h3>
+            <pre><code>#include "qot_plugin_abi.h"
 
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>原生类型 (C/C++ 风格)</th>
-                                <th>FUNC 配置写法</th>
-                                <th>QOT 映射类型</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><code>int</code></td>
-                                <td><code>int</code></td>
-                                <td>整数</td>
-                            </tr>
-                            <tr>
-                                <td><code>float</code></td>
-                                <td><code>float</code></td>
-                                <td>浮点数</td>
-                            </tr>
-                            <tr>
-                                <td><code>double</code></td>
-                                <td><code>double</code></td>
-                                <td>浮点数</td>
-                            </tr>
-                            <tr>
-                                <td><code>char</code></td>
-                                <td><code>char</code></td>
-                                <td>整数</td>
-                            </tr>
-                            <tr>
-                                <td><code>void*</code></td>
-                                <td><code>void</code></td>
-                                <td>指针（显示为数字）</td>
-                            </tr>
-                            <tr>
-                                <td><code>char*</code> (UTF-8)</td>
-                                <td><code>str</code></td>
-                                <td>字符串</td>
-                            </tr>
-                            <tr>
-                                <td><code>long</code></td>
-                                <td><code>long</code></td>
-                                <td>整数</td>
-                            </tr>
-                            <tr>
-                                <td><code>bool</code></td>
-                                <td><code>bool</code></td>
-                                <td>布尔值</td>
-                            </tr>
-                            <tr>
-                                <td><code>size_t</code></td>
-                                <td><code>size_t</code></td>
-                                <td>整数</td>
-                            </tr>
-                            <tr>
-                                <td><code>signed char</code></td>
-                                <td><code>byte</code></td>
-                                <td>整数 (0-255)</td>
-                            </tr>
-                            <tr>
-                                <td><code>wchar_t*</code></td>
-                                <td><code>wca</code></td>
-                                <td>宽字符串指针</td>
-                            </tr>
-                            <tr>
-                                <td><code>uint</code> / <code>unsigned int</code></td>
-                                <td><code>uint</code></td>
-                                <td>无符号整数</td>
-                            </tr>
-                            <tr>
-                                <td><code>void*</code> (通用指针)</td>
-                                <td><code>ptr</code></td>
-                                <td>指针（显示为数字）</td>
-                            </tr>
-                            <tr>
-                                <td><code>HWND</code></td>
-                                <td><code>hwnd</code></td>
-                                <td>窗口句柄（数字）</td>
-                            </tr>
-                            <tr>
-                                <td><code>HMODULE</code></td>
-                                <td><code>hmodule</code></td>
-                                <td>模块句柄（数字）</td>
-                            </tr>
-                            <tr>
-                                <td><code>HINSTANCE</code></td>
-                                <td><code>hinstance</code></td>
-                                <td>实例句柄（数字）</td>
-                            </tr>
-                            <tr>
-                                <td><code>HDC</code></td>
-                                <td><code>hdc</code></td>
-                                <td>设备上下文句柄（数字）</td>
-                            </tr>
-                            <tr>
-                                <td><code>HKEY</code></td>
-                                <td><code>hkey</code></td>
-                                <td>注册表键句柄（数字）</td>
-                            </tr>
-                            <tr>
-                                <td><code>HANDLE</code></td>
-                                <td><code>handle</code></td>
-                                <td>通用句柄（数字）</td>
-                            </tr>
-                            <tr>
-                                <td><code>DWORD</code></td>
-                                <td><code>dword</code></td>
-                                <td>32位无符号整数</td>
-                            </tr>
-                            <tr>
-                                <td><code>DWORD_PTR</code></td>
-                                <td><code>dword_ptr</code></td>
-                                <td>指针大小整数</td>
-                            </tr>
-                            <tr>
-                                <td><code>LPARAM</code></td>
-                                <td><code>lparam</code></td>
-                                <td>长参数（数字）</td>
-                            </tr>
-                            <tr>
-                                <td><code>WPARAM</code></td>
-                                <td><code>wparam</code></td>
-                                <td>宽参数（数字）</td>
-                            </tr>
-                            <tr>
-                                <td><code>LRESULT</code></td>
-                                <td><code>lresult</code></td>
-                                <td>返回值（数字）</td>
-                            </tr>
-                            <tr>
-                                <td><code>int64_t</code></td>
-                                <td><code>int64</code></td>
-                                <td>64位整数</td>
-                            </tr>
-                            <tr>
-                                <td><code>uint64_t</code></td>
-                                <td><code>uint64</code></td>
-                                <td>64位无符号整数</td>
-                            </tr>
-                            <tr style="background: #eef2ff;">
-                                <td><strong>变参函数</strong></td>
-                                <td><code>...</code></td>
-                                <td>任意数量参数</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-                <div class="desc-text" style="margin-top: 0.5rem; font-size: 0.85rem;">
-                    ⚙️ <strong>注意事项：</strong><br>
-                    • <code>str</code> 类型对应 <strong>UTF-8 编码</strong>的字符串，QOT 默认使用 UTF-8。<br>
-                    • <code>wca</code> 类型用于 Windows W 版本 API（如 MessageBoxW），需要宽字符串。<br>
-                    • <code>ptr</code> / <code>void</code> / <code>hwnd</code> 等句柄类型在 QOT
-                    中显示为<strong>数字</strong>，可直接用于计算或传递。<br>
-                    • <strong>变参函数</strong>（参数类型写为 <code>...</code>）可以接收任意数量的参数，常用于 call_address、call_func 等通用调用函数。
-                </div>
-            </div>
-
-
-            <div class="section">
-                <h2>📚 快速上手 · 示例示范</h2>
-                <div class="desc-text" style="background: #fef9e6;">
-                    🔧 <strong>编写 FUNC 配置文件范例：</strong><br>
-                    假设您的动态库 <code>math_ext.dll</code> 中有两个导出函数，签名如下：
-                    <ul style="margin: 0.8rem 0 0.2rem 1.5rem;">
-                        <li><code>int add(int a, int b) → 参数类型: int,int  返回类型: int</code></li>
-                        <li><code>double div(double a, double b) → 参数类型: double,double  返回类型: double</code></li>
-                    </ul>
-                    则 FUNC 配置文件内容应为：
-                    <div class="code-block" style="margin-top: 0.6rem; background:#0b1b1f;">
-                        add|int,int|int
-                        div|double,double|double
-                    </div>
-                    完成签名后，与 <code>math_ext.dll</code> 一同放入库文件夹，即可在 QOT 中调用。
-                </div>
-            </div>
-
-
-            <div class="section">
-                <h2>🛡️ 签名与部署要点</h2>
-                <div class="desc-text" style="display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: flex-start;">
-                    <span style="background:#e6f7f0; padding: 0.4rem 0.9rem; border-radius: 2rem;">📁
-                        库文件夹默认路径：<code>/package/库/</code></span>
-                    <span style="background:#e6f7f0; padding: 0.4rem 0.9rem; border-radius: 2rem;">🔐
-                        未签名的FUNC配置文件将被拒绝加载</span>
-                </div>
-                <div class="desc-text" style="margin-top: 0.8rem;">
-                    🧩 <strong>目录结构示例：</strong><br>
-                    <code style="background:#eef2f5; padding:0.2rem 0.4rem;">/package/库/</code> <br>
-                    &nbsp;&nbsp;├── <code>mylib.dll</code> &nbsp;（动态链接库）<br>
-                    &nbsp;&nbsp;└── <code>mylib.func</code> &nbsp;（签名后的配置文件）<br>
-                    请确保库文件名与配置文件名前缀一致，便于运行时索引。
-                </div>
-            </div>
-
-        </div>
-
-
-        <div id="tab2" class="tab-content">
-            <div class="section">
-                <h2>⚙️ 介绍</h2>
-                <div class="desc-text">
-                    <strong>QTC 文件</strong> 配套的 DLL 设计。当动态库使用 QOT 提供的 <code class="inline-code">platform_ept.h</code>
-                    编译后，DLL 内部会自带导出函数表<br>
-                    <strong>不需要编写 .func 配置文件，也不需要签名，复制 DLL 即可使用。</strong>
-                    <span class="badge">仅限 QTC 工程产物</span>
-                </div>
-            </div>
-
-            <div class="section">
-                <h2>📈 相比方案一的优势</h2>
-                <div class="feature-list">
-                    <span class="feature-tag">✅ 零配置文件</span>
-                    <span class="feature-tag">✅ 无需签名流程</span>
-                    <span class="feature-tag">✅ 加载速度更快</span>
-                    <span class="feature-tag">✅ 单个 DLL 分发</span>
-                    <span class="feature-tag">✅ 调用开销更低</span>
-                </div>
-                <div class="desc-text">
-                    省去磁盘读取和文本解析，DLL 直接向调用方提供函数列表，适合正式发布及对性能有要求的场景。
-                </div>
-            </div>
-
-            <div class="section">
-                <h2>🎯 适用条件</h2>
-                <div class="desc-text">
-                    • DLL 必须使用 QOT 标准插件头文件（<code class="inline-code">platform_ept.h</code>）编译生成。<br>
-                    • 通常配合 QTC 编译流程产出，编译后 DLL 具备自描述能力。<br>
-                    • 适合不想暴露函数签名文件、追求简洁部署的开发者。
-                </div>
-            </div>
-
-
-            <div class="section">
-                <h2>🖥️ 平台库代码模板</h2>
-                <div class="desc-text">
-                    使用以下模板编译生成的 DLL
-                </div>
-
-
-
-                <div class="code-block" id="winCodeBlock">
-                    <button class="copy-btn" data-copy="winCode">复制</button>
-                    <code id="winCode" style="display: block; white-space: pre-wrap; font-family: monospace;">
-#include "platform_ept.h"
-
-static PluginValue Add_wrapper(const PluginValue* args, int n) {
-    if (n < 2) return PluginValue(0);
-    double a = args[0].num_val;
-    double b = args[1].num_val;
-    return PluginValue(a + b);
+static void add(qot_value *ret, const qot_plugin_api *api,
+                const qot_value *args, int argc)
+{
+    api->set_num(ret, api->num_of(&args[0]) + api->num_of(&args[1]));
 }
 
-PLUGIN_BEGIN
-    g_exporter->add("add", Add_wrapper);
-PLUGIN_END
-        </code>
-                </div>
-
-
-
-
-                <div class="desc-text">
-                    ⚡ 包含 <code class="inline-code">platform_ept.h</code> 后，用 <code
-                        class="inline-code">PLUGIN_BEGIN/PLUGIN_END</code> 注册函数即可。编译完成后，DLL 可直接放入 package 目录。
-                </div>
-            </div>
-
-            <div class="section">
-                <h2>📄 platform_ept.h 头文件</h2>
-                <div class="desc-text">
-                    此头文件QTC 方案必须包含
-                    <a href="assets/platform_ept.h" download="platform_ept.h" target="_blank">Download</a>
-                </div>
-                <div class="code-block" id="platformExportBlock">
-                    <button class="copy-btn" data-copy="platformExportCode">复制</button>
-                    <code id="platformExportCode"
-                        style="display: block; white-space: pre-wrap; font-family: monospace;">
-#pragma once
-#include <cstring>
-#include <string>
-#include <vector>
-#include <unordered_map>
-#ifdef _WIN32
-#define PLUGIN_EXPORT __declspec(dllexport)
-#else
-#define PLUGIN_EXPORT __attribute__((visibility("default")))
-#endif
-
-struct PluginValue
+QOT_PLUGIN_EXPORT int qot_plugin_init(const qot_plugin_api *api)
 {
-    enum Type : uint8_t
-    {
-        TYPE_NULL = 0,
-        TYPE_BOOL = 1,
-        TYPE_NUMBER = 2,
-        TYPE_STRING = 3,
-        TYPE_POINTER = 4
-    };
+    int n = 0;
+    n += api->reg("add", add, 2, "sum of two numbers");
+    return n;            /* = 注册个数（契约） */
+}</code></pre>
+            <p>编译（Windows）：</p>
+            <pre><code>g++ -shared -I ot-asset/c/plugin my_plugin.c -o my_plugin.dll</code></pre>
 
-    Type type = TYPE_NULL;
+            <h3>3.4 从 QOT 调用</h3>
+            <pre><code>var h = plugin_load("my_plugin.dll");        // 装载 → 句柄（失败 null）
+output(plugin_names(h));                // ["add"]（注册序）
+var r = plugin_call(h, "add", [2.0, 3.0]);
+output(r);                              // 5.000000
+plugin_free(h);                          // 卸载，其注册一并失效</code></pre>
+            <h2>4. 契约要点</h2>
+            <ul>
+                <li><strong>初始化契约</strong>：<code>qot_plugin_init</code> 的返回值必须等于 <code>api-&gt;reg</code>
+                    成功注册的次数，否则宿主判定初始化失败并回滚；负数表示插件自认失败（宿主卸载并报错）。</li>
+                <li><strong>调用契约</strong>：插件函数必须写返回值出参 <code>ret</code>（不写就写 <code>null</code>）；
+                    <code>args</code> 只读，且只在本次调用内有效。</li>
+                <li><strong>线程契约</strong>：插件函数只会在装载它的主线程被调用，不要把宿主指针交给其它线程。</li>
+                <li><strong>版本协商</strong>：<code>ffi_abi_version()</code> 返回当前 ABI 版本（v2）；
+                    插件可据此判断宿主能力。</li>
+                <li><strong>可移植性</strong>：只用 <code>api</code> 访问值，插件就能在解释器与原生程序上行为一致。</li>
+            </ul>
 
-    union
-    {
-        bool bool_val;
-        double num_val;
-        const char *str_val;
-        void* ptr_val;
-    };
+            <h2>5. 常见问题</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>现象</th>
+                        <th>原因与处理</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>plugin_load</code> 返回 <code>null</code></td>
+                        <td>路径不对、缺依赖、或导出的入口名不是 <code>qot_plugin_init</code>；用 <code>ffi_last_error()</code> 看原因</td>
+                    </tr>
+                    <tr>
+                        <td><code>plugin_call</code> 返回 <code>null</code>，但函数确实存在</td>
+                        <td>插件内部调用了 <code>api-&gt;set_error</code>；错误文本在 <code>ffi_last_error()</code></td>
+                    </tr>
+                    <tr>
+                        <td>参数读出来是乱码</td>
+                        <td>字符串是借用引用且非 NUL 结尾——必须用 <code>api-&gt;str_of(v, &amp;len)</code> 并按长度处理</td>
+                    </tr>
+                    <tr>
+                        <td>进程崩溃</td>
+                        <td>越界访问了 <code>args</code>（实参个数由 <code>argc</code> 决定），或直接解引用了值的载荷指针</td>
+                    </tr>
+                </tbody>
+            </table>
 
-    PluginValue() : type(TYPE_NULL), num_val(0) {}
-    PluginValue(std::nullptr_t) : type(TYPE_NULL), num_val(0) {}
-    PluginValue(bool v) : type(TYPE_BOOL), bool_val(v) {}
-    PluginValue(double v) : type(TYPE_NUMBER), num_val(v) {}
-    PluginValue(int v) : type(TYPE_NUMBER), num_val((double)v) {}
-    PluginValue(const char *v) : type(TYPE_STRING), str_val(v) {}
-    PluginValue(const std::string &v) : type(TYPE_STRING)
-    {
-        static std::string storage;
-        storage = v;
-        str_val = storage.c_str();
-    }
-    PluginValue(void* v) : type(TYPE_POINTER), ptr_val(v) {} 
-};
+            <h2>6. 相关文件</h2>
+            <ul>
+                <li>公共头：<code>ot-asset/c/plugin/qot_plugin_abi.h</code></li>
+                <li>ABI 冻结文档：<code>docs/</code></li>
+                <li>可运行示例：<code>testing/tools/qot_demo_plugin.c</code>（构建脚本 <code>testing/tools/build_demo_plugin.py</code>）</li>
+            </ul>
 
-using PluginFunction = PluginValue (*)(const PluginValue *args, int arg_count);
-
-class PluginExporter
-{
-public:
-    PluginExporter &add(const char *name, PluginFunction func)
-    {
-        m_functions[name] = func;
-        m_names.push_back(name);
-        return *this;
-    }
-
-    PluginFunction get(const char *name) const
-    {
-        auto it = m_functions.find(name);
-        return it != m_functions.end() ? it->second : nullptr;
-    }
-
-    int getCount() const
-    {
-        return (int)m_names.size();
-    }
-
-    const char *getName(int index) const
-    {
-        if (index >= 0 && index < (int)m_names.size())
-        {
-            return m_names[index].c_str();
-        }
-        return nullptr;
-    }
-
-private:
-    std::unordered_map<std::string, PluginFunction> m_functions;
-    std::vector<std::string> m_names;
-};
-
-#define PLUGIN_BEGIN                             \
-    static PluginExporter *g_exporter = nullptr; \
-    namespace                                    \
-    {                                            \
-        struct PluginRegistrar                   \
-        {                                        \
-            PluginRegistrar()                    \
-            {                                    \
-                static PluginExporter exporter;  \
-                g_exporter = &exporter;
-
-#define PLUGIN_END                                                       \
-    }                                                                    \
-    }                                                                    \
-    ;                                                                    \
-    static PluginRegistrar _plugin_registrar;                            \
-    }                                                                    \
-    extern "C"                                                           \
-    {                                                                    \
-        PLUGIN_EXPORT PluginFunction PluginGetFunction(const char *name) \
-        {                                                                \
-            return g_exporter ? g_exporter->get(name) : nullptr;         \
-        }                                                                \
-        PLUGIN_EXPORT int PluginGetFunctionCount()                       \
-        {                                                                \
-            return g_exporter ? g_exporter->getCount() : 0;              \
-        }                                                                \
-        PLUGIN_EXPORT const char *PluginGetFunctionName(int index)       \
-        {                                                                \
-            return g_exporter ? g_exporter->getName(index) : nullptr;    \
-        }                                                                \
-    }
-        </code>
-                </div>
-            </div>
-            <div class="section">
-                <h2>📖 调用示例</h2>
-                <div class="code-block" id="callExample">
-                    <button class="copy-btn" data-copy="callExampleCode">复制</button>
-                    <code id="callExampleCode">require("my_QTClib.dll") </br>
-                        var sum = add(25, 17) </br>
-                        output("add 结果: " + sum) </br>
-                        var msg = hello("开发者") </br>
-                        output(msg) </br>
-                        var product = mul(6, 7) </br>
-                        output("mul 结果: " + product)</code>
-                </div>
-                <div class="desc-text">
-                    语法与普通库完全一致，调用时自动识别绑定方式。
-                </div>
-            </div>
-
-            <div class="section">
-                <h2>📌 补充说明</h2>
-                <div class="desc-text">
-                    <ul style="margin-left: 1.2rem; margin-top: 0.3rem;">
-                        <li><strong>兼容性：</strong> 方案二与方案一可共存。如果 DLL 不支持自描述接口，系统会自动回退读取 .func 文件，不影响已有项目。</li>
-                        <li><strong>编译要求：</strong> 需要包含 <code>platform_ept.h</code>（头文件已提供），并链接对应运行时。</li>
-                        <li><strong>QTC 配套：</strong> 该模式是 QTC 编译产物的标准特性</li>
-                    </ul>
-                </div>
-            </div>
+            <h2>7. 历史形态</h2>
+            <p>早期还有「<code>export.func</code> 描述文件 + <code>require "x.dll"</code> + <code>x##fn()</code>」的接入方式。
+                当前推荐使用上面两条通路；旧形态仅在维护历史项目时可能遇到。</p>
         </div>
 
-        <div class="footer">
-            QOT 扩展集成
+        <div class="doc-foot">
+            <span>QOT 文档中心</span>
+            <span>
+                <a href="index.html">返回目录</a> ·
+                <a href="doc.html">语言总述</a> ·
+                <a href="chinese-dsl-guide.html">语言扩展指南</a> ·
+                <a href="function_inside.html">内置函数参考</a>
+            </span>
         </div>
     </div>
-
-    <script>
-
-        const tabs = document.querySelectorAll('.tab-btn');
-        const panels = document.querySelectorAll('.tab-content');
-        tabs.forEach(btn => {
-            btn.addEventListener('click', () => {
-                const target = btn.getAttribute('data-tab');
-                tabs.forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                panels.forEach(p => {
-                    p.classList.remove('active');
-                    if (p.id === target) p.classList.add('active');
-                });
-            });
-        });
-
-
-        document.querySelectorAll('.copy-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const targetId = btn.getAttribute('data-copy');
-                if (!targetId) return;
-                const sourceElem = document.getElementById(targetId);
-                if (!sourceElem) return;
-                const text = sourceElem.innerText;
-                navigator.clipboard.writeText(text).then(() => {
-                    const original = btn.innerText;
-                    btn.innerText = '✓ 已复制';
-                    setTimeout(() => { btn.innerText = original; }, 1500);
-                }).catch(() => {
-                    alert('无法自动复制，请手动选中文本');
-                });
-            });
-        });
-    </script>
 </body>
 
 </html>

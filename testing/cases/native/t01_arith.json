@@ -1,0 +1,17 @@
+{
+ "name": "t01_arith",
+ "runs_on": "vm",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stderr_empty": true
+ },
+ "tags": [
+  "arith",
+  "precedence"
+ ],
+ "note": ""
+}

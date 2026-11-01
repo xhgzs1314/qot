@@ -1,0 +1,21 @@
+{
+ "name": "std_net",
+ "runs_on": "native",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "setup": [
+  "python testing/tools/echo_http_srv.py 47300"
+ ],
+ "expect": {
+  "exit": 0,
+  "stderr_empty": true
+ },
+ "tags": [
+  "net",
+  "stdlib",
+  "p0.3"
+ ],
+ "note": "P0.3：std.net（http_get/http_post/url_parse/download）差分。正路径靠 setup 钩子起本地回显服务器（固定响应 qot-net-ok，循环 accept，teardown kill）；http_get 带 25×200ms 重试窗口（服务器启动期），超限以确定性失败收场。失败面 = 回环拒绝端口 + 非 URL + 端口越界。oracle 裁判同构支持 setup（test_primitive_oracle_diff._setup_procs）。"
+}

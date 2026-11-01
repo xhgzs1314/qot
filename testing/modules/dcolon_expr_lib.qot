@@ -1,0 +1,7 @@
+// ## 后缀调用进表达式的被测模块（G-11 钉）
+number_t func val() {
+    return 7;
+}
+number_t func twice(x) {
+    return x * 2;
+}

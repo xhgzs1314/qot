@@ -1,0 +1,19 @@
+// 表达式 · 比较右侧算术钉（G-00）：`i == n - 1` 这类最自然的写法曾经是
+// 语法错误（PLY 优先级表把比较排在加减之上 → 状态机判 REDUCE 而非 SHIFT）。
+// 修复后比较低于加减（C 系惯例），^ 与一元负号的既有定价不变。
+var n = 10;
+var i = 9;
+if (i == n - 1) { output("A ok"); }
+if (n - 1 == i) { output("B ok"); }
+if (i + 1 == n) { output("C ok"); }
+if (i < n - 1 + 1) { output("D ok"); }
+if (i == n - 1 && 1 == 3 - 2) { output("E ok"); }
+if (2 * 3 == 6) { output("F ok"); }
+// 既有定价保持：^ 与一元负号语义不受本次优先级调整影响
+output("pow: " + int_to_str(2 ^ 3 * 2));
+output("uminus: " + int_to_str(-3 + 1));
+// 循环条件里的算术
+var c = 0;
+loop (c < n - 8) { c += 1; }
+output("loop: " + int_to_str(c));
+output("pin-end");

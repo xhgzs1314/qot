@@ -13,6 +13,8 @@
 #include <stdexcept>
 #include <new>
 #include <utility>
+#include "qot_hash.h"   // T-33：StringBox 缓存的字符串哈希
+#include "vm_profile.h" // SPEC T-32：生产构建宏为空，零开销
 #if defined(_MSC_VER)
 #define QOT_INLINE __forceinline
 #define QOT_NOINLINE __declspec(noinline)
@@ -52,8 +54,8 @@ namespace qot
         STOP = 51,
         REQUIRE = 60,
         BREAK = 52,
-        RPN_LOOP_START = 200,
-        RPN_LOOP_END = 201,
+        // 200/201 曾是 RPN_LOOP_START / RPN_LOOP_END，随 RPN 超指令一并删除（SPEC D-03）。
+        // 号段保留不再复用，避免旧 .qtc 被误解析。
     };
 
     enum class BinaryOp : uint8_t
@@ -81,6 +83,7 @@ namespace qot
     };
 
     class Value;
+    class FlatDict; // 完整定义见 qot_flatdict.h（在 Value 类体之后包含，SPEC T-33）
     struct CodeBlock;
 
     using FunctionType = std::function<Value(const std::vector<Value> &)>;
@@ -97,6 +100,23 @@ namespace qot
         T obj;
         template <class... A>
         explicit Box(A &&...a) : ObjHeader(1), obj(std::forward<A>(a)...) {}
+    };
+
+    // T-33：字符串专用堆对象——内联缓存哈希。
+    // 字典键/常量池字符串不可变，同一 StringBox 反复命中时哈希只算一次。
+    struct StringBox : ObjHeader
+    {
+        std::string s;
+        mutable uint64_t hash; // 0 = 尚未计算
+        explicit StringBox(const char *v) : ObjHeader(1), s(v), hash(0) {}
+        explicit StringBox(const std::string &v) : ObjHeader(1), s(v), hash(0) {}
+        explicit StringBox(std::string &&v) : ObjHeader(1), s(std::move(v)), hash(0) {}
+        uint64_t get_hash() const
+        {
+            if (!hash)
+                hash = qot_hash_string(s.data(), s.size());
+            return hash;
+        }
     };
 
    
@@ -166,7 +186,15 @@ namespace qot
     };
 
     using ArrayPtr = Ref<std::vector<Value>>;
-    using DictPtr = Ref<std::unordered_map<std::string, Value>>;
+    // T-33: 字典内部表示从节点式 unordered_map 换成开放寻址扁平表。
+    // QOT_DICT_LEGACY_BASELINE 仅用于性能 A/B 对比基线（build.ps1 -ExtraDefines），
+    // 生产构建永远走 FlatDict。
+#ifdef QOT_DICT_LEGACY_BASELINE
+    #define QOT_DICT_MAP_TYPE std::unordered_map<std::string, Value>
+#else
+    #define QOT_DICT_MAP_TYPE FlatDict
+#endif
+    using DictPtr = Ref<QOT_DICT_MAP_TYPE>;
     using CodeBlockPtr = Ref<CodeBlock>;
 
 
@@ -234,12 +262,19 @@ namespace qot
         QOT_INLINE void retain() const
         {
             if (isHeapType(m_type))
+            {
+                QOT_PROF_ADD(valueRetain, 1);
                 ++m_obj->rc;
+            }
         }
         QOT_INLINE void release()
         {
-            if (isHeapType(m_type) && --m_obj->rc == 0)
-                destroy();
+            if (isHeapType(m_type))
+            {
+                QOT_PROF_ADD(valueRelease, 1);
+                if (--m_obj->rc == 0)
+                    destroy();
+            }
         }
 
     public:
@@ -253,7 +288,7 @@ namespace qot
         Value(std::string &&v);
         Value(const std::vector<Value> &v);
         Value(ArrayPtr ptr);
-        Value(const std::unordered_map<std::string, Value> &v);
+        Value(const QOT_DICT_MAP_TYPE &v);
         Value(DictPtr ptr);
         Value(const FunctionType &v);
         Value(CodeBlockPtr ptr);
@@ -261,11 +296,13 @@ namespace qot
 
         QOT_INLINE Value(const Value &o) : m_type(o.m_type)
         {
+            QOT_PROF_ADD(valueCopyCtor, 1);
             m_bits = o.m_bits;
             retain();
         }
         QOT_INLINE Value(Value &&o) noexcept : m_type(o.m_type)
         {
+            QOT_PROF_ADD(valueMoveCtor, 1);
             m_bits = o.m_bits;
             o.m_type = Type::NONE;
             o.m_bits = 0;
@@ -293,7 +330,11 @@ namespace qot
             }
             return *this;
         }
-        QOT_INLINE ~Value() { release(); }
+        QOT_INLINE ~Value()
+        {
+            QOT_PROF_ADD(valueDtor, 1);
+            release();
+        }
 
         Type type() const { return m_type; }
         bool isNone() const { return m_type == Type::NONE; }
@@ -306,6 +347,12 @@ namespace qot
         bool isFunction() const { return m_type == Type::FUNCTION; }
         bool isBuiltin() const { return m_type == Type::BUILTIN; }
         bool isCodeBlock() const { return m_type == Type::CODEBLOCK; }
+
+        // T-33：字符串哈希（带缓存）。仅 STRING 合法；其余类型调用为未定义行为。
+        uint64_t string_hash() const
+        {
+            return static_cast<const StringBox *>(m_obj)->get_hash();
+        }
 
         static Value createArray();
         static Value createDict();
@@ -331,8 +378,8 @@ namespace qot
         std::string &asString();
         std::vector<Value> &asArray();
         const std::vector<Value> &asArray() const;
-        std::unordered_map<std::string, Value> &asDict();
-        const std::unordered_map<std::string, Value> &asDict() const;
+        QOT_DICT_MAP_TYPE &asDict();
+        const QOT_DICT_MAP_TYPE &asDict() const;
         const FunctionType &asFunction() const;
         CodeBlockPtr asCodeBlock() const;
         const void *getPtr() const;
@@ -355,8 +402,9 @@ namespace qot
         std::string toString() const;
     };
 
-    
-  
+    // T-33：FlatDict 的成员函数体用到 Value 完整定义，必须在 Value 类体之后展开。
+    #include "qot_flatdict.h"
+
     class OperandStack
     {
         Value *m_data = nullptr;
@@ -364,6 +412,7 @@ namespace qot
         Value *m_end = nullptr;
         QOT_NOINLINE void grow()
         {
+            QOT_PROF_ADD(stackGrows, 1);
             size_t oldSize = static_cast<size_t>(m_top - m_data);
             size_t nc = m_data ? static_cast<size_t>(m_end - m_data) * 2 : 64;
             Value *nd = static_cast<Value *>(::operator new(sizeof(Value) * nc));
@@ -532,12 +581,22 @@ namespace qot
 
     struct CodeBlock
     {
+        // T-34/T-35：调用目标缓存。CALL 的操作数是 funcNames 下标（编译期烘进 .qtc 的索引），
+        // 加载后把「名字 → 内置函数指针 / 用户函数块」解析一次，运行期 = 数组下标 + 间接调用，
+        // 消掉每次调用的字符串哈希（T-32 剖析：builtinNameLookups/call ≈ 1.28）。
+        struct CallTarget
+        {
+            const BuiltinFunction *builtin = nullptr; // BuiltinManager 表项（借用，进程级单例）
+            CodeBlock *user = nullptr;                // 用户函数块（借用，constants/m_functions 持有）
+        };
+
         std::vector<Instr> instructions;
         std::vector<std::vector<uint8_t>> blobs; // 超长操作数
         std::vector<Value> constants;
         std::vector<std::string> varNames;
         std::vector<std::string> funcNames;
         std::string sourceFile;
+        std::vector<CallTarget> callTargets; // 与 funcNames 一一对应，由 VMExecutor::resolve_calls 填充
         std::unordered_map<std::string, uint32_t> var_name_to_index;
         std::unordered_map<std::string, uint32_t> const_name_to_index;
 
@@ -548,6 +607,7 @@ namespace qot
             constants.clear();
             varNames.clear();
             funcNames.clear();
+            callTargets.clear();
             sourceFile.clear();
             var_name_to_index.clear();
             const_name_to_index.clear();
@@ -592,13 +652,13 @@ namespace qot
         switch (m_type)
         {
         case Type::STRING:
-            delete static_cast<Box<std::string> *>(m_obj);
+            delete static_cast<StringBox *>(m_obj);
             break;
         case Type::ARRAY:
             delete static_cast<Box<std::vector<Value>> *>(m_obj);
             break;
         case Type::DICT:
-            delete static_cast<Box<std::unordered_map<std::string, Value>> *>(m_obj);
+            delete static_cast<Box<QOT_DICT_MAP_TYPE> *>(m_obj);
             break;
         case Type::FUNCTION:
             delete static_cast<Box<FunctionType> *>(m_obj);
@@ -613,15 +673,15 @@ namespace qot
 
     inline Value::Value(const char *v) : m_type(Type::STRING), m_bits(0)
     {
-        m_obj = new Box<std::string>(v);
+        m_obj = new StringBox(v);
     }
     inline Value::Value(const std::string &v) : m_type(Type::STRING), m_bits(0)
     {
-        m_obj = new Box<std::string>(v);
+        m_obj = new StringBox(v);
     }
     inline Value::Value(std::string &&v) : m_type(Type::STRING), m_bits(0)
     {
-        m_obj = new Box<std::string>(std::move(v));
+        m_obj = new StringBox(std::move(v));
     }
     inline Value::Value(const std::vector<Value> &v) : m_type(Type::ARRAY), m_bits(0)
     {
@@ -637,9 +697,9 @@ namespace qot
         m_obj = ptr.box();
         ++m_obj->rc;
     }
-    inline Value::Value(const std::unordered_map<std::string, Value> &v) : m_type(Type::DICT), m_bits(0)
+    inline Value::Value(const QOT_DICT_MAP_TYPE &v) : m_type(Type::DICT), m_bits(0)
     {
-        m_obj = new Box<std::unordered_map<std::string, Value>>(v);
+        m_obj = new Box<QOT_DICT_MAP_TYPE>(v);
     }
     inline Value::Value(DictPtr ptr) : m_type(Type::DICT), m_bits(0)
     {
@@ -677,13 +737,13 @@ namespace qot
     {
         if (m_type != Type::STRING)
             throw std::runtime_error("not a string");
-        return static_cast<Box<std::string> *>(m_obj)->obj;
+        return static_cast<StringBox *>(m_obj)->s;
     }
     inline std::string &Value::asString()
     {
         if (m_type != Type::STRING)
             throw std::runtime_error("not a string");
-        return static_cast<Box<std::string> *>(m_obj)->obj;
+        return static_cast<StringBox *>(m_obj)->s;
     }
     inline std::vector<Value> &Value::asArray()
     {
@@ -697,17 +757,17 @@ namespace qot
             throw std::runtime_error("not an array");
         return static_cast<Box<std::vector<Value>> *>(m_obj)->obj;
     }
-    inline std::unordered_map<std::string, Value> &Value::asDict()
+    inline QOT_DICT_MAP_TYPE &Value::asDict()
     {
         if (m_type != Type::DICT)
             throw std::runtime_error("not a dict");
-        return static_cast<Box<std::unordered_map<std::string, Value>> *>(m_obj)->obj;
+        return static_cast<Box<QOT_DICT_MAP_TYPE> *>(m_obj)->obj;
     }
-    inline const std::unordered_map<std::string, Value> &Value::asDict() const
+    inline const QOT_DICT_MAP_TYPE &Value::asDict() const
     {
         if (m_type != Type::DICT)
             throw std::runtime_error("not a dict");
-        return static_cast<Box<std::unordered_map<std::string, Value>> *>(m_obj)->obj;
+        return static_cast<Box<QOT_DICT_MAP_TYPE> *>(m_obj)->obj;
     }
     inline const FunctionType &Value::asFunction() const
     {

@@ -1,0 +1,1 @@
+{"name": "err_meta", "runs_on": "native", "compile": {"args": [], "expect_ok": true}, "expect": {"exit": 0, "stderr_empty": true}, "tags": ["err", "f2"], "note": "err()/is_err()/err_val() 元语（F2 第一步：错误对象化，为标准库的「不抛异常失败约定」打底）"}

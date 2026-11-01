@@ -58,11 +58,75 @@ def http_naviat_request(url,params=None,method="GET",timeout=10):
         return (None, None, f"请求发生错误: {str(e)}")
     finally:
         conn.close()
+# ================================================================= F1/F2
+# err() 错误对象与闭包值的解释器侧载体（定义在此而非 index.py：内置 handler
+# 需要引用它们，而 builtin_func 被 index 导入 —— 反向导入会成环）。
+# native 镜像 = qot_aot_runtime.h 的 QErr / QClosure。
+
+class QotError:
+    """err() 错误对象。定价与 native 一致：不参与值相等（== 恒 false）。"""
+    __slots__ = ('payload',)
+    def __init__(self, payload=None):
+        self.payload = payload
+    def __eq__(self, other):
+        return False
+    def __ne__(self, other):
+        return True
+    def __str__(self):
+        return 'err(%s)' % (self.payload,)
+
+class QotClosure:
+    """闭包值：函数定义 + 创建点的自由变量环境（name → Box）。"""
+    __slots__ = ('name', 'params', 'body', 'env', 'return_type', 'captured')
+    def __init__(self, name, params, body, env, return_type, captured):
+        self.name = name
+        self.params = params
+        self.body = body
+        self.env = env
+        self.return_type = return_type
+        self.captured = captured
+    def __str__(self):
+        return 'closure'
+
+# ================================================================= M4（0）
+# 最小对象模型的解释器侧载体。native 镜像 = qot_aot_runtime.h 的
+# QTypeDesc / QObj。定价与 native 逐条对齐：
+#   * 字段 = 固定声明集（fields 之外读 null / 写忽略）；
+#   * 方法缺席 → null；非对象接收者的 -> 走既有 receiver 前置调用；
+#   * 相等 = 同一性（默认 __eq__ 不覆写）；
+#   * tostring = "<类名>"（native qotrt_tostring 同律）。
+
+class QotClass:
+    """类描述：字段声明序 + 方法表 + 构造器（init）。"""
+    __slots__ = ('name', 'fields', 'methods', 'init_params', 'init_body')
+    def __init__(self, name, fields, methods, init_params=None, init_body=None):
+        self.name = name
+        self.fields = list(fields)              # 声明序字段名
+        self.methods = methods                  # 方法名 → (params, body)
+        self.init_params = init_params
+        self.init_body = init_body
+
+class QotObject:
+    """实例：类 + 字段值（dict，按声明序初始化为 None）。"""
+    __slots__ = ('cls', 'fields')
+    def __init__(self, cls):
+        self.cls = cls
+        self.fields = {f: None for f in cls.fields}
+    def __str__(self):
+        return '<%s>' % self.cls.name
+
+
 def format_value_for_output(val, indent=0, pretty=False):
     if val is None:
         return 'null'
     if isinstance(val, bool):
         return 'true' if val else 'false'
+    if isinstance(val, QotError):
+        return 'err(' + format_value_for_output(val.payload) + ')'
+    if isinstance(val, QotClosure):
+        return 'closure'
+    if isinstance(val, QotObject):
+        return '<%s>' % val.cls.name
     if isinstance(val, (int, float)):
         return str(val)
     if isinstance(val, bytes):
@@ -212,6 +276,18 @@ class BuiltFunc:
             if not args:
                 raise ValueError("string()需要至少一个参数")
             arg = args[0]
+            # 【P1030】布尔/null 渲染对齐 native 口径（CP-N4：oracle 向发布面
+            # 对齐）：true/false/null 是语言字面量 —— str(True)='True' 是
+            # Python 渗漏（D-07a 的 'True' 钉是 VM 裁判时代的记录，转向后
+            # 由 native 口径取代；demo_csv_report 的 oracle 裁判实证该分歧）。
+            # 数字渲染（'4' vs '4.000000'）维持 S-13 既定差异（oracle 裁判
+            # token 归一），不在此扫荡。
+            if arg is True:
+                return 'true'
+            if arg is False:
+                return 'false'
+            if arg is None:
+                return 'null'
             return str(arg)
         def list_advice_append(*args):
             if not args:
@@ -257,7 +333,10 @@ class BuiltFunc:
             if not isinstance(arg, str):  
                 raise TypeError(f"part方法参数必须是字符串，而非 {type(arg).__name__}")
             splitter = args[1] if len(args) > 1 else ","
-            return (part for part in arg.split(splitter))
+            # 【S-11 终审 0】返回 list（清单 ret='array' 的既定语义）。
+            # 旧实现返回生成器 —— 与自declared返回类型矛盾，且一次性消费后
+            # 二次遍历静默为空。规范形态 = str_split（interp+native 双引擎）。
+            return list(arg.split(splitter))
         def file_open_handler(*args):
             if not args:
                 raise ValueError("fopen()需要至少一个参数")
@@ -367,13 +446,25 @@ class BuiltFunc:
         def types_search_dev(*args):
             if not args:
                 raise ValueError("gtypes()需要至少一个参数")
-            tname = type(args[0]).__name__
-            if(tname=='str'):
+            arg = args[0]
+            tname = type(arg).__name__
+            if tname == 'str':
                 return 'string'
-            elif(tname=='list'):
+            elif tname == 'list':
                 return 'array'
-            elif(tname=='int' or tname=='float'):
+            elif tname == 'int' or tname == 'float':
                 return 'number'
+            elif tname == 'bool':
+                # 【P1030-4】对齐 native 口径（CP-N4：oracle 向发布面对齐）：
+                # native gtypes(布尔)='boolean'（qotrt_type_name），interp 原
+                # 'any' 是 Python 类型面渗漏 —— 与 strings(bool) 的 'True'
+                # 同族分歧，KNOWN-GTYPES-BOOL 随之收敛。
+                return 'boolean'
+            elif isinstance(arg, QotObject):
+                # 【M4】对象：type/gtypes 同为 'object'（native qotrt_type 同律）
+                return 'object'
+            elif arg is None:
+                return 'null'
             else:
                 return 'any'
         def time_now_handler():
@@ -826,6 +917,20 @@ class BuiltFunc:
                 return False
             return isinstance(args[0], (int, float))
 
+        # ---- F2 错误对象元语（err/is_err/err_val）----
+        def err_handler(*args):
+            return QotError(args[0] if args else None)
+
+        def is_err_handler(*args):
+            if not args:
+                return False
+            return isinstance(args[0], QotError)
+
+        def err_val_handler(*args):
+            if not args or not isinstance(args[0], QotError):
+                return None
+            return args[0].payload
+
         def __iter_len(*args):
             if not args:
                 return 0
@@ -838,6 +943,17 @@ class BuiltFunc:
                 return len(val)
             else:
                 return 0
+
+        # 【M3 0】for-in 脱糖内部元语：dict → 键列表（插入序 ——
+        # native 侧是槽序，D-JSON-ORDER 登记分歧族），其余透传。与
+        # qotrt_for_keys 同律（dict_keys 物化一次，每 for 入口调用一次）。
+        def __for_keys(*args):
+            if not args:
+                return None
+            val = args[0]
+            if isinstance(val, dict):
+                return list(val.keys())
+            return val
         def json_encode_handler(*args):
             if not args:
                 raise ValueError("json_encode()需要至少一个参数")
@@ -847,6 +963,12 @@ class BuiltFunc:
             ensure_ascii = args[2] if len(args) > 2 and isinstance(args[2], bool) else False
             try:
                 converted_obj = _convert_to_json_serializable(obj)
+                # 【0 · native json 对齐】QOT 数值是 **单一 f64 类型**
+                # （没有 int/float 之分，native 侧 V16 只有 double）。Python 的
+                # 1（int）与 1.0（float）会分别编码成 "1" / "1.0" —— 那是解释器
+                # 的 Python 类型渗漏。规范形：整数值一律无小数（与 native
+                # qotrt_json_num 逐位一致）。
+                converted_obj = _json_canon_numbers(converted_obj)
                 if indent is not None:
                     return json.dumps(converted_obj, ensure_ascii=ensure_ascii, indent=indent)
                 else:
@@ -869,6 +991,22 @@ class BuiltFunc:
                 return json.loads(json_str)
             except json.JSONDecodeError as e:
                 raise ValueError(f"JSON解码失败: {str(e)}")
+
+        def _json_canon_numbers(obj):
+            """整数值的 float 归一为 int（json 数字规范形 = native 侧口径）。"""
+            if isinstance(obj, bool) or obj is None:
+                return obj
+            if isinstance(obj, float):
+                if obj == int(obj) and abs(obj) < 9.2e18:
+                    return int(obj)
+                return obj
+            if isinstance(obj, int):
+                return obj
+            if isinstance(obj, list):
+                return [_json_canon_numbers(x) for x in obj]
+            if isinstance(obj, dict):
+                return {k: _json_canon_numbers(v) for k, v in obj.items()}
+            return obj
 
         def _convert_to_json_serializable(obj):
             if obj is None:
@@ -915,104 +1053,156 @@ class BuiltFunc:
             except json.JSONDecodeError:
                 return False
 
-        self.register_function('output',output_handler,(-1, ['any'],'unknown'))
-        self.register_function('cinget',input_handler,(-1, ['any'],'any'))
-        self.register_function('glen',len_handler,(1, ['string', 'array','any'],'number'))
-        self.register_function('strings',str_exchange_handler,(1, ['any'],'string'))
-        self.register_function('push',list_advice_append,(-1, ['array','any'],'bool'))
-        self.register_function('remove',list_advice_remove,(-1, ['array','any'],'boolean'))
-        self.register_function('pop',list_advice_pop,(-1, ['array','any'],'bool'))
-        self.register_function('get',list_advice_get,(-1, ['array','any'],'number'))
-        self.register_function('parts',str_advice_split,(-1, ['string','any'],'array'))
-        self.register_function('fopen',file_open_handler,(-1, ['string','any'],'any'))
-        self.register_function('fread',file_read_handler,(1, ['string','any'],'string'))
-        self.register_function('fclose',file_close_handler,(1, ['string','any'],'boolean'))
-        self.register_function('fwrite',file_write_handler,(-1, ['string','any'],'boolean'))
-        self.register_function('unlink',file_unlink_handler,(1, ['string','any'],'boolean'))
-        self.register_function('fnew',file_new_handler,(1, ['string','any'],'boolean'))
-        self.register_function('prog_end',program_exit_handler,(-1, ['any'],'boolean'))
-        self.register_function('sleep',time_program_sleep,(1, ['number','any'],'boolean'))
-        self.register_function('ints',numbers_exchange_toint,(1, ['number','any'],'number'))
-        self.register_function('floats',numbers_exchange_tofloat,(1, ['number','any'],'number'))
-        self.register_function('bools',strings_exchange_tobool,(-1, ['string','any'],'boolean'))
-        self.register_function('lists',others_exchange_tolists,(-1, ['any'],'array'))
-        self.register_function('gtypes',types_search_dev,(1, ['any'],'string'))
-        self.register_function('tnow',time_now_handler,(-1, ['any'],'string'))
-        self.register_function('tstamp',time_timestamp,(-1, ['any'],'number'))
-        self.register_function('fsize',file_size_get,(-1, ['string','any'],'number'))
-        self.register_function('sqrt',math_sqrt_evolute,(2, ['number','any'],'number'))
-        self.register_function('rand',math_rand_handler,(-1, ['any'],'number'))
-        self.register_function('beair',str_trim_handler,(1, ['string','any'],'string'))
-        self.register_function('strcase',str_case_bigorsmall,(-1, ['string','any'],'string'))
-        self.register_function('strrep',str_replace_init,(-1, ['string','any'],'string'))
-        self.register_function('max',math_number_max,(-1, ['number','any'],'number'))
-        self.register_function('min',math_number_min,(-1, ['number','any'],'number'))
-        self.register_function('pow',math_number_power,(-1, ['number','any'],'number'))
-        self.register_function('sum',math_number_sum,(-1, ['number','any'],'number'))
-        self.register_function('round',math_number_round,(-1, ['number','any'],'number'))
-        self.register_function('dict_get', dict_get_handler, (2, ['dict', 'any'], 'any'))
-        self.register_function('dict_set', dict_set_handler, (3, ['dict', 'any', 'any'], 'bool'))
-        self.register_function('dict_keys', dict_keys_handler, (1, ['dict'], 'array'))
-        self.register_function('http_send', http_sendpromise_handler, (-1, ['any'], 'any'))
-        self.register_function('window_new', window_tk_window_start, (-1, ['any'], 'any'))
-        self.register_function('window_title', window_tk_window_title, (-1, ['any'], 'any'))
-        self.register_function('window_size', window_tk_window_size, (-1, ['any'], 'any'))
-        self.register_function('window_loop', window_tk_window_loop, (-1, ['any'], 'any'))
-        self.register_function('window_button', window_tk_ment_button, (-1, ['any'], 'any'))
-        self.register_function('window_label', window_tk_ment_label, (-1, ['any'], 'any'))
-        self.register_function('window_entry', window_tk_ment_entry, (-1, ['any'], 'any'))
-        self.register_function('window_place', window_tk_grid_place, (-1, ['any'], 'any'))
-        self.register_function('window_bind', window_tk_thing_bind, (-1, ['any'], 'any'))
-        self.register_function('window_bind_get', windoe_tk_thingbind_get, (-1, ['any'], 'any'))
-        self.register_function('entry_get', window_entry_inputget, (-1, ['any'], 'string'))
-        self.register_function('window_msg_info', window_msgbox_information, (-1, ['any'], 'any'))
-        self.register_function('window_config', window_compement_config, (-1, ['any'], 'any'))
-        self.register_function('window_visible', window_compement_config_hidden, (-1, ['any'], 'any'))
-        self.register_function('cmd_exec', cmd_outfnc_exec, (-1, ['any'], 'any'))
-        self.register_function('webloc_init', webapp_local_init, (-1, ['any'], 'any'))
-        self.register_function('webloc_sbp', webapp_local_setbasepath, (-1, ['any'], 'any'))
-        self.register_function('webloc_run', webapp_local_start, (-1, ['any'], 'any'))
-        self.register_function('getpath', get_os_filepathnow, (-1, ['any'], 'string'))
-        self.register_function('batch_push', list_batch_append, (2, ['array', 'array'], 'bool'))
-        self.register_function('utf8_enc', utf_8_encode_handler, (-1, ['any'], 'string'))
-        self.register_function('utf8_dec', utf_8_decode_handler, (-1, ['any'], 'string'))
-        self.register_function('ScLoad', shellcode_instance_make, (1, ['any'], 'any'))
-        self.register_function('ScExec', shellcode_instance_exec, (-1, ['any'], 'any'))
-        self.register_function('ScSweep', shellcode_instance_cleanup, (1, ['any'], 'any'))
-        self.register_function('set_env', set_environment_variable, (2, ['string', 'any'], 'bool'))
-        self.register_function('get_env', get_environment_variable, (-1, ['string', 'any'], 'string'))
-        self.register_function('unset_env', unset_environment_variable, (1, ['string'], 'bool'))
-        self.register_function('__is_number', __is_number, (1, ['any'], 'boolean'))
-        self.register_function('__iter_len', __iter_len, (1, ['any'], 'number'))
-        self.register_function('json_encode', json_encode_handler, (-1, ['any'], 'string'))
-        self.register_function('json_decode', json_decode_handler, (-1, ['string'], 'any'))
-        self.register_function('json_pretty', json_pretty_handler, (-1, ['any'], 'string'))
-        self.register_function('json_valid', json_validate_handler, (-1, ['string'], 'boolean'))
-        def _gui_only(name):
-            def handler(*args):
-                raise RuntimeError(
-                    "GUI 函数 %s() 只在编译执行下可用："
-                    "index.py bstrust compile <源码> <目标.qtc> 后再 bstrust run" % name)
-            return handler
-        for _vg in (
-            'vg_init', 'vg_uninit', 'vg_create_window', 'vg_show_window',
-            'vg_run', 'vg_close_window', 'vg_set_window_title', 'vg_set_window_size',
-            'vg_set_window_bg_gradient', 'vg_create_button', 'vg_button_set_text', 'vg_button_set_color',
-            'vg_button_set_hover_color', 'vg_button_set_border_radius', 'vg_button_on_click', 'vg_button_set_position',
-            'vg_create_checkbox', 'vg_checkbox_set_checked', 'vg_checkbox_get_checked', 'vg_checkbox_on_changed',
-            'vg_create_toggle', 'vg_toggle_set_checked', 'vg_toggle_get_checked', 'vg_toggle_on_changed',
-            'vg_create_textbox', 'vg_textbox_set_text', 'vg_textbox_get_text', 'vg_textbox_set_placeholder',
-            'vg_create_slider', 'vg_slider_set_value', 'vg_slider_get_value', 'vg_slider_on_changed',
-            'vg_create_progressbar', 'vg_progressbar_set_value', 'vg_progressbar_get_value', 'vg_progressbar_set_color',
-            'vg_create_card', 'vg_card_set_title', 'vg_card_set_elevation', 'vg_create_combobox',
-            'vg_combobox_add_item', 'vg_combobox_clear', 'vg_combobox_set_selected', 'vg_combobox_get_selected',
-            'vg_combobox_on_selected', 'vg_create_listbox', 'vg_listbox_add_item', 'vg_listbox_clear',
-            'vg_listbox_set_selected', 'vg_listbox_get_selected', 'vg_listbox_on_selected', 'vg_create_tabcontrol',
-            'vg_tabcontrol_add_tab', 'vg_tabcontrol_set_selected', 'vg_create_spinner', 'vg_spinner_start',
-            'vg_spinner_stop', 'vg_set_position', 'vg_set_size', 'vg_set_visible',
-            'vg_set_enabled', 'vg_destroy',
-        ):
-            self.register_function(_vg, _gui_only(_vg), (-1, ['any'], 'any'))
+        # 实现注册表：name → 解释器实现。只登记【实现】，
+        # 参数个数/类型/引擎归属/别名等全部元数据在 builtins.toml（M1 单一清单）。
+        impls = {}
+        impls['output'] = output_handler
+        impls['cinget'] = input_handler
+        impls['glen'] = len_handler
+        impls['strings'] = str_exchange_handler
+        impls['push'] = list_advice_append
+        impls['remove'] = list_advice_remove
+        impls['pop'] = list_advice_pop
+        impls['get'] = list_advice_get
+        impls['parts'] = str_advice_split
+        impls['fopen'] = file_open_handler
+        impls['fread'] = file_read_handler
+        impls['fclose'] = file_close_handler
+        impls['fwrite'] = file_write_handler
+        impls['unlink'] = file_unlink_handler
+        impls['fnew'] = file_new_handler
+        impls['prog_end'] = program_exit_handler
+        impls['sleep'] = time_program_sleep
+        impls['ints'] = numbers_exchange_toint
+        impls['floats'] = numbers_exchange_tofloat
+        impls['bools'] = strings_exchange_tobool
+        impls['lists'] = others_exchange_tolists
+        impls['gtypes'] = types_search_dev
+        impls['tnow'] = time_now_handler
+        impls['tstamp'] = time_timestamp
+        impls['fsize'] = file_size_get
+        impls['sqrt'] = math_sqrt_evolute
+        impls['rand'] = math_rand_handler
+        impls['beair'] = str_trim_handler
+        impls['strcase'] = str_case_bigorsmall
+        impls['strrep'] = str_replace_init
+        impls['max'] = math_number_max
+        impls['min'] = math_number_min
+        impls['pow'] = math_number_power
+        impls['sum'] = math_number_sum
+        impls['round'] = math_number_round
+        impls['dict_get'] = dict_get_handler
+        impls['dict_set'] = dict_set_handler
+        impls['dict_keys'] = dict_keys_handler
+        impls['http_send'] = http_sendpromise_handler
+        impls['window_new'] = window_tk_window_start
+        impls['window_title'] = window_tk_window_title
+        impls['window_size'] = window_tk_window_size
+        impls['window_loop'] = window_tk_window_loop
+        impls['window_button'] = window_tk_ment_button
+        impls['window_label'] = window_tk_ment_label
+        impls['window_entry'] = window_tk_ment_entry
+        impls['window_place'] = window_tk_grid_place
+        impls['window_bind'] = window_tk_thing_bind
+        impls['window_bind_get'] = windoe_tk_thingbind_get
+        impls['entry_get'] = window_entry_inputget
+        impls['window_msg_info'] = window_msgbox_information
+        impls['window_config'] = window_compement_config
+        impls['window_visible'] = window_compement_config_hidden
+        impls['cmd_exec'] = cmd_outfnc_exec
+        impls['webloc_init'] = webapp_local_init
+        impls['webloc_sbp'] = webapp_local_setbasepath
+        impls['webloc_run'] = webapp_local_start
+        impls['getpath'] = get_os_filepathnow
+        impls['batch_push'] = list_batch_append
+        impls['utf8_enc'] = utf_8_encode_handler
+        impls['utf8_dec'] = utf_8_decode_handler
+        impls['ScLoad'] = shellcode_instance_make
+        impls['ScExec'] = shellcode_instance_exec
+        impls['ScSweep'] = shellcode_instance_cleanup
+        impls['set_env'] = set_environment_variable
+        impls['get_env'] = get_environment_variable
+        impls['unset_env'] = unset_environment_variable
+        impls['__is_number'] = __is_number
+        impls['__iter_len'] = __iter_len
+        impls['__for_keys'] = __for_keys
+        impls['err'] = err_handler
+        impls['is_err'] = is_err_handler
+        impls['err_val'] = err_val_handler
+        impls['json_encode'] = json_encode_handler
+        impls['json_decode'] = json_decode_handler
+        impls['json_pretty'] = json_pretty_handler
+        impls['json_valid'] = json_validate_handler
+
+        # P0.1 原语（CP-2 · primitives.py）：解释器 oracle 侧实现按模块聚拢，
+        # 键集 = 清单新增条目集（_apply_builtin_manifest 的对账会机械验证
+        # 「实现表 ↔ 清单」双向一致，多一个少一个名字都直接构建失败）。
+        try:
+            from primitives import PRIMITIVE_IMPLS as _prim_impls
+            impls.update(_prim_impls)
+        except ImportError as _e:  # pragma: no cover - 缺模块是安装级故障
+            raise ImportError('primitives.py 缺失或损坏（P0.1 原语装载失败）: %s' % _e)
+
+        # 登记表（functions / type_hints）与别名全部由 builtins.toml 派生：
+        # 清单里没有的名字一律不进解释器表，反之实现表里有、清单里没有
+        # 也会直接报错 —— 两侧再也不会各自漂移（G-5）。
+        self._apply_builtin_manifest(impls)
+
+    @staticmethod
+    def _unsupported_stub(name, engines, hint):
+        """清单声明「本引擎无实现」时的自动桩。
+
+        为什么要登记它而不是干脆不登记：不登记的话语义分析只报
+        「函数未定义」，把真正的病因（这个内置属于别的引擎）藏起来 ——
+        这正是 G-5 那类分歧能长期存在的原因。现在解释器会明确说：
+        它在清单里、属于哪些引擎、该怎么跑到那个引擎上。
+        """
+        def handler(*args):
+            raise RuntimeError(
+                "内置函数 %s() 在【解释器】引擎下没有实现：builtins.toml 登记"
+                "的引擎是 [%s]。请用 VM/AOT 运行（index.py bstrust compile "
+                "<源码> <目标.qtc> 后再 bstrust run）%s"
+                % (name, '/'.join(engines), ('；' + hint) if hint else '。'))
+        return handler
+
+    def _apply_builtin_manifest(self, impls):
+        """按 builtins.toml 生成解释器侧登记表（M1 唯一真相源）。
+
+        注意这里遍历【全部条目】而不是只看 engines 含 interp 的：语义分析
+        必须认识所有语言级内置名（含 VM/AOT 专属的那些），否则 `type()`
+        这类调用会先在语义层被判「函数未定义」，根本走不到后端 —— 那就是
+        G-5 的老症状。没实现的那些登记为明确报错的桩。
+        """
+        import qot_builtins as _bm
+        for e in _bm.entries():
+            name = e['name']
+            if 'interp' not in e['engines'] or e['interp'] == _bm.STUB_UNSUPPORTED:
+                handler = self._unsupported_stub(name, e['engines'], e['stub_hint'])
+            else:
+                if name not in impls:
+                    # 构建失败而不是静默少一个内置（M1 验收门：故意删掉一侧
+                    # 注册必须失败）。
+                    raise _bm.BuiltinManifestError(
+                        'builtins.toml 声明 %s 需要解释器实现 interp="%s"，'
+                        '但实现表里没有它' % (name, e['interp']))
+                handler = impls[name]
+                # 清单里写死的 handler 名必须真的对得上：改了实现函数名却没
+                # 同步清单 → 装载即失败（否则清单里的 interp 字段就是摆设）。
+                if getattr(handler, '__name__', None) != e['interp']:
+                    raise _bm.BuiltinManifestError(
+                        '内置 %s 的实现对不上：builtins.toml 写 interp="%s"，'
+                        '实际绑定的函数叫 %r'
+                        % (name, e['interp'], getattr(handler, '__name__', None)))
+            hint = (e['argc'], list(e['args']), e['ret'])
+            self.register_function(name, handler, hint)
+            for alias in e['aliases']:
+                # 别名：M5 命名规范化的平滑迁移层（旧名仍是规范名）。
+                # QOT_NO_ALIAS=1 时 canonical(alias) != name → 一个都不登记
+                # （A/B 开关的归零验证见 _dbg_switches.py）。
+                if _bm.canonical(alias) == name:
+                    self.register_function(alias, handler, hint)
+        _bm.check_interp_impls(impls, self.functions)
+
     def has_function(self, func_name):
         return func_name in self.functions
     

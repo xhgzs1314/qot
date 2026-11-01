@@ -1,0 +1,29 @@
+// 【G-03 钉 】复合赋值算子族 *= /= %=（+=/-= 已有他用例）。
+// 语法层早已就位（parser 脱糖 `x op= e` → `x = x op e`，token_char t_OPERATOR
+// 正则 + grammar p_statement_assignment 的 5 条产生式齐全），但此前**没有任何
+// 测试钉**覆盖 *= /= %=（ B 级 G-03 实证 gap_demo_wishlist `x %= 3`）。
+// 本钉把三个算子的值演进写死，防回归。
+var x = 10;
+x *= 3;   // 30
+output(x);
+x /= 4;   // 7.5
+output(x);
+x %= 2;   // 1.5
+output(x);
+x -= 1;   // 0.5
+output(x);
+x += 99;  // 99.5
+output(x);
+// 与三元组合（G-03 的另一半在同一缺口条目里）
+var sign = x > 0 ? "pos" : "neg";
+output(sign);
+// 复合赋值在函数体内（局部槽路径）
+number_t func accum(n) {
+    var s = 1;
+    var i = 0;
+    for (i in n) {
+        s *= 2;
+    }
+    return s;
+}
+output(accum(10));

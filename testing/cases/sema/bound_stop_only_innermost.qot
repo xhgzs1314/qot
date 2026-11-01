@@ -1,0 +1,9 @@
+for (i in 3) {
+    for (j in 3) {
+        if (j == 1) {
+            stop;
+        }
+        output(j);
+    }
+    output(i);
+}

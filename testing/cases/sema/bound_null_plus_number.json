@@ -1,0 +1,24 @@
+{
+ "name": "bound_null_plus_number",
+ "runs_on": "vm",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stdout": [
+   "string",
+   "1"
+  ],
+  "compile_stderr_contains": [
+   "实际是 null"
+  ]
+ },
+ "tags": [
+  "null",
+  "arith",
+  "coerce"
+ ],
+ "note": "null + 1 走字符串拼接分支，结果是字符串 \"1\"（gtypes 确认），并给出语义警告"
+}

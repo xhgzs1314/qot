@@ -1,0 +1,5 @@
+var b = 0;
+for (i in 100000) {
+    b += i;
+}
+output(b);

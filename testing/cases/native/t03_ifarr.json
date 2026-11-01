@@ -1,0 +1,18 @@
+{
+ "name": "t03_ifarr",
+ "runs_on": "vm",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stderr_empty": true
+ },
+ "tags": [
+  "if",
+  "array",
+  "string"
+ ],
+ "note": ""
+}

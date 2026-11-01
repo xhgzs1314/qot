@@ -1,0 +1,13 @@
+// F1 循环捕获：按引用捕获变量（Python 同款定价，循环结束 = 最后写入）
+number_t func make_getter() {
+    var i = 0;
+    loop (i < 3) {
+        number_t func get_i() {
+            return i;
+        }
+        i = i + 1;
+    }
+    return get_i;
+}
+var g = make_getter();
+output(g());

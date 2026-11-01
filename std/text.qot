@@ -1,0 +1,218 @@
+// ============================================================================
+// std.text —— 文本 / CSV 标准库
+// ============================================================================
+
+// 私有：解析一行（从 pos 起），返回 [row, nextPos]。
+// 行尾裁决 = \n（前置 \r 由字段裁剪吸收）；无尾换行的末行在 n 结束。
+array_t func _stx_csv_row(text, n, pos) {
+    var row = arr_new();
+    var more = true;
+    loop (more) {
+        // ---- 一个字段 ----
+        var field = "";
+        if (pos < n) {
+            if (str_byte_at(text, pos) == 34) { // '"'
+                // 引号字段：找真闭引号（"" 转义跳过）
+                var hit = str_find(text, "\"", pos + 1);
+                var scanning = true;
+                loop (scanning) {
+                    if (hit < 0) {
+                        hit = n;
+                        scanning = false;
+                    } else {
+                        if (str_slice(text, hit + 1, hit + 2) == "\"") {
+                            hit = str_find(text, "\"", hit + 2);
+                        } else {
+                            scanning = false;
+                        }
+                    }
+                }
+                field = str_replace(str_slice(text, pos + 1, hit), "\"\"", "\"\"");
+                pos = hit + 1;
+            } else {
+                // 非引号字段：到 , 或 \n 或 n
+                var c1 = str_find(text, ",", pos);
+                var c2 = str_find(text, "\n", pos);
+                var end = n;
+                if (c1 >= 0 && c1 < end) { end = c1; }
+                if (c2 >= 0 && c2 < end) { end = c2; }
+                field = str_slice(text, pos, end);
+                pos = end;
+            }
+        }
+        arr_push(row, str_trim(field)); // 字段裁剪吸收 \r（CRLF）
+        // ---- 字段后的分隔符 ----
+        if (pos >= n) {
+            more = false; // 末行无尾换行
+        } else {
+            if (str_byte_at(text, pos) == 44) { // ','
+                pos += 1;
+            } else {
+                if (str_byte_at(text, pos) == 10) { // '\n'
+                    pos += 1;
+                    more = false;
+                } else {
+                    more = false; // \r 已被 trim 吸收；防御性停行
+                }
+            }
+        }
+    }
+    var packed = arr_new();
+    arr_push(packed, row);
+    arr_push(packed, pos);
+    return packed;
+}
+
+
+// ---- CSV 解析（RFC 4180：引号字段 / "" 转义 / CRLF·LF / 尾换行不产生空行）----
+// text 必须是字符串（字节语义：字段内容按 UTF-8 字节透明保留）。
+// 实现：str_find 扫描（每字段 O(1) 次切片，非逐字符）。
+array_t func csv_parse(text) {
+    if (type_is(text, "string") == false) { return null; }
+    var rows = arr_new();
+    var n = str_len(text);
+    var pos = 0;
+    loop (pos < n) {
+        var packed = _stx_csv_row(text, n, pos);
+        var row = arr_get(packed, 0);
+        pos = arr_get(packed, 1);
+        if (arr_len(row) > 0) { arr_push(rows, row); }
+    }
+    return rows;
+}
+
+// ---- 单字段序列化（含逗号/引号/CRLF 的字段加引号，内部引号翻倍）----
+string_t func _stx_csv_field(v) {
+    var s = strings(v);
+    var need = str_contains(s, ",") || str_contains(s, "\"") ||
+               str_contains(s, "\r") || str_contains(s, "\n");
+    if (need == false) { return s; }
+    return "\"" + str_replace(s, "\"", "\"\"") + "\"";
+}
+
+// ---- CSV 生成（RFC 4180 规范形：字段引号按需，行尾 CRLF）----
+// rows = [[f, f, ...], ...]；非数组/行元素非数组 → ""（失败哨兵）。
+string_t func csv_write(rows) {
+    if (type_is(rows, "array") == false) { return ""; }
+    var out = "";
+    var i = 0;
+    var nr = arr_len(rows);
+    loop (i < nr) {
+        var row = arr_get(rows, i);
+        if (type_is(row, "array") == false) { return ""; }
+        var j = 0;
+        var nf = arr_len(row);
+        loop (j < nf) {
+            if (j > 0) { out = out + ","; }
+            out = out + _stx_csv_field(arr_get(row, j));
+            j += 1;
+        }
+        out = out + "\r\n";
+        i += 1;
+    }
+    return out;
+}
+
+// ---- 取第 idx 列（缺失字段得 null；rows 非数组 → null）----
+array_t func csv_column(rows, idx) {
+    if (type_is(rows, "array") == false) { return null; }
+    var out = arr_new();
+    var i = 0;
+    var nr = arr_len(rows);
+    loop (i < nr) {
+        var row = arr_get(rows, i);
+        if (type_is(row, "array")) {
+            arr_push(out, arr_get(row, idx));
+        } else {
+            arr_push(out, null);
+        }
+        i += 1;
+    }
+    return out;
+}
+
+// ---- 全字段 trim（行元素非数组则原样保留；rows 非数组 → null）----
+array_t func trim_all(rows) {
+    if (type_is(rows, "array") == false) { return null; }
+    var out = arr_new();
+    var i = 0;
+    var nr = arr_len(rows);
+    loop (i < nr) {
+        var row = arr_get(rows, i);
+        if (type_is(row, "array")) {
+            var nr2 = arr_new();
+            var j = 0;
+            loop (j < arr_len(row)) {
+                arr_push(nr2, str_trim(strings(arr_get(row, j))));
+                j += 1;
+            }
+            arr_push(out, nr2);
+        } else {
+            arr_push(out, row);
+        }
+        i += 1;
+    }
+    return out;
+}
+
+// ---- 空白归一：trim + 内部空白连串压成单个空格 ----
+string_t func normalize(s) {
+    var out = "";
+    var i = 0;
+    var n = str_len(s);
+    var prev_ws = false;
+    loop (i < n) {
+        var c = str_slice(s, i, i + 1);
+        var ws = (c == " ") || (c == "\t") || (c == "\r") || (c == "\n");
+        if (ws) {
+            if (prev_ws == false) { out = out + " "; }
+        } else {
+            out = out + c;
+        }
+        prev_ws = ws;
+        i += 1;
+    }
+    return str_trim(out);
+}
+
+// ---- 贪心按词折行（width < 1 → ""；超长词独立成行不截断）----
+string_t func wrap(s, width) {
+    if (type_is(s, "string") == false) { return ""; }
+    if (width < 1) { return ""; }
+    var out = "";
+    var line = "";
+    var i = 0;
+    var n = str_len(s);
+    loop (i < n) {
+        var word = "";
+        var took_space = false;
+        loop (i < n && took_space == false) {
+            var c = str_slice(s, i, i + 1);
+            if (c == " ") {
+                took_space = true;
+                i += 1;
+            } else {
+                word = word + c;
+                i += 1;
+            }
+        }
+        if (str_len(word) > 0) {
+            if (str_len(line) == 0) {
+                line = word;
+            } else {
+                if (str_len(line) + 1 + str_len(word) > width) {
+                    if (str_len(out) > 0) { out = out + "\n"; }
+                    out = out + line;
+                    line = word;
+                } else {
+                    line = line + " " + word;
+                }
+            }
+        }
+    }
+    if (str_len(line) > 0) {
+        if (str_len(out) > 0) { out = out + "\n"; }
+        out = out + line;
+    }
+    return out;
+}

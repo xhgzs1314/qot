@@ -1,0 +1,14 @@
+// B8b 闭包 · 创建成本探针
+// 负载：N 轮各创建一个捕获局部变量的闭包并立即调用一次验证活性，
+// 上一轮的闭包被覆盖丢弃。量的是：make 调用 + env 分配 + 闭包对象
+// 构造的单次成本（内存账面 = arena-free 的 env/closure 池持有，
+// 与 B3 同一定价口径；RSS 判读归长跑臂，不混进本表）。
+number_t func make_adder(k) {
+    return func(x) -> x + k;
+}
+var acc = 0;
+for (i in 87654321) {
+    var f = make_adder(i % 7);
+    acc = f(1);
+}
+output(acc);

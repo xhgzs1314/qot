@@ -1,0 +1,20 @@
+{
+ "name": "err_annotation_inline",
+ "runs_on": "none",
+ "compile": {
+  "args": [],
+  "expect_ok": false
+ },
+ "expect": {
+  "exit_not": 0,
+  "stderr_contains": [
+   "[错误]"
+  ],
+  "artifact": null
+ },
+ "tags": [
+  "syntax",
+  "negative"
+ ],
+ "note": "注解必须独占一行 【P1030-4 修复摘钉】t_ANNOTATION 行首校验：行内注解 = 词法硬错误（README 契约落地）。"
+}

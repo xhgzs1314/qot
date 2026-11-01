@@ -5,9 +5,37 @@
 #include <fstream>
 #include <cstring>
 #include <iostream>
+#include <cstdio>
+#include <string>
+#include <vector>
 
 namespace qot
 {
+
+    // zlib 兼容 CRC32（IEEE 802.3），用于 .qtc v2 完整性校验（SPEC 7.3-T-32 / 7.4）。
+    inline uint32_t qot_crc32(const uint8_t *data, size_t len, uint32_t crc = 0)
+    {
+        crc = ~crc;
+        for (size_t i = 0; i < len; i++)
+        {
+            crc ^= data[i];
+            for (int k = 0; k < 8; k++)
+                crc = (crc >> 1) ^ (0xEDB88320U & (0U - (crc & 1)));
+        }
+        return ~crc;
+    }
+
+    // .qtc v2 扩展段（跟在 v1 主体之后、CRC 之前）
+    struct QtcExtra
+    {
+        static const uint32_t FLAG_AGGRESSIVE_OK = 0x1; // T-48：可激进优化（require 全内联、无运行期代码加载）
+
+        uint32_t qtcVersion = 0;
+        uint32_t flags = 0;
+        std::vector<std::string> builtinHints; // 编译期解析出的内置函数候选名（元数据/诊断用）
+        std::vector<uint8_t> lir;              // LIR 段（含版本号），空 = 无（保守路径）
+    };
+
 
     class VMLoader
     {
@@ -268,7 +296,9 @@ namespace qot
             return true;
         }
 
-        static bool load(const std::string &filename, CodeBlock &code)
+        // 解析 .qtc。v1：无 CRC、funcsInfoLen 死字段（跳过）；v2：CRC32 + 扩展段、删死字段。
+        // SPEC R6：loader 必须同时接受 v1 与 v2（版本支持区间 [1,2]）。
+        static bool load(const std::string &filename, CodeBlock &code, QtcExtra *extra = nullptr)
         {
             std::ifstream file(filename, std::ios::binary);
             if (!file.is_open())
@@ -276,97 +306,192 @@ namespace qot
                 std::cerr << "[Error] 无法打开文件: " << filename << std::endl;
                 return false;
             }
-            char magic[5] = {0};
-            file.read(magic, 4);
-            std::cerr << std::dec << std::endl;
-            if (std::string(magic, 3) != "QTC")
+            file.seekg(0, std::ios::end);
+            std::streamoff fsize = file.tellg();
+            if (fsize < 8)
             {
-                std::cerr << "[Error] 异常的起始编码"
-                          << std::string(magic, 3) << "'" << std::endl;
+                std::cerr << "[Error] 文件过短，不是有效的 .qtc: " << filename << std::endl;
                 return false;
             }
-            if (magic[3] != 0 && magic[3] != 0x20)
+            file.seekg(0, std::ios::beg);
+            std::vector<uint8_t> buf(static_cast<size_t>(fsize));
+            file.read(reinterpret_cast<char *>(buf.data()), fsize);
+            file.close();
+            return load_from_buffer(buf, code, extra);
+        }
+
+        static bool load_from_buffer(const std::vector<uint8_t> &buf, CodeBlock &code, QtcExtra *extra)
+        {
+            size_t off = 0;
+            if (buf.size() < 8 || std::memcmp(buf.data(), "QTC", 3) != 0)
             {
-                std::cerr << "[Warning] 4字节异常编码" << std::hex
-                          << (int)(unsigned char)magic[3] << std::dec << std::endl;
-            }
-            uint32_t version;
-            file.read(reinterpret_cast<char *>(&version), 4);
-            if (version != 1)
-            {
-                std::cerr << "[Error] 不支持的版本: " << version << std::endl;
+                // 注意：loader 的错误消息保持 ASCII——std::cerr 在管道下按 ANSI 代码页输出，
+                // 中文会破坏跨进程 UTF-8 解码（R2 错误流契约的隐含要求）。
+                std::cerr << "[Error] bad magic: '"
+                          << std::string(buf.begin(), buf.begin() + (buf.size() < 4 ? buf.size() : 4))
+                          << "'" << std::endl;
                 return false;
             }
+            uint8_t magicTail = buf[3];
+            if (magicTail != 0 && magicTail != 0x20)
+            {
+                std::cerr << "[Warning] 4字节异常编码" << std::hex << (int)magicTail << std::dec << std::endl;
+            }
+            off = 4;
+            uint32_t version = read_u32(buf, off);
+            if (extra)
+                extra->qtcVersion = version;
+            if (version == 1)
+            {
+                // v1：funcsInfoLen 死字段（读了就跳过）
+                uint32_t funcsInfoLen = read_u32(buf, off);
+                if (off + funcsInfoLen > buf.size())
+                {
+                    std::cerr << "[Error] funcsInfoLen out of range" << std::endl;
+                    return false;
+                }
+                off += funcsInfoLen;
+                return parse_body(buf, off, code);
+            }
+            if (version == 2)
+            {
+                // v2：末尾 4 字节 CRC32，覆盖其前的全部字节
+                if (buf.size() < 4 + 4)
+                {
+                    std::cerr << "[Error] file too short, CRC missing" << std::endl;
+                    return false;
+                }
+                uint32_t stored = 0;
+                std::memcpy(&stored, buf.data() + buf.size() - 4, 4);
+                uint32_t calc = qot_crc32(buf.data(), buf.size() - 4);
+                if (stored != calc)
+                {
+                    std::cerr << "[Error] CRC32 check failed (corrupted or tampered file): stored="
+                              << std::hex << stored << " calc=" << calc << std::dec << std::endl;
+                    return false;
+                }
+                size_t bodyEnd = buf.size() - 4;
+                bool ok = parse_body(buf, off, code, bodyEnd);
+                if (!ok)
+                    return false;
+                if (extra)
+                    parse_ext(buf, off, *extra);
+                return true;
+            }
+            std::cerr << "[Error] unsupported .qtc version: " << version
+                      << " (supported range: 1..2)" << std::endl;
+            return false;
+        }
 
-            uint32_t funcsInfoLen;
-            file.read(reinterpret_cast<char *>(&funcsInfoLen), 4);
-            file.seekg(funcsInfoLen, std::ios::cur);
+    private:
+        static uint32_t read_u32(const std::vector<uint8_t> &b, size_t &off)
+        {
+            if (off + 4 > b.size())
+                return 0;
+            uint32_t v;
+            std::memcpy(&v, b.data() + off, 4);
+            off += 4;
+            return v;
+        }
 
-            uint32_t instCount;
-            file.read(reinterpret_cast<char *>(&instCount), 4);
-
+        // v1/v2 共用的主体：instCount | [op,argLen,arg]* | consts | vars | funcs | source
+        static bool parse_body(const std::vector<uint8_t> &buf, size_t &off, CodeBlock &code, size_t hardEnd = static_cast<size_t>(-1))
+        {
+            size_t end = (hardEnd == static_cast<size_t>(-1)) ? buf.size() : hardEnd;
             code.instructions.clear();
             code.blobs.clear();
-            code.instructions.reserve(instCount);
+            code.constants.clear();
+            code.varNames.clear();
+            code.funcNames.clear();
 
+            if (off + 4 > end)
+                return false;
+            uint32_t instCount = read_u32(buf, off);
+            code.instructions.reserve(instCount);
             for (uint32_t i = 0; i < instCount; i++)
             {
-                uint8_t op;
-                file.read(reinterpret_cast<char *>(&op), 1);
-
-                uint32_t argLen;
-                file.read(reinterpret_cast<char *>(&argLen), 4);
-
-                std::vector<uint8_t> argData(argLen);
-                if (argLen > 0)
-                {
-                    file.read(reinterpret_cast<char *>(argData.data()), argLen);
-                }
-
-                code.instructions.push_back(makeInstr(op, argData.data(), argLen, code));
+                if (off + 5 > end)
+                    return false;
+                uint8_t op = buf[off++];
+                uint32_t argLen = read_u32(buf, off);
+                if (off + argLen > end)
+                    return false;
+                code.instructions.push_back(makeInstr(op, buf.data() + off, argLen, code));
+                off += argLen;
             }
-
-            uint32_t constsLen;
-            file.read(reinterpret_cast<char *>(&constsLen), 4);
-            std::vector<uint8_t> constsData(constsLen);
-            file.read(reinterpret_cast<char *>(constsData.data()), constsLen);
-
+            if (off + 4 > end)
+                return false;
+            uint32_t constsLen = read_u32(buf, off);
+            if (off + constsLen > end)
+                return false;
+            std::vector<uint8_t> constsData(buf.begin() + off, buf.begin() + off + constsLen);
+            off += constsLen;
             if (!deserializeConstants(constsData, code.constants))
             {
                 std::cerr << "[Error] 无法解析表达式" << std::endl;
                 return false;
             }
-
-            uint32_t varsLen;
-            file.read(reinterpret_cast<char *>(&varsLen), 4);
-            std::vector<uint8_t> varsData(varsLen);
-            file.read(reinterpret_cast<char *>(varsData.data()), varsLen);
-
+            if (off + 4 > end)
+                return false;
+            uint32_t varsLen = read_u32(buf, off);
+            if (off + varsLen > end)
+                return false;
+            std::vector<uint8_t> varsData(buf.begin() + off, buf.begin() + off + varsLen);
+            off += varsLen;
             if (!deserializeStringList(varsData, code.varNames))
             {
                 std::cerr << "[Error] 无法解析变量名" << std::endl;
                 return false;
             }
-
-            uint32_t funcsLen;
-            file.read(reinterpret_cast<char *>(&funcsLen), 4);
-            std::vector<uint8_t> funcsData(funcsLen);
-            file.read(reinterpret_cast<char *>(funcsData.data()), funcsLen);
-
+            if (off + 4 > end)
+                return false;
+            uint32_t funcsLen = read_u32(buf, off);
+            if (off + funcsLen > end)
+                return false;
+            std::vector<uint8_t> funcsData(buf.begin() + off, buf.begin() + off + funcsLen);
+            off += funcsLen;
             if (!deserializeStringList(funcsData, code.funcNames))
             {
                 std::cerr << "[Error] 无法解析函数名" << std::endl;
                 return false;
             }
-
-            uint32_t sourceLen;
-            file.read(reinterpret_cast<char *>(&sourceLen), 4);
-            std::vector<char> sourceData(sourceLen + 1, 0);
-            file.read(sourceData.data(), sourceLen);
-            code.sourceFile = std::string(sourceData.data());
-
+            if (off + 4 > end)
+                return false;
+            uint32_t sourceLen = read_u32(buf, off);
+            if (off + sourceLen > end)
+                return false;
+            code.sourceFile = std::string(buf.begin() + off, buf.begin() + off + sourceLen);
+            off += sourceLen;
             return true;
         }
+
+        // v2 扩展段：flags u32 | builtinHints(string-list) | lirLen u32 | lir
+        static void parse_ext(const std::vector<uint8_t> &buf, size_t off, QtcExtra &extra)
+        {
+            extra.flags = 0;
+            extra.builtinHints.clear();
+            extra.lir.clear();
+            if (off + 4 > buf.size())
+                return;
+            extra.flags = read_u32(buf, off);
+            if (off + 4 > buf.size())
+                return;
+            uint32_t hintsLen = read_u32(buf, off);
+            if (off + hintsLen > buf.size())
+                return;
+            std::vector<uint8_t> hintsData(buf.begin() + off, buf.begin() + off + hintsLen);
+            off += hintsLen;
+            deserializeStringList(hintsData, extra.builtinHints);
+            if (off + 4 > buf.size())
+                return;
+            uint32_t lirLen = read_u32(buf, off);
+            if (off + lirLen > buf.size())
+                return;
+            extra.lir.assign(buf.begin() + off, buf.begin() + off + lirLen);
+        }
+
+    public:
+
 
         static int32_t parseArgInt(const std::vector<uint8_t> &data)
         {

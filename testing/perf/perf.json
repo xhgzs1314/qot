@@ -1,0 +1,86 @@
+{
+ "p01_loop_100k": {
+  "vm_min_s": 0.037244,
+  "vm_median_s": 0.043052,
+  "interp_min_s": 1.020895,
+  "repeat": 5,
+  "meta": {
+   "cpu": "Intel64 Family 6 Model 69 Stepping 1, GenuineIntel",
+   "os": "Windows-10-10.0.19042-SP0",
+   "python": "3.9.12",
+   "commit": "860d9fc",
+   "date": " 03:33:22",
+   "startup_noise_s": 0.2231
+  }
+ },
+ "p02_loop_1m": {
+  "vm_min_s": 0.364968,
+  "vm_median_s": 0.413732,
+  "interp_min_s": 8.857749,
+  "repeat": 5,
+  "meta": {
+   "cpu": "Intel64 Family 6 Model 69 Stepping 1, GenuineIntel",
+   "os": "Windows-10-10.0.19042-SP0",
+   "python": "3.9.12",
+   "commit": "860d9fc",
+   "date": " 03:33:22",
+   "startup_noise_s": 0.2231
+  }
+ },
+ "p03_arith_mix": {
+  "vm_min_s": 0.118684,
+  "vm_median_s": 0.150127,
+  "interp_min_s": 6.640998,
+  "repeat": 5,
+  "meta": {
+   "cpu": "Intel64 Family 6 Model 69 Stepping 1, GenuineIntel",
+   "os": "Windows-10-10.0.19042-SP0",
+   "python": "3.9.12",
+   "commit": "860d9fc",
+   "date": " 03:33:22",
+   "startup_noise_s": 0.2231
+  }
+ },
+ "p04_fib_recursive": {
+  "vm_min_s": 0.038429,
+  "vm_median_s": 0.064257,
+  "interp_min_s": 1.58425,
+  "repeat": 5,
+  "meta": {
+   "cpu": "Intel64 Family 6 Model 69 Stepping 1, GenuineIntel",
+   "os": "Windows-10-10.0.19042-SP0",
+   "python": "3.9.12",
+   "commit": "860d9fc",
+   "date": " 03:33:22",
+   "startup_noise_s": 0.2231
+  }
+ },
+ "p05_func_calls": {
+  "vm_min_s": 0.18309,
+  "vm_median_s": 0.215632,
+  "interp_min_s": 4.86,
+  "repeat": 5,
+  "meta": {
+   "cpu": "Intel64 Family 6 Model 69 Stepping 1, GenuineIntel",
+   "os": "Windows-10-10.0.19042-SP0",
+   "python": "3.9.12",
+   "commit": "860d9fc",
+   "date": " 03:33:22",
+   "startup_noise_s": 0.2231
+  }
+ },
+ "p06_array_rw": {
+  "vm_min_s": 0.085663,
+  "vm_median_s": 0.096225,
+  "interp_min_s": 3.264597,
+  "repeat": 5,
+  "meta": {
+   "cpu": "Intel64 Family 6 Model 69 Stepping 1, GenuineIntel",
+   "os": "Windows-10-10.0.19042-SP0",
+   "python": "3.9.12",
+   "commit": "860d9fc",
+   "date": " 03:33:22",
+   "startup_noise_s": 0.2231
+  }
+ }
+}

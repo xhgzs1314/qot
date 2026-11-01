@@ -1,0 +1,17 @@
+{
+ "name": "p16_prim_time",
+ "runs_on": "native",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stderr_empty": true
+ },
+ "tags": [
+  "primitive",
+  "time"
+ ],
+ "note": "P0.2：时间原语差分（P0-G）。两侧读墙钟时刻不同 → 绝对值不打印，只打关系判定与 time_make 造的确定性时间戳分量往返。"
+}

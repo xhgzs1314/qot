@@ -1,0 +1,38 @@
+ 03:22:50  commit=860d9fc  reason=T-03 首次由 run.py 生成 golden（原 golden/ 为手工遗留，无生成脚本）
+ 03:29:01  commit=860d9fc  reason=T-15 首次建立边界套件：README 有规定的已写硬断言，探索性用例先记录现状
+ 03:31:04  commit=860d9fc  reason=三个探索性边界复核后转为硬断言（null+1 结果为字符串）
+ 03:31:50  commit=860d9fc  reason=修正 bound_null_plus_number：语义警告属编译期，改用 compile_stderr_contains
+ 04:03:36  commit=860d9fc  reason=新增 RPN 语义地雷探测用例（D-03）
+ 04:04:17  commit=860d9fc  reason=新增 RPN 语义地雷探测用例（D-03），改用布尔断言规避两边格式差异
+ 12:05:21  commit=860d9fc  reason=D-05 修复后重建受影响 golden；新增 bound_dict_literal_decl / bound_dict_glen
+ 12:28:00  commit=860d9fc  reason=新增 D-08/D-09 及 strings/gtypes 布尔分歧的定价钉（fuzz 前哨发现）
+ 12:46:18  commit=860d9fc  reason=新增 D-08/D-09/D-10 空串、iterlen、数值串、strings/gtypes 布尔等定价钉
+ 16:30:23  commit=860d9fc  reason=S-02 负例矩阵 5 例 + 前批定价钉录 golden
+ 16:39:09  commit=860d9fc  reason=S-02 负例矩阵 5 例定稿（实证修正期望值）
+ 05:51:12  commit=860d9fc  reason=N-02 回归：新增 t16 内联×去装箱用例，先录 VM golden
+ 06:25:55  commit=860d9fc  reason=开关收敛到 pass 自检后复核 golden（应零差异）
+ 06:55:08  commit=860d9fc  reason=mod_semantics_edge: % 语义矩阵新钉（常量除数快路径/负零保号/INT_MIN 边界/大数回退/除零定价）
+ 06:55:18  commit=860d9fc  reason=mod_semantics_edge: %% 语义矩阵新钉（常量除数快路径/负零保号/INT_MIN 边界/大数回退/除零定价）
+ 07:05:03  commit=860d9fc  reason=builtin_fastpath_matrix: N-05 内置快速通道语义矩阵新钉
+ 07:05:18  commit=860d9fc  reason=builtin_fastpath_matrix: N-05 内置快速通道语义矩阵新钉
+ 07:05:56  commit=860d9fc  reason=builtin_fastpath_matrix: N-05 内置快速通道语义矩阵新钉
+ 07:06:16  commit=860d9fc  reason=builtin_fastpath_matrix: N-05 内置快速通道语义矩阵新钉
+ 07:06:31  commit=860d9fc  reason=builtin_fastpath_matrix: N-05 内置快速通道语义矩阵新钉
+ 07:16:36  commit=860d9fc  reason=unbox_call_numeric: N-04 双体快入口正例钉
+ 07:16:38  commit=860d9fc  reason=unbox_call_fallback: N-04 回退/不资格钉
+ 09:30:23  commit=860d9fc  reason=ssa_shapes: N-03 SSA 汇合/循环/嵌套形状钉
+ 23:08:07  commit=860d9fc  reason=T0 裁判脱钩后新增 native-only 用例：E3 常量键折叠路径的对拍钉（首次录制 golden，native 口径）
+ 23:08:21  commit=860d9fc  reason=T0 裁判脱钩后新增 native-only 用例：E1 字典槽压缩的迭代顺序回归钉（首次录制 golden，native 口径）
+ 00:04:35  commit=860d9fc  reason=E3 落地前重录：用例改为『只用一个字面量下标键 + 运行期同值键对拍』（原版含数字键，sema 报警且折叠路径未走到）
+ 03:17:57  commit=860d9fc  reason=F1/F2 交付：八条闭包与异常用例首录 golden（clo_counter/clo_lambda/clo_recursion/clo_loop_capture/try_basic/try_control_flow/err_meta/try_uncaught）
+ 03:22:46  commit=860d9fc  reason=F0 交付：f0_require 用例首录 golden（native 编译期 require .qot 模块）
+ 07:17:27  commit=860d9fc  reason=P0.1 原语 CP-2：p10-p14 五组差分用例首录（native 口径；oracle 对比由 test_primitive_oracle_diff 承担）
+ 23:49:30  commit=860d9fc  reason=CP-3+P0.2: p15-p18 primitives, bool_eq/empty_string pricing pins, std_fs stdlib golden; empty-string pricing realigned AOT to interp
+ 07:36:03  commit=860d9fc  reason=P1030 std_text 摘钉（P0-POOL-1 修复）后首录 golden；内容=native 口径预期输出
+ 07:04:03  commit=860d9fc  reason=M7 v2: 混族分派器落地（同族限制废除、ldexp 混调、未知码仍拒），ffi_abi_version 1→2（docs/）
+ 07:04:44  commit=860d9fc  reason=M7: 新用例（原生插件 ABI 差分，demo 插件 prerun 构建）
+ 07:05:57  commit=860d9fc  reason=M7 v2: 混族分派器（用例 types 数组修正：返回码+2 实参码）
+ 17:50:05  commit=860d9fc  reason=M5: std.data 新用例（统计/分组标准库）
+ 17:50:25  commit=860d9fc  reason=M5: std.cli 新用例（参数解析标准库）
+ 19:27:10  commit=860d9fc  reason=P0-D 补：位运算 6 条差分（int64 域 + uint64 承载移位）
+ 19:27:41  commit=860d9fc  reason=P0-D 补：位运算差分（边界段改位恒等自证）

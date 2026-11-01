@@ -1,0 +1,126 @@
+// ============================================================================
+// std.net —— HTTP 客户端标准库
+// ============================================================================
+
+// 解析 "scheme://host[:port]/path" → dict{scheme,host,port,path}。
+// 非 URL（无 "://"）→ null；无路径 → "/"；无端口 → 80；端口越界 → null。
+// （S-14 注意：端口是运行期字符串值，str_to_num 正常解析——只有字面量
+// 才有数字样定价，运行期拼接的 "8080" 是真字符串。）
+any_t func url_parse(url) {
+    var pos = str_find(url, "://", 0);
+    if (pos < 0) {
+        return null;
+    }
+    var scheme = str_slice(url, 0, pos);
+    var rest = pos + 3;
+    var n = str_len(url);
+    var slash = str_find(url, "/", rest);
+    var hostport = "";
+    var path = "/";
+    if (slash >= 0) {
+        hostport = str_slice(url, rest, slash);
+        path = str_slice(url, slash, n);
+    } else {
+        hostport = str_slice(url, rest, n);
+    }
+    var host = hostport;
+    var port = 80;
+    var colon = str_find(hostport, ":", 0);
+    if (colon >= 0) {
+        host = str_slice(hostport, 0, colon);
+        port = str_to_num(str_slice(hostport, colon + 1, str_len(hostport)));
+        if (port <= 0 || port > 65535) {
+            return null;
+        }
+    }
+    var d = dict_new();
+    dict_set(d, "scheme", scheme);
+    dict_set(d, "host", host);
+    dict_set(d, "port", port);
+    dict_set(d, "path", path);
+    return d;
+}
+
+// 私有：发一次 HTTP/1.0 请求并收完整响应（状态行 + 头 + EOF 分帧的体）。
+// 任一步失败 → null（socket 资源总是被关闭）。
+any_t func _net_request(url, method, body, ctype) {
+    var u = url_parse(url);
+    if (u == null) {
+        return null;
+    }
+    var h = socket_new();
+    if (h == null) {
+        return null;
+    }
+    var connected = socket_connect(h, dict_get(u, "host"), dict_get(u, "port"));
+    if (connected == false) {
+        socket_close(h);
+        return null;
+    }
+    socket_set_timeout(h, 10000);
+    var req = method + " " + dict_get(u, "path") + " HTTP/1.0\r\nHost: "
+        + dict_get(u, "host");
+    if (str_empty(ctype) == false) {
+        req = req + "\r\nContent-Type: " + ctype;
+    }
+    req = req + "\r\nConnection: close\r\n\r\n" + body;
+    if (socket_send_all(h, req) < 0) {
+        socket_close(h);
+        return null;
+    }
+    // 状态行："HTTP/1.x 200 OK" → 第 2 个 token = 状态码
+    var line = socket_recv_line(h);
+    if (str_empty(line)) {
+        socket_close(h);
+        return null;
+    }
+    var parts = str_split(line, " ");
+    var status = 0;
+    if (arr_len(parts) >= 2) {
+        status = str_to_num(arr_get(parts, 1));
+    }
+    // 头部循环：读到空行（recv_line 剥完 \r\n 后返回 ""）
+    var scanning = true;
+    loop (scanning) {
+        var hl = socket_recv_line(h);
+        if (str_empty(hl)) {
+            scanning = false;
+        }
+    }
+    // 体：读到 EOF（Connection: close 分帧）
+    var rbody = "";
+    var reading = true;
+    loop (reading) {
+        var chunk = socket_recv(h, 65536);
+        if (str_empty(chunk)) {
+            reading = false;
+        } else {
+            rbody = rbody + chunk;
+        }
+    }
+    socket_close(h);
+    var out = dict_new();
+    dict_set(out, "status", status);
+    dict_set(out, "body", rbody);
+    return out;
+}
+
+// GET url → dict{status, body}；失败 null（URL 非法/连接失败/协议错）。
+any_t func http_get(url) {
+    return _net_request(url, "GET", "", "");
+}
+
+// POST url, body [, ctype] → dict{status, body}；失败 null。
+any_t func http_post(url, body, ctype) {
+    return _net_request(url, "POST", body, ctype);
+}
+
+// 下载 url 响应体到文件（文本覆写）→ true/false。
+// 文件失败回传 false；HTTP 层失败（null）同样 false —— 需要区分时用 http_get。
+boolean_t func download(url, path) {
+    var r = http_get(url);
+    if (r == null) {
+        return false;
+    }
+    return file_write(path, dict_get(r, "body")) > 0;
+}

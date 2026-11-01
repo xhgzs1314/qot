@@ -1,0 +1,58 @@
+// ============================================================================
+// std.net 差分钉（P0.3 · ）：url_parse 单元 + HTTP 正路径（hermetic）
+// + 失败面。正路径靠 setup 钩子起本地回显服务器（testing/tools/echo_http_srv.py，
+// 固定响应 "qot-net-ok"；run.py 与 oracle 裁判均已支持 setup/teardown）。
+// 服务器启动有窗口 → http_get 失败重试（time_sleep_ms 节流，上限 5s）。
+// 【登记】interp 的 ## 调用结果不能直接进 == 表达式（解析器因子层级缺口，
+// native inliner 合并后无此问题）—— 本用例以中间变量绕开，缺陷随 P0.3 入账。
+// ============================================================================
+
+require "../../../std/net.qot";
+
+// ---- url_parse 单元 ----
+var u = net##url_parse("http://127.0.0.1:47300/a/b?q=1");
+output(dict_get(u, "scheme"));                       // http
+output(dict_get(u, "host"));                         // 127.0.0.1
+output(dict_get(u, "port"));                         // 47300.000000
+output(dict_get(u, "path"));                         // /a/b?q=1
+var u2 = net##url_parse("http://example.com");
+output(dict_get(u2, "port"));                        // 80.000000
+output(dict_get(u2, "path"));                        // /
+output(dict_get(u2, "host"));                        // example.com
+var bad1 = net##url_parse("not-a-url");
+output(bad1 == null);                                // true（无 ://）
+var bad2 = net##url_parse("http://h:99999/");
+output(bad2 == null);                                // true（端口越界）
+
+// ---- HTTP 正路径：起服后重试连接（窗口 ≤5s）----
+var r = null;
+var tries = 0;
+var ready = false;
+loop (ready == false) {
+    r = net##http_get("http://127.0.0.1:47300/hello");
+    if (r != null) {
+        ready = true;
+    } else {
+        tries = tries + 1;
+        if (tries >= 25) {
+            ready = true;   // 上限 5s：让用例以确定性失败收场，不挂起套件
+        } else {
+            time_sleep_ms(200);
+        }
+    }
+}
+output(dict_get(r, "status"));                       // 200.000000
+output(dict_get(r, "body"));                         // qot-net-ok
+
+// POST（服务器对任何方法回同一响应 —— 方法无关的固定响应）
+var pr = net##http_post("http://127.0.0.1:47300/submit", "k=v&x=1", "text/plain");
+output(dict_get(pr, "status"));                      // 200.000000
+output(dict_get(pr, "body"));                        // qot-net-ok
+
+// ---- 失败面 ----
+var nf1 = net##http_get("http://127.0.0.1:1/x");
+output(nf1 == null);                                 // true（回环拒绝端口）
+var nf2 = net##http_get("not-a-url");
+output(nf2 == null);                                 // true
+var dl = net##download("http://127.0.0.1:1/x", "nope.txt");
+output(dl == false);                                 // true

@@ -1,0 +1,93 @@
+// 【GOD-SELF 涌现验收钉  · §8.24-D0 过关主判据】
+// 纯 .qot（宏 + 协议）把 C 档缺口长出来 —— 内核零依赖（本文件 require 为空，
+// 只依赖 G1/G2 的机制面与 M4 的对象模型）。四项：
+//   * C4 运算符重载：Vec2 的 a+b / a-b / a==b 走 __add__/__sub__/__eq__；
+//   * C1 接口与多态：协议约定（实现者提供 speak()）+ any 调用点运行期
+//     方法表分派（describe(obj) 的 obj 类型未知 → 现行为 = 多态）+
+//     speak! 宏（接口方法的编译期改写面）—— 无类层级，组合/委托涌现
+//     （Robot 组合 Engine，speak 委托 engine->sound()）；
+//   * C6 引用语义：官方宏 swap! 真实交换两个变量；
+//   * C3 加分原型：yield! 宏 —— 生成器写法经回调改写涌现（yield!(v) 展开为
+//     __emit(v)，序列累积由闭包承担 —— 不动内核的惰性序列最小面）。
+// —— 宏库（本文件自带；require 只允许 std/ 与包自身，本例连 std/ 都不用）——
+macro speak(x) {
+    return &< "kind": "method_call", "receiver": x, "name": "speak",
+              "args": [] >&;
+}
+macro yield(v) {
+    // 注意：改写目标名用 _m_ 前缀（`__` 前缀 = 编译器隐藏临时保留，
+    // 函数体内按局部槽编译 —— 见 README §25 保留名登记）
+    return &< "kind": "function_call", "name": "_m_emit", "args": [v] >&;
+}
+// ===== C4 运算符重载（G1 协议的真实使用面）=====
+class Vec2 {
+    var x = 0;
+    var y = 0;
+    func init(ax, ay) { this->x = ax; this->y = ay; }
+    func __add__(o) { return Vec2(this->x + o->x, this->y + o->y); }
+    func __sub__(o) { return Vec2(this->x - o->x, this->y - o->y); }
+    func __eq__(o) {
+        if (this->x == o->x && this->y == o->y) { return 1; }
+        return 0;
+    }
+    func __to_str() {
+        return "(" + int_to_str(this->x) + "," + int_to_str(this->y) + ")";
+    }
+}
+var p = Vec2(2, 3);
+var q = Vec2(5, 7);
+var sum = p + q;
+output(sum);
+output(sum == Vec2(7, 10));
+var diff = q - p;
+output(diff);
+// ===== C1 接口与多态（无类层级；协议约定 + 运行期方法表分派）=====
+class Dog {
+    var name = "";
+    func init(n) { this->name = n; }
+    func speak() { return this->name + ": woof"; }
+}
+class Engine {
+    var kind = "";
+    func init(k) { this->kind = k; }
+    func sound() { return this->kind + "-hum"; }
+}
+class Robot {
+    var name = "";
+    var engine = null;
+    func init(n) {
+        this->name = n;
+        this->engine = Engine("ion");
+    }
+    func speak() { return this->name + ": beep/" + this->engine->sound(); }
+}
+// any 调用点：obj 类型未知 → 不绑定 → 运行期方法表分派（多态本体）
+any_t func describe(obj) {
+    return obj->speak();
+}
+output(describe(Dog("Rex")));
+output(describe(Robot("R7")));
+// speak! 宏：接口方法的编译期改写面（同一分派，宏形态）
+output(speak!(Dog("Max")));
+// ===== C6 引用语义（官方宏 swap!）=====
+var lo = 1;
+var hi = 9;
+swap!(lo, hi);
+output(int_to_str(lo));
+output(int_to_str(hi));
+// ===== C3 加分原型：yield! → 回调改写（生成器写法的库层涌现）=====
+var collected = [];
+var _m_emit = func(v) -> arr_push(collected, v);
+number_t func squares(n) {
+    for (i in n) {
+        yield!(i * i);
+    }
+    return 0;
+}
+squares(5);
+var joined = "";
+for (v in collected) {
+    joined = joined + int_to_str(v) + ";";
+}
+output(joined);
+output("GS3-END");

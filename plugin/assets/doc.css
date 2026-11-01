@@ -1,0 +1,235 @@
+/* QOT 文档中心*/
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background: #f5f7fb;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+        'Microsoft YaHei', Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.75;
+    color: #1e293b;
+    padding: 2rem 1rem;
+}
+
+.doc {
+    max-width: 1080px;
+    margin: 0 auto;
+    background: #fff;
+    border-radius: 20px;
+    box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.18);
+    overflow: hidden;
+}
+
+.doc-head {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
+    padding: 2.6rem 3rem;
+}
+
+.doc-head h1 {
+    font-size: 2.1rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+
+.doc-head p {
+    margin-top: 0.8rem;
+    opacity: 0.92;
+    max-width: 46em;
+}
+
+.doc-head .eyebrow {
+    display: inline-block;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: rgba(255, 255, 255, 0.18);
+    padding: 0.2rem 0.7rem;
+    border-radius: 20px;
+    margin-bottom: 0.8rem;
+}
+
+.doc-body {
+    padding: 2.4rem 3rem 3.2rem;
+}
+
+.doc-body h2 {
+    font-size: 1.45rem;
+    font-weight: 650;
+    margin: 2.2rem 0 0.9rem;
+    padding-left: 0.75rem;
+    border-left: 4px solid #6366f1;
+}
+
+.doc-body h3 {
+    font-size: 1.12rem;
+    font-weight: 650;
+    margin: 1.6rem 0 0.6rem;
+    color: #312e81;
+}
+
+.doc-body h4 {
+    font-size: 1rem;
+    font-weight: 650;
+    margin: 1.2rem 0 0.4rem;
+    color: #475569;
+}
+
+.doc-body p {
+    margin: 0.7rem 0;
+}
+
+.doc-body ul,
+.doc-body ol {
+    margin: 0.7rem 0 0.7rem 1.4rem;
+}
+
+.doc-body li {
+    margin: 0.3rem 0;
+}
+
+.doc-body code {
+    background: #f1f5f9;
+    color: #be123c;
+    padding: 0.1rem 0.35rem;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+    font-size: 0.88em;
+}
+
+.doc-body pre {
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 1.1rem 1.3rem;
+    border-radius: 12px;
+    overflow-x: auto;
+    margin: 0.9rem 0;
+    font-size: 0.86rem;
+    line-height: 1.65;
+}
+
+.doc-body pre code {
+    background: none;
+    color: inherit;
+    padding: 0;
+    font-size: inherit;
+}
+
+.doc-body table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.9rem;
+}
+
+.doc-body th,
+.doc-body td {
+    border: 1px solid #e2e8f0;
+    padding: 0.55rem 0.75rem;
+    text-align: left;
+    vertical-align: top;
+}
+
+.doc-body th {
+    background: #f8fafc;
+    font-weight: 600;
+}
+
+.doc-body blockquote {
+    border-left: 4px solid #f59e0b;
+    background: #fffbeb;
+    padding: 0.85rem 1.1rem;
+    margin: 1rem 0;
+    border-radius: 0 10px 10px 0;
+    color: #78350f;
+}
+
+.doc-body .note {
+    border-left-color: #6366f1;
+    background: #eef2ff;
+    color: #3730a3;
+}
+
+.doc-body .warn {
+    border-left-color: #ef4444;
+    background: #fef2f2;
+    color: #991b1b;
+}
+
+.doc-body .ok {
+    border-left-color: #10b981;
+    background: #ecfdf5;
+    color: #065f46;
+}
+
+.tag {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.1rem 0.5rem;
+    border-radius: 12px;
+    background: #eef2ff;
+    color: #4338ca;
+    margin-right: 0.35rem;
+}
+
+.tag.ok {
+    background: #dcfce7;
+    color: #15803d;
+}
+
+.tag.no {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
+    margin: 1.1rem 0;
+}
+
+.card {
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 1rem 1.1rem;
+    background: #fbfdff;
+}
+
+.card h4 {
+    margin-top: 0;
+}
+
+.doc-foot {
+    padding: 1.4rem 3rem 2rem;
+    border-top: 1px solid #e2e8f0;
+    color: #64748b;
+    font-size: 0.85rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    justify-content: space-between;
+}
+
+.doc-foot a {
+    color: #6366f1;
+    text-decoration: none;
+}
+
+@media (max-width: 720px) {
+    body {
+        padding: 0.75rem;
+    }
+
+    .doc-head,
+    .doc-body,
+    .doc-foot {
+        padding-left: 1.2rem;
+        padding-right: 1.2rem;
+    }
+}

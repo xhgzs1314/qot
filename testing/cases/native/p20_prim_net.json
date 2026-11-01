@@ -1,0 +1,18 @@
+{
+ "name": "p20_prim_net",
+ "runs_on": "native",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stderr_empty": true
+ },
+ "tags": [
+  "net",
+  "primitive",
+  "p0.3"
+ ],
+ "note": "P0.3：18 条 socket 原语差分（§4.9）。全 hermetic：127.0.0.1 固定端口 47210/47211 自环（bind+listen 后同进程 connect，内核 backlog 完成握手，accept 只出队——单线程两侧同构）；bind 恒 SO_REUSEADDR（顺序复跑 TIME_WAIT 友好）；所有阻塞点先 set_timeout(2000)（最坏失败不挂起套件）；句柄不打印裸值（各自进程计数）；\"ping-你好\"=11 字节（D-12 字节语义）。DNS 用 localhost（成员断言）+ .invalid（NXDOMAIN，离线安全）。v0 = AF_INET；tls_connect 留口 FFI。oracle 差分顺序执行（native→interp），oracle 裁判 token 归一数字。"
+}

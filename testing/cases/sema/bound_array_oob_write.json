@@ -1,0 +1,23 @@
+{
+ "name": "bound_array_oob_write",
+ "runs_on": "vm",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stdout": [
+   "3.000000",
+   "1.000000",
+   "2.000000",
+   "3.000000"
+  ],
+  "stderr_empty": true
+ },
+ "tags": [
+  "array",
+  "oob"
+ ],
+ "note": "README 8.7：VM 越界写被静默丢弃，数组不变"
+}

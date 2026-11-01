@@ -1,0 +1,20 @@
+{
+ "name": "bound_unary_prec",
+ "runs_on": "vm",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stdout": [
+   "4.000000"
+  ],
+  "stderr_empty": true
+ },
+ "tags": [
+  "arith",
+  "precedence"
+ ],
+ "note": "README 5.5：一元负号优先于 ^，(-2)^2=4"
+}

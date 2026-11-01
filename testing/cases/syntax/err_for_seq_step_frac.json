@@ -1,0 +1,12 @@
+{
+ "name": "err_for_seq_step_frac",
+ "runs_on": "none",
+ "compile": { "args": [], "expect_ok": false },
+ "expect": {
+  "exit_not": 0,
+  "stderr_contains": ["[错误]", "整数"],
+  "artifact": null
+ },
+ "tags": ["syntax", "negative", "G-04"],
+ "note": "G-04 序列步长立法（）：E by S 的 S 必须非零整数（下标跳步）；小数步长仅区间形态 A..B by S 允许。"
+}

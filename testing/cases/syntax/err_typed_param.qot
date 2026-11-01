@@ -1,0 +1,3 @@
+number_t func f(number_t a) {
+    return a;
+}

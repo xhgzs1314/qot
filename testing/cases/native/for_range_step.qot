@@ -1,0 +1,76 @@
+// 【G-04 钉 】for-in 区间（A..B [by S]）与序列步长（E by S）。
+// 语义定价（README §6.2 / SPEC §3）：
+//   * 区间半开：B 不含；`for (i in N)` ≡ `0..N`；B<=A（无 by）→ 空区间
+//   * by S：S 符号定方向（S>0 升序 i<B；S<0 降序 i>B）；小数步长仅区间形态
+//   * by 0 / 非编译期数字 → 编译期致命（G-10 律：静态可判错误 = 编译失败）
+//   * 序列（数组/字符串/字典键）by S：S>0 从 0 跳步；S<0 从 len-1 倒序
+//   * 数字 E by S ≡ 0..E by S（E>0 且 S<0 → 空区间）
+var acc = "";
+for (i in 0..5) { acc = acc + i + ","; }
+output(acc);
+acc = "";
+for (i in 10..0 by -2) { acc = acc + i + ","; }
+output(acc);
+acc = "";
+for (i in 0..10 by 3) { acc = acc + i + ","; }
+output(acc);
+acc = "";
+for (i in 0..1 by 0.25) { acc = acc + i + ","; }
+output(acc);
+// 空区间（B<=A 无 by）
+var cnt = 0;
+for (i in 5..5) { cnt += 1; }
+for (i in 3..0) { cnt += 1; }
+output(cnt);
+// 动态边界 + continue（步进在继续点）
+number_t func upto(n) {
+    var s = 0;
+    for (j in 0..n) {
+        if (j % 2 == 0) { continue; }
+        s += j;
+    }
+    return s;
+}
+output(upto(10));
+// 嵌套区间
+var grid = "";
+for (r in 0..3) {
+    for (c in 0..3) {
+        if (c > r) { continue; }
+        grid = grid + r + "" + c + " ";
+    }
+}
+output(grid);
+// 数组跳步与倒序
+var a = [10,20,30,40,50];
+acc = "";
+for (v in a by 2) { acc = acc + v + ","; }
+output(acc);
+acc = "";
+for (v in a by -1) { acc = acc + v + ","; }
+output(acc);
+// 字符串跳步（ASCII —— 非 ASCII 的字节/字符分歧是登记族，钉里不碰）
+acc = "";
+for (c in "abcde" by 2) { acc = acc + c; }
+output(acc);
+acc = "";
+for (c in "abcde" by -2) { acc = acc + c; }
+output(acc);
+// 字典键倒序（槽序的逆 —— native 确定性槽序；interp 为插入序的逆，
+// 属 D-JSON-ORDER 登记分歧族，本钉 runs_on=native 只钉 native 口径）
+var d = &< "x": 1, "y": 2, "z": 3 >&;
+acc = "";
+for (k in d by -1) { acc = acc + k + ","; }
+output(acc);
+// 数字 by 步长（0..N by S）
+acc = "";
+for (i in 10 by 4) { acc = acc + i + ","; }
+output(acc);
+// 数字 by 负步长 → 空区间（0..10 by -1）
+cnt = 0;
+for (i in 10 by -1) { cnt += 1; }
+output(cnt);
+// 体内改循环变量不影响计数（隐藏计数器纪律）
+var mutated = 0;
+for (i in 0..5) { i = 100; mutated += 1; }
+output(mutated);

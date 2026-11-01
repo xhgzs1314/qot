@@ -1,0 +1,58 @@
+// P17 · P0-H 系统与进程原语差分（P0.2）。
+// 纪律：
+//   * hostname/username/env 全集是机器相关值 → 只打印「非空 / 命中」布尔；
+//   * kill 后的退出码是平台定价差异面（Windows=1 / POSIX 128+sig，
+//     interp 侧 subprocess 还是 -9）→ 只验证「能拿到 code 字段」，不打印值；
+//   * stdout_write 的字节直写与 output 同流，两侧行形状一致。
+var k = "QOT_P02_DIFF_VAR";
+output(env_get(k));
+output(env_set(k, "v1"));
+output(env_get(k));
+output(env_unset(k));
+output(env_get(k));
+output(env_unset(k));
+output(env_expand("x-%QOT_P02_NOPE%-y"));
+env_set("QOT_P02_HOME2", "zz");
+output(env_expand("a=${QOT_P02_HOME2};b=$QOT_P02_HOME2;c=%QOT_P02_HOME2%"));
+env_unset("QOT_P02_HOME2");
+output(arr_len(env_list()) > 0);
+output(env_expand("$%"));
+output(arr_len(args_get()) == 0);
+output(str_len(cwd()) > 0);
+output(path_is_absolute(cwd()));
+output(cwd_set(".../definitely/not/here"));
+output(str_len(hostname()) > 0);
+output(str_len(username()) > 0);
+var r = proc_shell("echo hello-sys");
+output(dict_has(r, "code"));
+output(dict_has(r, "stdout"));
+output(dict_has(r, "stderr"));
+output(str_trim(arr_get(str_split_lines(dict_get(r, "stdout")), 0)));
+output(dict_get(r, "code") == 0);
+var r2 = proc_run("python", ["-c", "print('hello-run')"], null);
+output(str_trim(arr_get(str_split_lines(dict_get(r2, "stdout")), 0)));
+output(dict_get(r2, "code") == 0);
+output(str_len(dict_get(r2, "stderr")) >= 0);
+var bad = proc_run("qot-no-such-binary-xyz", ["a"], null);
+output(is_null(bad));
+var bad2 = proc_shell("exit 3");
+output(dict_get(bad2, "code") == 3);
+var sp = proc_run("python", ["-c", "import time; time.sleep(1)"], null);
+output(dict_get(sp, "code") == 0);
+var h = proc_spawn("python", ["-c", "import time; time.sleep(30)"]);
+output(is_null(h) == false);
+output(proc_pid(h) > 0);
+output(proc_is_running(h));
+output(is_handle(h));
+output(type_of(h));
+output(proc_kill(h));
+output(proc_is_running(h) == false);
+var rw = proc_wait(h, 5000);
+output(dict_has(rw, "code"));
+output(is_null(proc_wait(h, 100)));
+output(proc_kill(h));
+output(is_handle(h) == false);
+output(type_of(h) == "number");
+var wr = stdout_write("P17:");
+output(wr);
+output("direct-write");

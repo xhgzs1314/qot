@@ -1,0 +1,1 @@
+{"name": "clo_lambda", "runs_on": "native", "compile": {"args": [], "expect_ok": true}, "expect": {"exit": 0, "stderr_empty": true}, "tags": ["closure", "lambda", "f1"], "note": "lambda 捕获外层形参 k（每次调用独立环境）+ 顶层函数值变量调用（CALL_DYNAMIC）"}

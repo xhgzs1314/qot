@@ -1,0 +1,2 @@
+var q = -2 ^ 2;
+output(q);

@@ -218,8 +218,8 @@
     <p>QOT 是一种动态类型的脚本语言。它设计简洁，语法直观，适合初学者入门学习，同时也具备一定的灵活性和功能性。</p>
     <p>QOT 语言支持基本的数据类型、控制结构、函数定义与调用，以及数组和字典等复合数据类型，能够满足基础编程需求。</p>
 
-    <h3>1.1 两套运行时（重要）</h3>
-    <p><strong>同一份 <code>.qot</code> 源码，QOT 有两条完全独立的执行路径。它们并不等价</strong>——内置函数表不同，部分语义也不同。学习时请先确定自己走的是哪一条：</p>
+    <h3>1.1 两种执行方式（重要）</h3>
+    <p><strong>同一份 <code>.qot</code> 源码，QOT 有两条执行路径。它们并不等价</strong>——内置函数面不同，部分语义也不同。用之前先确定自己走的是哪一条：</p>
 
     <table cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%; margin: 1rem 0;">
         <thead style="background-color: #f0f0f0;">
@@ -235,20 +235,24 @@
                 <td><strong>解释器</strong></td>
                 <td><code>python index.py run a.qot</code></td>
                 <td>Python 树遍历解释器</td>
-                <td>快速试错、调试；启动快，执行慢</td>
+                <td>快速试错、调试；启动快，执行慢；图形界面函数只在这条路径上可用</td>
             </tr>
             <tr>
-                <td><strong>字节码 VM</strong></td>
-                <td><code>python index.py bstrust compile a.qot a.qtc</code><br>
-                    <code>python index.py bstrust run a.qtc</code></td>
-                <td>C++ 虚拟机（<code>qotrun.dll</code>）</td>
-                <td><strong>生产环境用这条</strong>；GUI 只在这条路径上可用</td>
+                <td><strong>原生可执行文件</strong></td>
+                <td><code>python index.py aot a.qot a.exe</code></td>
+                <td>AOT 编译 → C → 原生程序</td>
+                <td><strong>生产环境用这条</strong>；数值输出格式与解释器不同（浮点按 %f 打印）</td>
             </tr>
         </tbody>
     </table>
 
-    <p>本文档正文描述的是<strong>两条路径共有</strong>的语法。凡是两边行为不一致的地方，都会用「⚠ 运行时差异」明确标出，并在 <a href="#runtime-diff">第 21 章</a> 集中列表。</p>
-    <p><strong>建议：写生产代码时始终以字节码 VM 为准。</strong>解释器不支持 GUI，数值输出格式也不同，仅适合验证逻辑。</p>
+    <p>本文档正文描述的是<strong>两条路径共有</strong>的语法。凡是两边行为不一致的地方，都会用「⚠ 运行环境差异」明确标出，并在 <a href="#runtime-diff">第 21 章</a> 集中列表。</p>
+    <p><strong>建议：写生产代码时以原生可执行文件为准</strong>，用解释器验证逻辑。</p>
+    <blockquote style="border-left: 4px solid #999; padding-left: 1rem; color: #555; margin: 1rem 0;">
+        <p><strong>关于字节码 VM：</strong>早期的 <code>.qtc</code> 字节码虚拟机已经<strong>冻结弃管</strong>——它不再接受功能开发，
+            也不作为新项目的目标环境。仓库里仍保留 <code>bstrust</code> 子命令与相关工具，方便处理历史产物；
+            新代码请直接走原生（AOT）路径。仓库里的 <code>qotrun.dll</code> 与 <code>vmcshit/</code> 属于历史资产。</p>
+    </blockquote>
     <h2>2. 基本语法</h2>
     <h3>2.1 程序结构</h3>
     <p>QOT 程序由一系列语句组成，语句通常以分号<code>;</code>结尾。程序文件以<code>.qot</code>为扩展名。</p>
@@ -266,7 +270,7 @@ var x = 1;   @-@-@ 错误：注解不能跟在语句后面</code></pre>
     <ul>
         <li>
             <p>控制结构：<code>if</code>、<code>else</code>、<code>eif</code>（else if
-                的简写）、<code>loop</code>、<code>for</code>、<code>in</code></p>
+                的简写）、<code>loop</code>、<code>for</code>、<code>in</code>、<code>continue</code></p>
         </li>
         <li>
             <p>变量声明：<code>var</code>、<code>const</code></p>
@@ -280,6 +284,9 @@ var x = 1;   @-@-@ 错误：注解不能跟在语句后面</code></pre>
             </p>
         </li>
         <li>
+            <p>类与宏：<code>class</code>、<code>macro</code></p>
+        </li>
+        <li>
             <p>其他：<code>null</code>、<code>stop</code>、<code>true</code>、<code>false</code>、<code>require</code></p>
         </li>
         <li>
@@ -291,7 +298,7 @@ var x = 1;   @-@-@ 错误：注解不能跟在语句后面</code></pre>
     <ul>
         <li><code>while</code>：QOT 的条件循环叫 <code>loop</code></li>
         <li><code>break</code>：跳出循环用 <code>stop;</code></li>
-        <li><code>continue</code>：<strong>QOT 没有 continue</strong>，只能用 <code>if</code> 把循环体剩下的部分包起来</li>
+        <li><code>continue</code>：<strong>continue 现在是关键字</strong>（跳过本轮剩余语句，进入下一轮）</li>
         <li><code>function</code>：定义函数用 <code>func</code>，而且前面必须写返回类型</li>
         <li><code>else if</code>：要写成一个词 <code>eif</code></li>
         <li><code>output</code>、<code>strings</code> 等：这些是<strong>内置函数</strong>，不是关键字，可以被同名的用户函数覆盖</li>
@@ -568,13 +575,15 @@ const b = 4;</code></pre>
     <ul>
         <li><code>&amp;&amp;</code>：逻辑与</li>
         <li><code>||</code>：逻辑或</li>
+        <li><code>!</code>：一元逻辑非（前缀位）</li>
     </ul>
-    <p>⚠ <strong>QOT 没有逻辑非运算符。</strong><code>!a</code> 是语法错误——注意 <code>!</code> 只在 <code>!=</code> 里出现，单独用不构成表达式。要取反，请这样写：</p>
-    <pre><code class="code-highlight">// 想写 if (!flag)，改成：
-if (flag == false) { ... }
-
-// 想写 if (!(a > b))，改成：
-if (a &lt;= b) { ... }</code></pre>
+    <p><code>!</code>：一元逻辑非（前缀位；<code>!a</code> 即「非 a」）。真值判定与 <code>if</code> /
+        <code>loop</code> 条件用的是同一张表：<code>null</code>、<code>false</code>、<code>0</code>、空串、空数组、
+        空字典为假；其余为真。优先级与一元负号同级（<code>!a + b</code> = <code>(!a) + b</code>），右结合（<code>!!x</code> 合法）。</p>
+    <pre><code class="code-highlight">if (!flag) { ... }                 // 取反
+var empty = !list_is_empty(a);</code></pre>
+    <p>⚠ <strong>标识符后紧跟 <code>!(</code> 不是逻辑非，而是宏调用</strong>（见<a href="macros.html">编译期宏</a>）：
+        <code>foo!(x)</code> 是宏展开，<code>!foo</code> 才是取反。</p>
 
     <p>⚠ <strong><code>&amp;&amp;</code> 和 <code>||</code> 优先级完全相同</strong>，从左到右结合。这跟 C、Java、Python、JavaScript 都不一样，是最容易踩的坑：</p>
     <pre><code class="code-highlight">true || false &amp;&amp; false
@@ -618,8 +627,8 @@ d["n"] = d["n"] + 1;  // 正确写法</code></pre>
         <tbody>
             <tr>
                 <td>1（最高）</td>
-                <td><code>()</code> <code>[]</code> <code>-&gt;</code> <code>##</code> <code>-</code>（一元负号）</td>
-                <td>括号、下标、方法调用、模块调用、取负</td>
+                <td><code>()</code> <code>[]</code> <code>-&gt;</code> <code>##</code> <code>-</code>（一元负号）<code>!</code>（逻辑非）</td>
+                <td>括号、下标、方法调用、模块调用、取负、逻辑非</td>
                 <td>从左到右</td>
             </tr>
             <tr>
@@ -723,6 +732,23 @@ for (name in names) {
     output(name);  // 依次输出 Alice, Bob, Charlie
 }</code></pre>
 
+    <h4>for 循环（区间与步长）</h4>
+    <pre><code class="code-highlight">for (i in 0..5) {        // 0,1,2,3,4,5（闭区间）
+    output(i);
+}
+for (i in 0..10 by 2) {     // 0,2,4,6,8,10
+    output(i);
+}
+for (i in 10..0 by -5) {    // 10,5（负步长倒序）
+    output(i);
+}</code></pre>
+
+    <h4>for 循环（遍历字典）</h4>
+    <pre><code class="code-highlight">var d = &amp;lt; "a": 1, "b": 2 &amp;gt;;
+for (k in d) {              // 遍历键（顺序不保证）
+    output(k);
+}</code></pre>
+
     <h4>loop 循环</h4>
     <pre><code class="code-highlight">var count = 0;
 loop (count < 3) {
@@ -742,18 +768,20 @@ loop (count < 3) {
 // 输出: 0, 1, 2, 3, 4</code></pre>
     <p><code>stop</code> 只跳出<strong>最内层</strong>的那一层循环。<code>stop</code> 写在循环外面是编译错误。</p>
 
-    <p><strong>⚠ QOT 没有 <code>continue</code>。</strong>想跳过本次迭代，只能把剩下的代码用 <code>if</code> 包起来：</p>
-    <pre><code class="code-highlight">// 其他语言里会写 if (i % 2 == 0) { continue; }
-for (i in 10) {
-    if (i % 2 != 0) {
-        output(i);      // 只处理奇数
+    <h4>循环控制：continue 语句</h4>
+    <p><code>continue</code> 跳过本轮剩余语句，直接进入下一轮：</p>
+    <pre><code class="code-highlight">for (i in 10) {
+    if (i % 2 == 0) {
+        continue;   // 偶数跳过本轮剩余部分
     }
+    output(i);        // 只输出奇数
 }</code></pre>
+    <p><code>continue</code> 与 <code>stop</code> 一样只作用于<strong>最内层</strong>循环；写在循环外是编译错误。</p>
 
     <h4>三种循环怎么选</h4>
     <ul>
         <li>知道次数 → <code>for (i in n)</code></li>
-        <li>遍历数组/字典的键数组 → <code>for (x in arr)</code></li>
+        <li>遍历数组 / 字典 / 区间 → <code>for (x in 集合)</code>、<code>for (i in a..b by s)</code></li>
         <li>其他一切 → <code>loop (条件)</code></li>
     </ul>
     <p>QOT <strong>没有 C 风格的三段式 <code>for(init; cond; step)</code></strong>，也没有 <code>while</code> 和 <code>do-while</code> 关键字。要手动控制步长，用 <code>loop</code>：</p>
@@ -1143,38 +1171,45 @@ funcA();  // 输出 "A" 和 "B"</code></pre>
     <pre><code class="code-highlight">// a.qot
 require "b.qot";  // 错误：循环依赖 a -> b -> a</code></pre>
 
-    <h3>11.4 动态库模块 (.dll)</h3>
-    <h4>基本用法</h4>
-    <pre><code class="code-highlight">require "user32.dll";
-var result = user32##MessageBoxA(0, "Hello", "Title", 0);</code></pre>
+    <h3>11.4 原生扩展（动态库与原生插件）</h3>
+    <p>QOT 有两条与原生代码交互的路径：<strong>通用 FFI</strong>（直接调 C 符号）与<strong>原生插件 ABI</strong>
+        （结构化插件协议）。两条路径在解释器与原生程序上行为一致。</p>
 
-    <h4>调用语法</h4>
-    <p>与脚本模块不同，DLL 模块必须使用 <code>模块名##函数名</code> 语法调用：</p>
-    <pre><code class="code-highlight">require "miaudio.dll";
-var player = miaudio##MusicPlayer_Create();
-miaudio##MusicPlayer_Play(player);</code></pre>
+    <h4>通用 FFI：直接调用 C 函数</h4>
+    <pre><code class="code-highlight">var lib = ffi_load("user32.dll");       // 加载动态库 → 句柄（失败 null）
+var sym = ffi_sym(lib, "MessageBoxA");   // 取符号 → 句柄（失败 null）
+ffi_call(sym, 0, 0.0, 0.0, 0.0, 0.0);   // 调用（最多 8 个参数）</code></pre>
+    <table cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%; margin: 1rem 0;">
+        <thead style="background-color: #f0f0f0;">
+            <tr><th>函数</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>ffi_load(path)</code></td><td>加载动态库，返回句柄；失败返回 <code>null</code>，错误文本用 <code>ffi_last_error()</code> 取</td></tr>
+            <tr><td><code>ffi_sym(lib, name)</code></td><td>取符号地址；库句柄无效或符号缺失返回 <code>null</code></td></tr>
+            <tr><td><code>ffi_call(sym, ...)</code></td><td>推断调用：参数与返回值均按 <code>f64</code> 传递（libm 一类的 C 数学函数）</td></tr>
+            <tr><td><code>ffi_call_v(sym, types, ...)</code></td><td>显式类型调用：<code>types[0]</code> 是返回码，其余是实参码；码值：<code>void / i32 / i64 / f64 / str / ptr</code></td></tr>
+            <tr><td><code>ffi_str(ptr)</code></td><td>读取指针处的 C 字符串（有界 1MB）</td></tr>
+            <tr><td><code>ffi_ptr(x)</code></td><td>字符串 → NUL 结尾副本地址（进程生命周期持有）；数字 → 原样地址</td></tr>
+            <tr><td><code>ffi_free(lib)</code></td><td>卸载动态库（其符号句柄一并失效）</td></tr>
+            <tr><td><code>ffi_last_error()</code></td><td>上一次 FFI 错误的文本</td></tr>
+            <tr><td><code>ffi_abi_version()</code></td><td>FFI / 插件 ABI 版本号</td></tr>
+        </tbody>
+    </table>
 
-    <h4>导出表要求</h4>
-    <p>DLL 模块需要附带 <code>export.func</code> 文件，格式为每行一条函数定义：</p>
-    <pre><code class="code-highlight">函数名|参数类型列表|返回类型</code></pre>
-    <p><strong>示例 export.func：</strong></p>
-    <pre><code class="code-highlight">add|int,int|int
-greet|str|str
-processData|ptr,int|void</code></pre>
-
-    <p><strong>支持的类型：</strong></p>
-    <ul>
-        <li><code>int</code> - 整数</li>
-        <li><code>str</code> - 字符串（UTF-8）</li>
-        <li><code>bool</code> - 布尔值</li>
-        <li><code>ptr</code> - 指针（用于输出参数）</li>
-        <li><code>void</code> - 无返回值</li>
-        <li><code>hwnd</code> - 窗口句柄</li>
-        <li><code>handle</code> - 通用句柄</li>
-    </ul>
-
-    <h4>安全验证</h4>
-    <p>DLL 模块加载时会验证 <code>export.func</code> 的数字签名，验证失败则拒绝加载。</p>
+    <h4>原生插件：注册式 ABI</h4>
+    <p>插件是遵循固定 ABI 的动态库：导出 <code>qot_plugin_init</code>，通过 <code>api-&gt;reg</code> 注册函数。
+        QOT 侧用四个内置函数使用它：</p>
+    <pre><code class="code-highlight">var h = plugin_load("my_plugin.dll");     // 装载 → 句柄（失败 null）
+output(plugin_names(h));                 // 注册的函数名数组（注册序）
+var r = plugin_call(h, "add", [2.0, 3.0]);// 调用 → 5.000000
+plugin_free(h);                           // 卸载，其注册一并失效</code></pre>
+    <p>插件里的每个函数只通过 <code>api</code> 访问值（构造、读取、报错、注册），因此同一份插件在解释器与原生程序上行为一致。
+        完整 ABI 定义见仓库的 <code>ot-asset/c/plugin/qot_plugin_abi.h</code> 与 <code>docs/</code>，
+        可运行的示例见 <code>testing/tools/qot_demo_plugin.c</code>。</p>
+    <blockquote style="border-left: 4px solid #999; padding-left: 1rem; color: #555; margin: 1rem 0;">
+        <p>旧的 <code>export.func</code> 描述文件机制（<code>require "x.dll"</code> + <code>x##fn()</code>）属于历史形态，
+            当前推荐使用上面的 <code>ffi_*</code> 与 <code>plugin_*</code> 系列。</p>
+    </blockquote>
 
     <h3>11.5 路径解析规则</h3>
     <p><code>require</code> 按以下顺序查找模块：</p>
@@ -1282,30 +1317,38 @@ output(utf8_bytes);   // 解释器：&lt;&lt;E4 B8 AD E6 96 87&gt;&gt; 这样的
 
     <h3>13.1 用解释器执行（调试用）</h3>
     <pre><code class="code-highlight">qguoat run program.qot</code></pre>
-    <p>直接解释执行 <code>.qot</code> 源文件。启动快，适合改一行看一眼；但执行慢，而且<strong>不支持 <code>vg_*</code> GUI</strong>。</p>
-    <p><code>--console</code> 把脚本输出转到网页运行台 <code>localhost:8000</code>：</p>
+    <p>直接解释执行 <code>.qot</code> 源文件。启动快，适合改一行看一眼；但执行慢。</p>
+    <p><code>--console</code> 把脚本输出转到网页运行台：</p>
     <pre><code class="code-highlight">qguoat run program.qot --console</code></pre>
 
-    <h3 id="qtc">13.2 用字节码 VM 执行（推荐）</h3>
-    <p>分两步：先编译成 <code>.qtc</code>，再运行。</p>
-    <pre><code class="code-highlight">qguoat bstrust compile program.qot program.qtc
-qguoat bstrust run program.qtc</code></pre>
-    <p>可选参数：</p>
+    <h3 id="aot">13.2 编译为原生可执行文件（推荐）</h3>
+    <p>一条命令走完：<code>.qot</code> → 中间表示 → C 源码 → 原生程序（后端 A：LIR → C → g++ / MSVC）。</p>
+    <pre><code class="code-highlight">qguoat aot program.qot program.exe</code></pre>
+    <p>常用参数：</p>
     <table cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%; margin: 1rem 0;">
         <thead style="background-color: #f0f0f0;">
-            <tr><th>参数</th><th>用在</th><th>说明</th></tr>
+            <tr><th>参数</th><th>说明</th></tr>
         </thead>
         <tbody>
-            <tr><td><code>--opt</code></td><td>compile</td><td>开启 AST 层优化（常量折叠等），详见 18.4</td></tr>
-            <tr><td><code>--inline 0|1</code></td><td>compile</td><td><strong>默认 0（关）</strong>。引用了 <code>.qot</code> 脚本模块时<strong>必须显式写 <code>--inline 1</code></strong>，否则运行时报错码 193，见 <a href="#inline">§11.6</a></td></tr>
-            <tr><td><code>--debug</code> / <code>-d</code></td><td>run</td><td>打印 VM 调试信息</td></tr>
+            <tr><td><code>--opt</code></td><td>开启 AST 层优化（常量折叠等）</td></tr>
+            <tr><td><code>--keep-c</code></td><td>保留生成的 C 源码，便于排查</td></tr>
+            <tr><td><code>--emit-c &lt;file.cpp&gt;</code></td><td>把 C 源码写到指定文件</td></tr>
+            <tr><td><code>--split-tu</code></td><td>按模块切分编译单元，增量编译</td></tr>
+            <tr><td><code>--cache-stats</code> / <code>--explain</code></td><td>打印各层缓存命中率 / 本次命中详情</td></tr>
+            <tr><td><code>--determinism</code></td><td>确定性自测：同输入连编两次比对产物哈希</td></tr>
+            <tr><td><code>--no-static</code></td><td>动态链接（默认静态链接，产物无运行时依赖）</td></tr>
+            <tr><td><code>--unsafe-index</code></td><td>移除下标边界检查（越界 = 未定义行为，默认关闭）</td></tr>
+            <tr><td><code>-j N</code> / <code>--jobs N</code></td><td>并行度（默认 min(4, CPU 核数)）</td></tr>
         </tbody>
     </table>
-    <p><strong>编译失败时不会生成 <code>.qtc</code>，退出码为 1。</strong>看到「编译成功」才说明整个文件都被正确解析了。</p>
+    <p>编译失败不会产出可执行文件，退出码为 1。</p>
 
-    <h3>13.3 编译为 EXE</h3>
-    <pre><code class="code-highlight">qguoat build program.qot</code></pre>
-    <p>详见第 17 章。</p>
+    <h3>13.3 用字节码 VM 执行（历史产物）</h3>
+    <p>早期的字节码虚拟机已经<strong>冻结弃管</strong>，只用于处理历史产物：</p>
+    <pre><code class="code-highlight">qguoat bstrust compile program.qot program.qtc
+qguoat bstrust run program.qtc</code></pre>
+    <p>新项目请直接用 <code>aot</code>；<code>bstrust compile</code> 支持 <code>--opt</code>（AST 层优化）与
+        <code>--inline 0|1</code>（脚本模块内联；引用 <code>.qot</code> 模块时必须为 1，详见 <a href="#inline">§11.6</a>）。</p>
 
     <h3>13.4 QBC 字节码</h3>
     <p>用 <code>distrust</code> 命令把源码编译成不可直接阅读的 QBC 字节码：</p>
@@ -2305,24 +2348,25 @@ output(x);</code></pre>
     <p>另外，用 <code>--inline 1</code> 引入 <code>.qot</code> 模块时会出现「变量 'XXX' 未定义」的<strong>误报</strong>警告，那个可以放心忽略，原因见 <a href="#inline">§11.3</a>。</p>
 
     <h3>20.5 错误处理最佳实践</h3>
-
-    <p>QOT 没有 <code>try/catch</code>，也没有异常。<strong>错误处理在这门语言里就是「自己先判一下」</strong>——尤其是在 VM 上，没人替你判。</p>
-
+    <p>QOT 有 <code>try / catch / throw</code>（见 <a href="#">第 23 章</a>），但它<strong>只捕获显式的 <code>throw</code></strong>——
+        越界、除零这类问题是既定定价，不会被 catch 接住。错误处理的主体仍然是「自己先判一下」。</p>
     <ul>
-        <li><strong>调试用解释器，上线用 VM</strong>：<code>qguoat run</code> 会把越界、除零、改常量、重复定义当场炸出来；确认干净了再 <code>bstrust compile</code>。这是本节最有用的一条。</li>
-        <li><strong>编译期警告一条都别放过</strong>：VM 运行期不报错，那几行警告就是你唯一的防线</li>
+        <li><strong>调试用解释器，上线用原生程序</strong>：<code>qguoat run</code> 会把越界、除零、改常量当场炸出来；
+            确认干净了再 <code>qguoat aot</code>。这是本节最有用的一条。</li>
+        <li><strong>编译期警告一条都别放过</strong>：原生程序运行期不报错，那几行警告就是你唯一的防线。</li>
         <li><strong>下标先判范围</strong>：<code>if (i &gt;= 0 &amp;&amp; i &lt; glen(arr))</code></li>
-        <li><strong>除数先判零</strong>：VM 上 <code>x / 0</code> 得到 0，不会报错，错误会一路传下去</li>
-        <li><strong>取值先判 null</strong>：字典缺键、数组越界、未定义变量在 VM 上一律给 <code>null</code>，拿到就先 <code>if (v == null)</code></li>
-        <li><strong>类型转换写显式的</strong>：别依赖 <code>"123" + 5</code> 这种隐式行为，拼接写 <code>strings()</code>，算术写 <code>numbers()</code></li>
-        <li><strong>始终以分号结尾</strong>：语法错误是唯一两个运行时都会硬拦下来的错误，改起来最省事</li>
-        <li><strong>函数名唯一</strong>：VM 上重名不报错，只是后面的悄悄覆盖前面的</li>
-        <li><strong>写 <code>.qot</code> 模块记得 <code>--inline 1</code></strong>：漏了会在运行期报 193，跟代码本身没关系</li>
+        <li><strong>除数先判零</strong>：原生程序上 <code>x / 0</code> 得到 0，不会报错，错误会一路传下去。</li>
+        <li><strong>取值先判 null</strong>：字典缺键、数组越界在原生程序上一律给 <code>null</code>，拿到就先 <code>if (v == null)</code>。</li>
+        <li><strong>类型转换写显式的</strong>：别依赖 <code>"123" + 5</code> 这种隐式行为，转换用
+            <code>to_num()</code> / <code>str()</code> 之类明确函数。</li>
+        <li><strong>始终以分号结尾</strong>：语法错误是唯一两条路径都会硬拦下来的错误。</li>
+        <li><strong>要跨层传错误就 throw</strong>：配合 <code>catch</code> 使用；未捕获的 throw 是确定性致命
+            （<code>[2001]</code>，退出码 124）。</li>
     </ul>
-
-    <blockquote>
-        <p><strong>关于本语言的错误哲学：</strong>QOT 的取向是<strong>性能优先，安全交给使用者</strong>。VM 里没有边界检查、没有除零检查、没有常量保护，因为这些检查每条指令都要花时间。这是一个明确的、故意的取舍——它把速度给你，同时把「保证输入正确」的责任也交给你。<strong>用得好，你拿到的是接近原生的执行速度；用得糙，错误会安静地传播很远才显形。</strong>这不是缺陷，是这门语言的定价方式，请按它的规则写代码。</p>
-    </blockquote>
+    <p><strong>关于本语言的错误哲学</strong>：QOT 的取向是性能优先，安全交给使用者。原生程序里没有边界检查、
+        没有除零检查、没有常量保护，因为这些检查每条指令都要花时间。这是一个明确的、故意的取舍——
+        它把速度给你，同时把「保证输入正确」的责任也交给你。用得好，你拿到的是接近原生的执行速度；
+        用得糙，错误会安静地传播很远才显形。这不是缺陷，是这门语言的定价方式，请按它的规则写代码。</p>
 
     <h3>20.6 注解关闭警告</h3>
 
@@ -2335,52 +2379,36 @@ output(x);</code></pre>
     <blockquote>
         <p><strong>提示：</strong> 错误信息中的行号指向源代码中出错的位置，请根据提示行号检查对应代码。如果遇到无法理解的错误，请检查语法是否正确，或参考本文档其他章节。</p>
     </blockquote>
-    <h2 id="runtime-diff">21. 两个运行时的差异对照</h2>
-
-    <p>QOT 有<strong>两套互相独立的执行引擎</strong>，同一份 <code>.qot</code> 源码在它们上面跑，结果可能不一样。这一章把所有已知差异集中列出来——<strong>如果你只读本文档的一章，就读这一章。</strong></p>
-
-    <table>
-        <thead>
-            <tr><th></th><th>解释器</th><th>字节码 VM</th></tr>
-        </thead>
-        <tbody>
-            <tr><td><strong>启动方式</strong></td><td><code>qguoat run x.qot</code><br><code>qguoat run x.qbc</code></td><td><code>qguoat bstrust compile x.qot x.qtc</code><br><code>qguoat bstrust run x.qtc</code></td></tr>
-            <tr><td><strong>实现</strong></td><td>Python，遍历 AST 执行</td><td>C++（<code>qotrun.dll</code>），执行字节码</td></tr>
-            <tr><td><strong>速度</strong></td><td>慢</td><td><strong>快得多</strong></td></tr>
-            <tr><td><strong>定位</strong></td><td>开发调试</td><td>生产运行</td></tr>
-        </tbody>
-    </table>
+    <h2 id="runtime-diff">21. 解释器与原生程序的差异对照</h2>
+    <p>同一份源码，解释器与原生程序的行为并不完全一致。下面是<strong>实测</strong>结论。</p>
 
     <h3>21.1 出错行为：最重要的差异</h3>
-    <p>一句话概括：<strong>解释器会拦你，VM 不会。</strong></p>
+    <p>一句话概括：<strong>解释器会拦你，原生程序不会</strong>。</p>
     <table>
         <thead>
-            <tr><th>情况</th><th>解释器</th><th>VM</th></tr>
+            <tr><th>情况</th><th>解释器</th><th>原生程序</th></tr>
         </thead>
         <tbody>
-            <tr><td>读未定义变量</td><td>错误 2001，退出</td><td><code>null</code>，继续</td></tr>
-            <tr><td>数组越界读</td><td>错误 2003，退出</td><td><code>null</code>，继续</td></tr>
-            <tr><td>数组越界写</td><td>错误，退出</td><td>静默丢弃，继续</td></tr>
-            <tr><td>除以零</td><td>错误 2004，退出</td><td>得到 <code>0</code>，继续</td></tr>
-            <tr><td>修改 <code>const</code></td><td>错误 2006，退出</td><td><strong>改成功</strong>，继续</td></tr>
-            <tr><td>函数重复定义</td><td>错误 2014，退出</td><td>后者覆盖前者，继续</td></tr>
-            <tr><td>语法错误</td><td colspan="2" style="text-align:center">两边都编译失败，不产出 <code>.qtc</code></td></tr>
+            <tr><td>读未定义变量</td><td>编译期语义告警 <code>[2000]</code>，不产出</td><td>得到 <code>&lt;none&gt;</code>，继续</td></tr>
+            <tr><td>数组越界读</td><td>错误 <code>[2003]</code>，退出</td><td><code>null</code>，继续</td></tr>
+            <tr><td>数组越界写</td><td>错误 <code>[2003]</code>，退出</td><td>静默丢弃，继续</td></tr>
+            <tr><td>除以零</td><td>错误 <code>[2004]</code>，退出</td><td>得到 <code>0</code>，继续</td></tr>
+            <tr><td>修改 <code>const</code></td><td>运行期错误 <code>[2006]</code>，退出</td><td>不保证拦截</td></tr>
+            <tr><td>语法错误 / 未定义函数</td><td colspan="2" style="text-align:center">两边都是<strong>编译期失败</strong>，不产出可执行文件</td></tr>
         </tbody>
     </table>
-    <p>这不是 VM 的 bug，是它的定价方式：<strong>省下每条指令上的检查，换取速度</strong>。完整说明见第 20.3 节。</p>
+    <p>这不是缺陷，是定价方式：<strong>原生程序省下每条指令上的检查，换取速度</strong>。完整错误码见第 20 章。</p>
 
     <h3>21.2 语义差异</h3>
     <table>
         <thead>
-            <tr><th>特性</th><th>解释器</th><th>VM</th></tr>
+            <tr><th>特性</th><th>解释器</th><th>原生程序</th></tr>
         </thead>
         <tbody>
             <tr><td><strong>函数内给全局变量赋值</strong></td><td>改动<strong>丢弃</strong>，函数外看不到</td><td>改动<strong>生效</strong>，函数外看得到</td></tr>
-            <tr><td><strong><code>const</code> 保护</strong></td><td>运行期强制</td><td><strong>完全不强制</strong></td></tr>
-            <tr><td><strong>数字打印格式</strong></td><td><code>3</code></td><td><code>3.000000</code>（一律六位小数）</td></tr>
-            <tr><td><strong><code>U"..."</code> / <code>L"..."</code></strong></td><td>字节序列 / 宽字符串</td><td>都是 <code>null</code>，值直接丢失</td></tr>
-            <tr><td><strong><code>require "x.qot"</code></strong></td><td>直接可用</td><td>编译时<strong>必须</strong>加 <code>--inline 1</code>，否则报错码 193</td></tr>
-            <tr><td><strong>GUI</strong></td><td><code>window_*</code> 一套（旧）</td><td><code>vg_*</code> 一套（<a href="#gui">第 22 章</a>）</td></tr>
+            <tr><td><strong>数字打印格式</strong></td><td><code>3</code> / <code>3.5</code></td><td><code>3.000000</code> / <code>3.500000</code>（一律六位小数）</td></tr>
+            <tr><td><strong>字符串拼接数字</strong></td><td colspan="2" style="text-align:center">一致（<code>"n=" + 3</code> → <code>n=3</code>）</td></tr>
+            <tr><td><strong>图形界面</strong></td><td>可用（<code>window_*</code> / <code>vg_*</code>）</td><td>不可用（GUI 函数在原生后端缺席）</td></tr>
         </tbody>
     </table>
 
@@ -2393,68 +2421,128 @@ any_t func touch() {
 }
 
 touch();
-output(g);           // 解释器: 10　　VM: 15</code></pre>
+output(g);           // 解释器: 10　　原生程序: 15</code></pre>
         <p style="margin:0.5rem 0 0 0"><strong>不要依赖任何一边的行为。</strong>要改全局就 <code>return</code> 出来再赋值，要局部就老老实实写 <code>var</code>：</p>
         <pre style="margin:0.5rem 0 0 0"><code class="code-highlight">number_t func compute() {
     return 15;
 }
-g = compute();       // 两个运行时结果一致</code></pre>
+g = compute();       // 两边结果一致</code></pre>
     </div>
 
     <h3>21.3 内置函数差异</h3>
-    <p>两套运行时的内置函数表是<strong>各自独立维护</strong>的，并不完全重合。</p>
-
-    <h4>两边都有（38 个，放心用）</h4>
-    <pre><code class="code-highlight">ScExec  ScLoad  ScSweep  cinget  cmd_exec  dict_get  dict_keys  dict_set
-fclose  fnew  fopen  fread  fsize  fwrite  get  get_env  glen  gtypes
-http_send  json_decode  json_encode  output  pop  pow  push  rand  remove
-round  set_env  sleep  sqrt  strcase  strings  strrep  tnow  tstamp
-unlink  unset_env</code></pre>
-    <p>（另有 <code>__is_number</code>、<code>__iter_len</code> 两个是 <code>for</code> 脱糖用的内部函数，两边都有，但<strong>不要直接调用</strong>。）</p>
-
-    <h4>只有 VM 有（7 个）</h4>
-    <pre><code class="code-highlight">numbers  type
-http_clear_headers  http_get_headers  http_set_header
-http_set_user_agent  http_set_verify_ssl</code></pre>
-    <p>加上 <a href="#gui">第 22 章</a> 的 62 个 <code>vg_*</code> GUI 函数。解释器里也注册了同名的 <code>vg_*</code>，但全都是<strong>报错桩</strong>，调了只会抛出 <code>GUI 函数 vg_init() 只在编译执行下可用</code>。</p>
-
-    <h4>只有解释器有（33 个）</h4>
-    <pre><code class="code-highlight">batch_push  beair  bools  entry_get  floats  getpath  ints
-json_pretty  json_valid  lists  max  min  parts  prog_end  sum
-utf8_dec  utf8_enc
-webloc_init  webloc_run  webloc_sbp
-window_bind  window_bind_get  window_button  window_config  window_entry
-window_label  window_loop  window_msg_info  window_new  window_place
-window_size  window_title  window_visible</code></pre>
-    <p>⚠ <strong>用了这些函数，你的程序就编译不成能跑的 <code>.qtc</code> 了。</strong> 尤其注意几个常用的：</p>
-    <ul>
-        <li><code>max</code> / <code>min</code> / <code>sum</code> —— VM 上没有，得自己写循环</li>
-        <li><code>ints</code> / <code>floats</code> / <code>bools</code> / <code>lists</code> —— VM 上只有一个 <code>numbers</code></li>
-        <li><code>utf8_enc</code> / <code>utf8_dec</code> —— VM 上没有</li>
-        <li><code>window_*</code> 这一整套旧 GUI —— VM 上请改用 <code>vg_*</code></li>
-    </ul>
+    <p>内置函数面以仓库的 <code>builtins.toml</code> 为唯一真相源，两侧可用性逐条标注，完整清单见
+        <a href="function_inside.html">内置函数参考</a>。</p>
+    <table>
+        <thead>
+            <tr><th>集合</th><th>数量</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>解释器 + 原生程序都有</td><td>269</td><td>放心用</td></tr>
+            <tr><td>仅解释器</td><td>121</td><td>写进原生程序会在编译期报错；GUI、ShellCode、部分网络与系统调用属于这一类</td></tr>
+            <tr><td>仅原生程序</td><td>3</td><td>原生后端专有</td></tr>
+            <tr><td>仅旧字节码 VM</td><td>5</td><td>属于冻结的历史面，两条活跃路径都不可用</td></tr>
+        </tbody>
+    </table>
+    <p>另有 6 个兼容别名（<code>float</code> / <code>input</code> / <code>int</code> / <code>len</code> /
+        <code>replace</code> / <code>str</code>）指向各自的新名，可用性一致。</p>
 
     <h3>21.4 该怎么选</h3>
-    <p>推荐的工作方式是<strong>两个都用</strong>：</p>
-    <ol>
-        <li><strong>写代码时用解释器</strong>（<code>qguoat run</code>）。它会把越界、除零、改常量、拼错变量名当场炸出来，省你半天时间。</li>
-        <li><strong>发布前编译成 <code>.qtc</code></strong>（<code>bstrust compile ... --opt</code>）用 VM 跑，拿性能。</li>
-        <li><strong>只用两边都有的那 38 个内置函数</strong>，这样两个阶段跑的是同一份代码。</li>
-    </ol>
-    <p>如果你的程序一开始就注定只在 VM 上跑（比如用了 GUI），那就直接按 VM 的规矩写：<strong>自己判边界、自己判零、自己判 null</strong>。</p>
+    <table>
+        <thead>
+            <tr><th>场景</th><th>建议</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>写业务逻辑、跑脚本</td><td>解释器迭代快，验证通过再编译</td></tr>
+            <tr><td>交付给别人、要性能</td><td><code>aot</code> 编译成原生程序</td></tr>
+            <tr><td>需要图形界面</td><td>用解释器运行（GUI 只在解释器侧可用）</td></tr>
+            <tr><td>需要浏览器控制台输出</td><td><code>run --console</code></td></tr>
+        </tbody>
+    </table>
+    <p><strong>建议的写法</strong>：先用解释器把逻辑跑通，再编译成原生程序验收一次。两条路径的<strong>语法</strong>完全一致，
+        差异集中在错误处理与数字输出格式（见上表）。</p>
 
-    <h2 id="gui">22. 图形界面（vg_*）</h2>
+    <h2 id="gui">22. 图形界面</h2>
 
-    <div style="border-left:4px solid #e74c3c;background:#fdf2f0;padding:0.8rem 1rem;margin:1rem 0;">
-        <p style="margin:0"><strong><code>vg_*</code> 只能在字节码 VM 上运行。</strong></p>
-        <pre style="margin:0.5rem 0 0 0"><code class="code-highlight">qguoat bstrust compile app.qot app.qtc
-qguoat bstrust run app.qtc</code></pre>
-        <p style="margin:0.5rem 0 0 0">用 <code>qguoat run</code>（解释器）跑会得到
-        <code>GUI 函数 vg_init() 只在编译执行下可用</code> 这句报错——解释器里注册的只是一批占位存根。
-        解释器自己那套 GUI 是完全不同的 <code>window_*</code> 系列函数，两者<strong>不能混用</strong>。</p>
+    <div style="border-left:4px solid #f59e0b;background:#fffbeb;padding:0.9rem 1.1rem;margin:1rem 0;">
+        <p style="margin:0 0 .5rem 0"><strong>QOT 的官方图形界面是 <code>vg_*</code> 系列（约 70 个函数，Direct2D 渲染），解释器与原生程序双实现</strong>
+            ——同一份 C++ 源（<code>ot-asset/c/wingui</code>），解释器经 <code>build/qotgui.dll</code> 驱动，原生程序编译期直接链接。
+            控件覆盖：窗口、标签、按钮、复选框、开关、输入框、滑块、进度条、卡片、下拉、列表、选项卡、加载指示。</p>
+        <table style="width:100%;border-collapse:collapse;margin:0;">
+            <thead><tr><th>API</th><th>函数数</th><th>可用环境</th><th>说明</th></tr></thead>
+            <tbody>
+                <tr><td><code>vg_*</code></td><td>约 70</td><td><strong>解释器 + 原生程序</strong></td><td>官方 GUI（wingui / Direct2D），事件模型 = 轮询（见 22.1）</td></tr>
+                <tr><td><code>window_*</code></td><td>14</td><td>解释器</td><td>基于 Tk 的轻量窗口，适合极简脚本</td></tr>
+            </tbody>
+        </table>
+        <p style="margin:.5rem 0 0 0">完整可运行示例：<code>testing/gui/hello_gui.qot</code>（输入名字 → 点「打招呼」→ 显示问候，
+            源码头部带 tkinter 对照表）。构建 DLL：<code>python ot-asset/c/wingui/build_qotgui.py</code>。</p>
     </div>
 
-    <h3>22.1 最小可运行程序</h3>
+    <h3>22.1 事件模型：轮询（vg_wait_event / vg_poll_event）</h3>
+    <pre><code class="code-highlight">var w = vg_create_window("演示", 520, 340);
+var btn = vg_create_button(w, "打招呼", 40, 100, 160, 42);
+vg_show_window(w);
+
+var running = 1;
+loop (running == 1) {
+    var ev = vg_wait_event(15);          // 泵消息；空闲近零 CPU
+    if (ev == null) { continue; }        // 超时无事件，下一轮
+    var id = ev[0];
+    var kind = ev[1];                    // 1 点击 / 2 改变 / 3 选中 / 9 窗口已关闭
+    if (kind == 1 && id == btn) {
+        output("按钮被点了");
+    }
+    if (kind == 9) { running = 0; }      // 窗口被 X 掉
+}</code></pre>
+    <p><strong>为什么不做成 command=函数 那样的回调</strong>：C 实现层无法反向调用各引擎的函数值，
+        轮询让解释器与原生程序天然同语义（事件延迟 ≤1ms，空闲 CPU 近零）。</p>
+
+    <h3>22.2 window_*（解释器可用，轻量替代）</h3>
+    <table cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%; margin: 1rem 0;">
+        <thead style="background-color: #f0f0f0;">
+            <tr><th>函数</th><th>作用</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>window_new(title)</code></td><td>创建窗口，返回窗口句柄</td></tr>
+            <tr><td><code>window_title(win, title)</code></td><td>设置窗口标题</td></tr>
+            <tr><td><code>window_size(win, w, h)</code></td><td>设置窗口尺寸</td></tr>
+            <tr><td><code>window_button(win, text, command)</code></td><td>放置一个按钮，<code>command</code> 是回调函数名</td></tr>
+            <tr><td><code>window_label(win, text)</code></td><td>放置一个标签</td></tr>
+            <tr><td><code>window_entry(win, variable)</code></td><td>放置一个输入框，值写入指定变量名</td></tr>
+            <tr><td><code>window_place(win, x, y, w, h)</code></td><td>用绝对坐标摆放控件</td></tr>
+            <tr><td><code>window_bind(win, event, handler)</code></td><td>绑定事件（点击、按键等）到回调</td></tr>
+            <tr><td><code>window_bind_get(win, event)</code></td><td>读取事件绑定的当前回调</td></tr>
+            <tr><td><code>entry_get(win, index)</code></td><td>读输入框内容</td></tr>
+            <tr><td><code>window_config(win, ...)</code></td><td>配置窗口属性</td></tr>
+            <tr><td><code>window_visible(win, visible)</code></td><td>显示 / 隐藏窗口</td></tr>
+            <tr><td><code>window_msg_info(win, text)</code></td><td>弹出信息框</td></tr>
+            <tr><td><code>window_loop(win)</code></td><td>进入事件循环（窗口关闭后返回）</td></tr>
+        </tbody>
+    </table>
+    <pre><code class="code-highlight">var counter = 0;
+
+any_t func on_click() {
+    counter = counter + 1;
+    output("点击次数: " + counter);
+}
+
+var win = window_new("QOT 窗口");
+window_size(win, 420, 240);
+window_label(win, "点下面的按钮");
+window_button(win, "点我", "on_click");
+window_loop(win);</code></pre>
+    <p><strong>注意</strong>：GUI 函数<strong>只在解释器侧可用</strong>，编译成原生程序会在编译期报「该内置在原生后端缺席」。
+        事件回调里要改的变量请声明在<strong>顶层</strong>（解释器里函数内写全局变量不生效，见 <a href="#runtime-diff">§21.2</a>）。</p>
+
+    <h3>22.3 附录：vg_* 详细参考（旧版手册，部分形态已过时）</h3>
+
+    <div style="border-left:4px solid #e74c3c;background:#fdf2f0;padding:0.8rem 1rem;margin:1rem 0;">
+        <p style="margin:0"><strong>过时之处</strong>：事件模型已改为轮询（<code>vg_wait_event</code> /
+        <code>vg_poll_event</code>，见 22.1），旧 <code>*_on_*</code> 回调注册函数已移除；实现也不再依赖旧字节码 VM
+        （现为 wingui，双引擎同源）。创建、属性、取值等函数形态仍然适用，可作速查。</p>
+    </div>
+
+    <h3>22.4 最小可运行程序（旧版形态）</h3>
     <pre><code class="code-highlight">any_t func onClick() {
     output("按钮被点了");
 }
@@ -2506,7 +2594,7 @@ vg_set_window_bg_gradient(c1, c2);</code></pre>
     <strong>一律当成不透明黑 [0,0,0,1]</strong>，不报错也不警告。数组不足 4 个元素时，缺的 r/g/b 补 0、
     缺的 a 补 1，所以 <code>[1, 0, 0]</code> 就是不透明纯红。</p>
 
-    <h3 id="gui-event">22.2 事件绑定：四种写法</h3>
+    <h3 id="gui-event">22.5 附录 A：旧版事件绑定（*_on_* 已移除，历史参考）</h3>
     <p>所有 <code>*_on_*</code> 函数的回调参数都支持下面四种写法，前三种可以混用。</p>
 
     <h4>写法一：直接给函数名（最常用）</h4>
@@ -2569,7 +2657,7 @@ vg_combobox_on_selected(cb, pick);
         <p style="margin:0.5rem 0 0 0"><strong>形参个数请照着上表写全</strong>，不要指望「少写几个就只收前几个」。</p>
     </div>
 
-    <h3>22.3 函数总表（62 个）</h3>
+    <h3>22.6 附录 B：函数总表（旧版 62 个形态；现行清单见内置函数参考 GUI 组）</h3>
 
     <h4>生命周期与窗口</h4>
     <table>
@@ -2691,7 +2779,7 @@ vg_combobox_on_selected(cb, pick);
     </table>
     <p>⚠ <code>vg_tabcontrol</code> <strong>没有</strong>切换事件回调，也没有 <code>get_selected</code>。</p>
 
-    <h3>22.4 一个完整例子</h3>
+    <h3>22.7 附录 C：一个完整例子（旧版形态，事件部分需按 22.1 改写）</h3>
     <pre><code class="code-highlight">var win;
 var txt;
 
@@ -2734,28 +2822,185 @@ vg_show_window();
 vg_run();
 vg_uninit();</code></pre>
 
-    <h3>22.5 注意事项</h3>
+    <h3>22.8 附录 D：注意事项（旧版要点，现行实现基本沿用）</h3>
     <ul>
         <li><strong>返回值是 ID 字符串</strong>，不是对象；<code>vg_*</code> 函数失败时<strong>只返回 <code>false</code>，不报错</strong>，控件没反应先查 ID 传对没有</li>
         <li><strong>窗口类函数不收窗口 ID</strong>（<code>vg_show_window</code> / <code>vg_close_window</code> / <code>vg_set_window_*</code>），多传一个 <code>win</code> 会把真参数挤掉</li>
         <li><strong><code>vg_destroy(id)</code> 并不会让控件从窗口上消失</strong>，它只是把 ID 从对象表里摘掉（C++ 里的释放分支是空的）；要隐藏请用 <code>vg_set_visible(id, false)</code></li>
         <li><strong>颜色只认 <code>[r,g,b,a]</code> 数组、取值 0–1</strong>；传字符串或十六进制一律变成不透明黑，还不报错</li>
         <li><strong><code>vg_run()</code> 之后的代码要等窗口关掉才执行</strong>；所有 UI 搭建必须写在它前面</li>
-        <li><strong>回调里被 GUI 用到的变量请声明成全局</strong>（顶层 <code>var</code>）。VM 上函数内可以写全局变量，这一点和解释器不同，见 <a href="#runtime-diff">§21.2</a></li>
+        <li><strong>回调里被 GUI 用到的变量请声明成全局</strong>（顶层 <code>var</code>）。解释器里函数内写全局变量不生效，见 <a href="#runtime-diff">§21.2</a></li>
         <li><strong>回调形参个数照 §22.2 的表写全</strong>，多余实参从前面丢，写少了拿到的是后面的参数</li>
         <li><strong>没有 <code>vg_create_label</code></strong>；要显示静态文字，可以用禁用的按钮或卡片标题代替</li>
         <li><strong>坐标是绝对像素</strong>，没有自动布局，窗口缩放不会跟着变</li>
-        <li><strong>只能在 VM 上跑</strong>，别忘了 <code>bstrust compile</code></li>
+        <li><strong>现行实现 = wingui（双引擎同源）</strong>；旧字节码 VM 里的那份已随弃管作废，本节条目以现行 wingui 行为为准</li>
     </ul>
 
+    <h2>23. 闭包与异常</h2>
+    <p>闭包与异常在解释器与原生程序上都是<strong>双实现</strong>：同一份源码，两边行为逐位一致。</p>
+
+    <h3>23.1 闭包</h3>
+    <p>函数体内可以再声明函数，它就是<strong>词法作用域的闭包值</strong>，可以赋值、传递、返回：</p>
+    <pre><code class="code-highlight">number_t func make_counter() {
+    var n = 0;
+    number_t func step() {
+        n = n + 1;      // 捕获外层的 n（按引用）
+        return n;
+    }
+    return step;
+}
+var c1 = make_counter();
+var c2 = make_counter();
+output(c1());   // 1
+output(c1());   // 2
+output(c2());   // 1   ← 独立实例</code></pre>
+    <p><strong>lambda 字面量</strong>（单表达式语法糖）：</p>
+    <pre><code class="code-highlight">var add = func(a, b) -> a + b;
+number_t func make_adder(k) {
+    return func(x) -> x + k;    // 捕获形参 k
+}</code></pre>
+    <p>语义要点：</p>
+    <ul>
+        <li><strong>按引用捕获</strong>：闭包记住的是变量本身，不是创建时的值快照；外层后续写入对闭包可见。</li>
+        <li><strong>循环捕获</strong>：捕获的是循环变量这个「槽」，循环结束后读到的是最后一次写入；
+            需要每次迭代的值，就在循环体内先 <code>var x = 循环变量;</code>。</li>
+        <li><strong>递归闭包</strong>：闭包体内按名字调用自己即递归。</li>
+        <li>顶层函数声明保持普通全局函数语义；只有<strong>嵌套</strong>函数与 lambda 是闭包。</li>
+    </ul>
+
+    <h3>23.2 try / catch / throw</h3>
+    <pre><code class="code-highlight">try {
+    throw "boom";
+} catch (e) {
+    output(e);          // boom
+}</code></pre>
+    <ul>
+        <li><code>throw &lt;表达式&gt;;</code> 可以抛任何值（字符串、数字、数组、错误对象……）。</li>
+        <li><code>catch (e)</code> 把被抛值绑定到 <code>e</code>；<code>catch { ... }</code> 表示不绑定。</li>
+        <li><strong>catch 只捕获 <code>throw</code></strong>。越界、除零等仍按各环境的既定定价处理（见 <a href="#runtime-diff">§21.1</a>）；
+            <code>stop</code> 与 <code>return</code> 正常穿透 <code>try</code>。</li>
+        <li><strong>未捕获的 <code>throw</code> 是确定性致命</strong>：stderr 输出 <code>[错误] [2001] 未捕获的 throw: &lt;值&gt;</code>，退出码 124。</li>
+    </ul>
+    <h4>错误对象</h4>
+    <table cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%; margin: 1rem 0;">
+        <thead style="background-color: #f0f0f0;">
+            <tr><th>函数</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>err(payload)</code></td><td>构造错误对象；无参时 payload 为 <code>null</code></td></tr>
+            <tr><td><code>is_err(v)</code></td><td>判断值是否为错误对象</td></tr>
+            <tr><td><code>err_val(e)</code></td><td>解包错误对象的 payload；非错误对象得 <code>null</code></td></tr>
+        </tbody>
+    </table>
+    <p>错误对象不参与值相等（<code>==</code> 恒为假），类型视角为 <code>"error"</code>。</p>
+
+    <h2>24. 类与对象</h2>
+    <p>QOT 的对象模型是最小而完整的：类、字段、方法、构造器。没有继承、没有类层级、没有接口声明——
+        多态与接口由「协议元语 + 组合」在库层解决。</p>
+    <pre><code class="code-highlight">class Point {
+    var x = 0;                    // 字段（声明序 = 布局偏移）
+    var y = 0;
+
+    func init(ax, ay) {           // init = 构造器（可选）
+        this->x = ax;
+        this->y = ay;
+    }
+
+    number_t func dist2() {       // 方法（返回类型可省略 = 隐式 any）
+        return this->x * this->x + this->y * this->y;
+    }
+}
+
+var p = Point(3, 4);
+output(p->x);                    // 3
+p->x = 5;
+output(p->dist2());              // 25</code></pre>
+    <ul>
+        <li>类只能声明在<strong>顶层</strong>；构造顺序 = 字段默认值 → <code>init</code> 体 → 恒返回实例。</li>
+        <li><code>init</code> 内不能 <code>return</code>（编译期致命）。</li>
+        <li>未声明字段读得 <code>null</code>、写被忽略；对象上调用缺席方法得 <code>null</code>。</li>
+        <li>非对象接收者的 <code>x->m(a)</code> 退化为「receiver 前置」的普通调用。</li>
+        <li>两个对象比较 = 引用同一性；<code>gtypes(obj)</code> = <code>"object"</code>。</li>
+    </ul>
+    <p>完整说明（含组合代替继承、保留名规则）见 <a href="objects.html">类与对象</a>。</p>
+
+    <h2>25. 协议元语</h2>
+    <p>类可以用一组固定名字的协议方法接管语言内建运算。类型可知时，编译器在<strong>编译期</strong>把它们改写成普通方法直调——
+        产物里没有运行期查找表，性能与手写代码等价。</p>
+    <table cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%; margin: 1rem 0;">
+        <thead style="background-color: #f0f0f0;">
+            <tr><th>协议方法</th><th>接管什么</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>__add__</code> / <code>__sub__</code> / <code>__mul__</code> / <code>__div__</code> / <code>__mod__</code></td><td>五则运算与复合赋值</td></tr>
+            <tr><td><code>__eq__</code></td><td><code>==</code>（<code>!=</code> 不在协议集内）</td></tr>
+            <tr><td><code>__index_get</code> / <code>__index_set</code></td><td>下标读写</td></tr>
+            <tr><td><code>__for_keys</code> / <code>__iter_len</code></td><td>for-in 的键协议 / 序列协议</td></tr>
+            <tr><td><code>__to_str</code></td><td><code>output(obj)</code> 与字符串拼接</td></tr>
+        </tbody>
+    </table>
+    <pre><code class="code-highlight">class Vec2 {
+    var x = 0;  var y = 0;
+    func init(ax, ay) { this->x = ax; this->y = ay; }
+    func __add__(o) { return Vec2(this->x + o->x, this->y + o->y); }
+    func __to_str() { return "(" + int_to_str(this->x) + "," + int_to_str(this->y) + ")"; }
+}
+output(Vec2(1, 2) + Vec2(10, 20));   // (11,22)</code></pre>
+    <p>类型推断不出来时（函数参数、数组元素等），运算保持运行期既有行为，不做绑定。完整清单与绑定规则见
+        <a href="protocols.html">协议元语</a>。</p>
+
+    <h2>26. 编译期宏</h2>
+    <p>宏在编译期把一段代码改写成另一段代码。写宏的语言就是 QOT：宏体是普通 QOT 函数，形参收到的是实参的
+        <strong>语法树节点</strong>，返回值就是改写产物。</p>
+    <pre><code class="code-highlight">macro twice(x) {
+    return &amp;lt; "kind": "binary_op", "op": "+", "left": x, "right": x &amp;gt;&amp;;
+}
+var n = twice!(21);        // 展开为 21 + 21
+output(n);                 // 42</code></pre>
+    <ul>
+        <li>宏声明只能在顶层；调用写作 <code>名字!(实参…)</code>；<code>!</code> 在表达式前缀位是逻辑非，标识符后是宏调用。</li>
+        <li>返回节点 = 表达式宏；返回数组 = 语句块宏（调用点可带块，块绑定到最后一个形参）。</li>
+        <li>宏体内调用其它宏 = 值语义（实参先求值成节点再展开）。</li>
+        <li>官方宏：<code>swap!(a, b)</code>（真交换两个变量）、<code>unless!(cond) { … }</code>（条件为假时执行块）。</li>
+        <li>展开有上限（深度 64、总步数 1,000,000，可用环境变量调整）；宏<strong>不做卫生处理</strong>，
+            临时名请用 <code>_m_</code> 前缀。</li>
+    </ul>
+    <p>节点字段表、错误契约与完整示例见 <a href="macros.html">编译期宏</a>。</p>
+
+    <h2>27. 标准库</h2>
+    <p>标准库就是 <code>.qot</code> 源码，没有隐藏实现，可以直接打开读、直接改、直接抄进自己的项目。
+        仓库的 <code>std/</code> 目录是它的全部内容。</p>
+    <table cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%; margin: 1rem 0;">
+        <thead style="background-color: #f0f0f0;">
+            <tr><th>模块</th><th>提供</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>std/fs.qot</code></td><td>按行读写文件、目录遍历、通配匹配</td></tr>
+            <tr><td><code>std/text.qot</code></td><td>CSV 解析与生成、列提取、空白归一、按词折行</td></tr>
+            <tr><td><code>std/data.qot</code></td><td>均值 / 中位数 / 总体标准差、按列分组计数与求和</td></tr>
+            <tr><td><code>std/cli.qot</code></td><td>命令行参数解析、用法文本、交互提示</td></tr>
+            <tr><td><code>std/net.qot</code></td><td>URL 解析、HTTP GET / POST、文件下载</td></tr>
+        </tbody>
+    </table>
+    <pre><code class="code-highlight">require "std/text.qot";
+require "std/data.qot";
+
+var rows = csv_parse("city,amount\nbeijing,100\nbeijing,50\n");
+output(group_sum(rows, 0, 1)["beijing"]);   // 150</code></pre>
+    <p>模块引入后其顶层名进入当前程序的名字空间，也可以用 <code>模块名##函数名</code> 显式限定。
+        各函数的完整语义见 <a href="stdlib.html">标准库</a>。</p>
+
     <h2>总结</h2>
-    <p>QOT 语言简洁易学，它结合了现代编程语言的诸多特性，语法清晰直观，适合编程初学者入门学习。通过本文档介绍的基本语法和特性，您可以开始编写简单的 QOT 程序，并逐步探索其更高级的功能。</p>
+    <p>QOT 简洁易学，同时保留了现代语言的关键能力：类与对象、协议化运算、编译期宏、闭包与异常、    标准库与原生扩展。本文档覆盖语言本身；更多示例见 <a href="demos.html">更多例子</a>，    实战写法见 <a href="application.html">实战应用</a>。</p>
     <blockquote>
-        <a href="index.html">回退</a><br>
-        <a href="function_inside.html">内置函数表</a><br>
-        <a href="moudle_inside.html">模块表</a><br>
-        <a href="demos.html">更多例子</a> </br>
-        <a href="logbuildv1.html">V1维护日志</a>
+        <a href="index.html">返回目录</a><br>
+        <a href="function_inside.html">内置函数参考</a><br>
+        <a href="stdlib.html">标准库</a><br>
+        <a href="objects.html">类与对象</a><br>
+        <a href="protocols.html">协议元语</a><br>
+        <a href="macros.html">编译期宏</a><br>
+        <a href="moudle_inside.html">用户模块库</a><br>
+        <a href="demos.html">更多例子</a>
     </blockquote>
 
 </body>

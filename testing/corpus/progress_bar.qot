@@ -1,0 +1,23 @@
+// 语料线 · 23 进度条渲染（百分比 + ASCII 条 + 确定性帧序列）
+// 任务画像：批处理任务的终端反馈。状态：✅ 可运行。
+// 【缺口备注】真实终端的 \r 原地刷新在 stdout_write 通道可用性未定价
+//（golden 体系按行比对）——本样本渲染为逐帧多行（等价信息量）。
+number_t func bar(done, total, width) {
+    var filled = int_div(done * width, total);
+    var s = "[";
+    var i = 0;
+    loop (i < width) {
+        if (i < filled) { s = s + "#"; }
+        else { s = s + "."; }
+        i += 1;
+    }
+    var pct = int_div(done * 100, total);
+    return s + "] " + int_to_str(pct) + "%";
+}
+
+var total = 4;
+var i = 0;
+loop (i <= total) {
+    output(bar(i, total, 20));
+    i += 1;
+}

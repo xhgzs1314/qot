@@ -1,0 +1,33 @@
+// 【G-03 钉 】三元表达式 `cond ? a : b`。
+// 全链路：QUESTION token + expression 层产生式（右结合贪心）+ precedence
+// （低于 AND/OR 与比较）+ 语义检查 + bytecode（跳转 + __tern_N 临时槽——
+// lir_lower 栈快照护栏要求两分支汇合点等栈，临时槽形态是唯一合法形态）
+// + interp 短路求值。VM 零新 opcode。
+var x = 10;
+output(x > 0 ? "pos" : "neg");
+output(x > 5 ? "big" : "small");
+// 右结合嵌套（grade 链）
+var g = 75;
+output(g >= 90 ? "A" : g >= 80 ? "B" : g >= 70 ? "C" : "F");
+// 算术位 / 数组字面量位 / 字典值位 / 实参位
+output(1 + (x > 5 ? 10 : 20));
+var arr = [x > 5 ? 1 : 2, x < 5 ? 3 : 4];
+output(arr[0] + arr[1]);
+var d = &< "k": x > 5 ? "yes" : "no" >&;
+output(d["k"]);
+output(str_len(x > 5 ? "hello" : "no"));
+// 逻辑组合条件
+output(x > 5 && x < 100 ? "in-range" : "out");
+// 惰性：未选中分支不执行
+any_t func boom() { output("BOOM-BAD-EAGER"); return 0; }
+output(false ? boom() : 42);
+output(true ? 42 : boom());
+// 三元嵌套（括号形态）
+output(true ? (false ? 1 : 2) : 3);
+// 函数体内（局部槽 + __tern 局部临时）
+number_t func classify(v) {
+    return v > 0 ? 1 : v < 0 ? -1 : 0;
+}
+output(classify(-5));
+output(classify(0));
+output(classify(5));

@@ -1,0 +1,11 @@
+{
+  "name": "bound_numeric_str_literal_interp",
+  "runs_on": "interp",
+  "expect": {
+    "exit": 0,
+    "stdout": ["9a"],
+    "stderr_empty": true
+  },
+  "tags": ["string", "literal", "concat", "pricing"],
+  "note": "S-14 终审（）：字面量不再编译期转数字，'9'+'a' 三引擎一致拼接为 '9a'。旧分歧 D-09（interp 报 2002、VM 拼接）随之消亡 —— KNOWN-NUMERIC-STR-ATOM 分歧类已解除。"
+}

@@ -1,0 +1,19 @@
+{
+ "name": "ssa_shapes",
+ "runs_on": "vm",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stderr_empty": true
+ },
+ "tags": [
+  "n03",
+  "ssa",
+  "join",
+  "nested-loop"
+ ],
+ "note": "N-03 SSA/槽合并的形状钉：菱形汇合、循环携带变量、嵌套循环 + 循环内 if、多定义函数内链。native 与 VM 逐行差分。改动 lir_ssa 的重命名/合并/改写逻辑前必跑。"
+}

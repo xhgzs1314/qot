@@ -1,0 +1,34 @@
+// 语料线 · 14 数值计算组合（fib 记忆化 + 素数筛 + 统计）
+// 任务画像：算法课/面试题集。状态：✅ 可运行。
+number_t func fib(n, memo) {
+    if (n < 2) { return n; }
+    if (dict_has(memo, strings(n))) { return dict_get(memo, strings(n)); }
+    var v = fib(n - 1, memo) + fib(n - 2, memo);
+    dict_set(memo, strings(n), v);
+    return v;
+}
+var memo = dict_new();
+output("fib(30) = " + int_to_str(fib(30, memo)));
+
+// 埃氏筛（布尔数组）
+var n = 100;
+// 【G-10 实证】arr_new_n 是 1 参（填 null）—— 旧稿误传 2 参被静默忽略，
+// 全靠 G-10 把它变编译期失败才暴露。判据用 `!= true`（null/false 同效）。
+var is_comp = arr_new_n(n + 1);
+var primes = arr_new();
+var i = 2;
+loop (i <= n) {
+    if (arr_get(is_comp, i) != true) {
+        arr_push(primes, i);
+        var j = i * i;
+        loop (j <= n) {
+            arr_set(is_comp, j, true);
+            j += i;
+        }
+    }
+    i += 1;
+}
+output("primes<=100: " + int_to_str(arr_len(primes)) + " -> " + arr_join(primes, ","));
+
+var sum = arr_sum(primes);
+output("sum = " + int_to_str(sum) + " max = " + int_to_str(arr_max(primes)));

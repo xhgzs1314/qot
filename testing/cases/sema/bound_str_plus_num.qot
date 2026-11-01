@@ -1,0 +1,2 @@
+output("123" + 5);
+output("abc" + 5);

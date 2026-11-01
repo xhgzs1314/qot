@@ -1,0 +1,69 @@
+// std.text 差分用例（CP-3）：csv_parse / csv_write / csv_column / trim_all /
+// normalize / wrap。golden 按 native 口径；oracle 裁判做零分歧对账。
+require "../../../std/text.qot";
+
+var csv = "name,age,city\n\"Zhang, San\",30,Beijing\n\"He said \"\"hi\"\"\",25,\nLi,22,Shanghai\n";
+var rows = text##csv_parse(csv);
+output(arr_len(rows));
+var r0 = arr_get(rows, 0);
+output(arr_len(r0));
+output(arr_get(r0, 0));
+output(arr_get(r0, 2));
+var r1 = arr_get(rows, 1);
+output(arr_get(r1, 0));
+output(arr_get(r1, 1));
+var r2 = arr_get(rows, 2);
+output(arr_get(r2, 0));
+output(arr_get(r2, 1));
+output(arr_get(r2, 2));
+var r3 = arr_get(rows, 3);
+output(arr_get(r3, 0));
+output(arr_get(r3, 1));
+output(arr_get(r3, 2));
+
+// 引号字段含 CRLF（RFC 4180 引号内换行属于字段）
+var rows2 = text##csv_parse("a,\"x\ny\",b\nz,1,2");
+output(arr_len(rows2));
+output(arr_len(arr_get(rows2, 0)));
+output(arr_get(arr_get(rows2, 0), 1));
+
+// 空输入 / 纯换行 / 尾行无换行
+output(arr_len(text##csv_parse("")));
+output(arr_len(text##csv_parse("\n")));
+output(arr_len(text##csv_parse("solo")));
+output(arr_get(arr_get(text##csv_parse("solo"), 0), 0));
+
+// 非字符串 → null
+output(is_null(text##csv_parse(123)));
+
+// csv_write 往返
+var back = text##csv_write(rows);
+var rows3 = text##csv_parse(back);
+output(arr_len(rows3));
+output(arr_get(arr_get(rows3, 1), 0));
+output(arr_get(arr_get(rows3, 2), 0));
+output(arr_len(text##csv_write(null)));
+output(arr_len(text##csv_write("nope")));
+
+// csv_column / trim_all
+var col = text##csv_column(rows3, 0);
+output(arr_len(col));
+output(arr_get(col, 0));
+output(arr_len(text##csv_column(null, 0)));
+var dirty = text##csv_parse(" a , b ,c\n d,e ,f ");
+var cleaned = text##trim_all(dirty);
+output(str_join(arr_get(cleaned, 0), "|"));
+output(str_join(arr_get(cleaned, 1), "|"));
+output(is_null(text##trim_all(5)));
+
+// normalize / wrap
+output(str_len(text##normalize("  a\t\tb  c \r\n d ")));
+var nm = text##normalize("  a\t\tb  c \r\n d ");
+output(nm);
+output(text##normalize(""));
+output(text##wrap("hello world foo bar", 11));
+output(text##wrap("abc", 0));
+output(text##wrap("a", 3));
+var w2 = text##wrap("supercalifragilistic ok", 5);
+output(arr_len(str_split_lines(w2)));
+output(arr_get(str_split_lines(w2), 0));

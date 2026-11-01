@@ -1,0 +1,23 @@
+{
+ "name": "err_macro_redef",
+ "runs_on": "none",
+ "compile": {
+  "args": [],
+  "expect_ok": false
+ },
+ "expect": {
+  "exit_not": 0,
+  "stderr_contains": [
+   "[4000]",
+   "宏 'dup' 已定义"
+  ],
+  "artifact": null
+ },
+ "tags": [
+  "syntax",
+  "negative",
+  "GOD-SELF",
+  "macro"
+ ],
+ "note": "GOD-SELF-G2 边界面（§8.24-C）：宏重名 = 重定义报错（F0 现律；官方宏 swap/unless 同律，用户遮蔽亦致命）。错误码 [4000]。"
+}

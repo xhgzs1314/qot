@@ -1,0 +1,21 @@
+{
+ "name": "bound_str_plus_num",
+ "runs_on": "vm",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stdout": [
+   "1235",
+   "abc5"
+  ],
+  "stderr_empty": true
+ },
+ "tags": [
+  "string",
+  "coerce"
+ ],
+ "note": "S-14 终审（，M5 命名规范化）：字符串字面量保持字符串，+ 对 (str,num) 恒为拼接；显式数值转换走 str_to_num/str_to_int/to_num。旧定价（先尝试转数字，'123'+5=128）废除。"
+}

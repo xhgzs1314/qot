@@ -1,0 +1,18 @@
+{
+ "name": "std_text",
+ "runs_on": "native",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stderr_empty": true
+ },
+ "tags": [
+  "stdlib",
+  "text",
+  "require"
+ ],
+ "note": "CP-3：std.text 差分。P0-POOL-1 已修复（）：根因=arena 回收 pass 的容器内容逃逸盲区（arr_push 把轮内 arena QStr 存进跨轮存活的 row，槽级染色看不见）+ 幻影循环（回边 JMP 链被误认成循环头，t∉body；插桩把区域开在真循环体外横跨真循环体）。修复=lir_opt.arena_loops 否决 1.5（t∈body 律 + 向后跳出律）+ 否决 3（mutates_container 内容逃逸）+ branchy 退化追 MOV 链 + 候选下标迁移账本（嵌套循环陈旧下标）；QOT_RT_POOL_DEBUG 取证工装在 arena pop 时墓碑化+毒化回滚区。本用例即回归钉：std_text 程序 arena 插桩必须为 0（test_lir 锚点）。"
+}

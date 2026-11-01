@@ -1,0 +1,17 @@
+{
+ "name": "p18_prim_type",
+ "runs_on": "native",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stderr_empty": true
+ },
+ "tags": [
+  "primitive",
+  "type"
+ ],
+ "note": "P0.2：类型与错误原语差分（P0-K）。type_of = type/gtypes 分歧的统一目标；句柄用先开后关时序钉住数字型模糊性（§4.0）。"
+}

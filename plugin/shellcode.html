@@ -294,7 +294,10 @@
 <body>
     <div class="container">
 
-        <div class="warning-banner">
+        <div class="note">
+    <p><strong>运行环境</strong>：<code>ScLoad</code> / <code>ScExec</code> / <code>ScSweep</code> 在<strong>解释器</strong>侧可用（<code>qguoat run</code>）；编译成原生程序时没有这批函数，编译期会报「该内置在原生后端缺席」。</p>
+</div>
+<div class="warning-banner">
             <h2>⚠️ 安全警告 · 使用Shellcode前必读</h2>
             <p><strong>Shellcode 与 DLL 一样拥有完整的系统权限</strong> —— 它可以读写文件、访问网络、修改内存、甚至格式化硬盘。<br>
                 加载不可信的 .bin 文件等同于执行未知原生程序<br>

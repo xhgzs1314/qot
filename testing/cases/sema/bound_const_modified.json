@@ -1,0 +1,19 @@
+{
+ "name": "bound_const_modified",
+ "runs_on": "vm",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stdout": [
+   "0.000000"
+  ],
+  "stderr_empty": true
+ },
+ "tags": [
+  "const"
+ ],
+ "note": "README 21.1：VM 不强制 const，赋值成功"
+}

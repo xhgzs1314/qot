@@ -1,0 +1,17 @@
+{
+ "name": "p15_prim_bytes",
+ "runs_on": "native",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stderr_empty": true
+ },
+ "tags": [
+  "primitive",
+  "encoding"
+ ],
+ "note": "P0.2：编码与字节原语差分（P0-C）。hex/base64/url 字母表与 UTF-8 扫描器两侧逐位镜像；非法字节经 url_decode(\"%FF\") 构造。"
+}

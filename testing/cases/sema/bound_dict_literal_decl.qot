@@ -1,0 +1,6 @@
+d = &< "k": 1, "j": 2 >&;
+output(dict_get(d, "k") == 1);
+output(dict_get(d, "j") == 2);
+dict_set(d, "z", 9);
+output(dict_get(d, "z") == 9);
+output(dict_get(d, "missing") == null);

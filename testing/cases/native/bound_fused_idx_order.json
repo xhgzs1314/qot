@@ -1,0 +1,26 @@
+{
+ "name": "bound_fused_idx_order",
+ "runs_on": "native",
+ "compile": { "args": [], "expect_ok": true },
+ "expect": {
+  "exit": 0,
+  "stderr_empty": true,
+  "stdout": [
+   "97.000000",
+   "33.333333",
+   "1.000000",
+   "-97.000000",
+   "0.030000",
+   "true",
+   "false",
+   "false",
+   "false",
+   "93.000000",
+   "-93.000000",
+   "true",
+   "gt"
+  ]
+ },
+ "tags": ["regression", "idxfuse", "correctness"],
+ "note": "融合下标算术的操作数序缺陷钉（ 根治）。旧快路径恒把 _ev 当左操作数 → 下标在右侧的非交换运算（> < >= <= - / %）错序；慢路径一直正确（快/慢双路径不一致本身就是缺陷信号）。修复 = 按 ai.a/ai.b 真实左右序发射。数组与字典键两形态、与三元组合形态全覆盖。"
+}

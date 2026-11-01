@@ -1,0 +1,11 @@
+// B2b 字典密集 · 动态键插入（键构造 + 开放寻址 + rehash）
+// 负载：ITER 次 m[strings(i)] = i。每次包含：
+//   ① 数字转字符串（新分配 QStr）② 计算键哈希 ③ 开放寻址探测
+//   ④ 容量触顶时的整表 rehash（slots 翻倍，摊还进 per_unit）
+// 拷问点：rehash 是否摊还成 O(1)；动态键（每轮换一个新 QStr、哈希缓存
+// 必然 miss）相对常量键贵多少 —— 与 B2a 的 per_unit 直接相减即得。
+var m = &< "z": 0 >&;
+for (i in 87654321) {
+    m[strings(i)] = i;
+}
+output(glen(m));

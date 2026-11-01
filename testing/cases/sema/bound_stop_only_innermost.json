@@ -1,0 +1,25 @@
+{
+ "name": "bound_stop_only_innermost",
+ "runs_on": "vm",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stdout": [
+   "0.000000",
+   "0.000000",
+   "0.000000",
+   "1.000000",
+   "0.000000",
+   "2.000000"
+  ],
+  "stderr_empty": true
+ },
+ "tags": [
+  "loop",
+  "stop"
+ ],
+ "note": "README 6.2：stop 只跳出最内层"
+}

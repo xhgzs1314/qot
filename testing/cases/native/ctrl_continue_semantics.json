@@ -1,0 +1,21 @@
+{
+ "name": "ctrl_continue_semantics",
+ "runs_on": "native",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stderr_empty": true,
+  "stdout": [
+   "for-odd: 1.000000,3.000000,5.000000,7.000000,9.000000",
+   "while-skip3: 18",
+   "nested: 11 13 21 23 31 33",
+   "mix: 1.000000,3.000000,4.000000",
+   "pin-end"
+  ]
+ },
+ "tags": ["control-flow", "continue", "G-01", "grammar"],
+ "note": "G-01 continue 语义钉（）。for 的步进必须落在『继续点』上（bytecode._compile_loop 把 inc 移出 body），否则 continue 跳到条件会跳过步进 → 死循环；本钉同时是防死循环的守卫（用例自带超时）。interp 由 LoopContinueException + for/while 各自捕获实现，两侧逐行同果。"
+}

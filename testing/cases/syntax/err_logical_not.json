@@ -1,0 +1,30 @@
+{
+ "name": "err_logical_not",
+ "runs_on": "interp",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stdout": [
+   "not-true-ok",
+   "not-false-ok",
+   "true",
+   "false",
+   "true",
+   "false",
+   "true",
+   "false",
+   "true"
+  ],
+  "stderr_empty": true
+ },
+ "tags": [
+  "syntax",
+  "unary-not",
+  "GOD-SELF",
+  "reversed-pin"
+ ],
+ "note": "【反转钉 】旧钉断言一元 `!` 不存在（期望编译失败）。GOD-SELF 收尾把 `!` 实现为正式一元逻辑非（前缀位；宏调用 name!( 形态与其在文法上零冲突），本钉反转：truthy 取反语义正向断言（null/false/0/空串/空容器=假，其余=真，interp is_truthy ≡ native qotrt_truthy_str 同表）。"
+}

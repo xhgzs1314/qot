@@ -1,0 +1,17 @@
+{
+ "name": "t05_float",
+ "runs_on": "vm",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stderr_empty": true
+ },
+ "tags": [
+  "number",
+  "divzero"
+ ],
+ "note": "含除零：VM 得 0 不报错，解释器报 2004 退出 —— 故 runs_on=vm"
+}

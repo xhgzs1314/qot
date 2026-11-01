@@ -1,0 +1,18 @@
+{
+ "name": "mod_semantics_edge",
+ "runs_on": "vm",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stderr_empty": true
+ },
+ "tags": [
+  "modulo",
+  "f64-fastpath",
+  "pricing"
+ ],
+ "note": "% 语义矩阵（VM=截断取模，符号随被除数；除零得 0）：常量除数快路径（qotrt_fmod_ci，-5%5 的 -0.0 保号）、INT_MIN/INT_MAX 边界（快路径范围外必须回退 std::fmod）、大指数差回退、变量除数、循环内热路径。native 侧与 VM 逐行差分（--suite native）。改动 qotrt_fmod_/qotrt_fmod_ci 前必跑。"
+}

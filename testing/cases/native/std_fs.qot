@@ -1,0 +1,79 @@
+// std.fs 差分用例（CP-3）：read_lines / write_lines / append_lines / walk / glob。
+// 沙箱目录 = testing/.artifacts/std_fs_demo（相对 CWD；native 与 interp 同根）。
+require "../../../std/fs.qot";
+
+var dir = "testing/.artifacts/std_fs_demo";
+dir_mkdirs(dir);
+dir_mkdirs(dir + "/sub");
+
+// write_lines → read_lines 往返
+var lines = arr_new();
+arr_push(lines, "alpha");
+arr_push(lines, "");
+arr_push(lines, "gamma");
+output(fs##write_lines(dir + "/a.txt", lines));
+var back = fs##read_lines(dir + "/a.txt");
+output(arr_len(back));
+output(arr_get(back, 0));
+output(str_empty(arr_get(back, 1)));
+output(arr_get(back, 2));
+
+// 追加
+output(fs##append_lines(dir + "/a.txt", arr_from(["delta"])));
+var back2 = fs##read_lines(dir + "/a.txt");
+output(arr_len(back2));
+output(arr_get(back2, 3));
+
+// CRLF 归一（手写 CRLF 文件再读）
+var fh = file_open(dir + "/crlf.txt", "wb");
+file_write(fh, "one\r\ntwo\r\n");
+file_close(fh);
+var crlf = fs##read_lines(dir + "/crlf.txt");
+output(arr_len(crlf));
+output(arr_get(crlf, 0));
+output(arr_get(crlf, 1));
+
+// 失败面
+output(is_null(fs##read_lines(dir + "/definitely_missing.txt")));
+output(fs##write_lines(dir + "/x/y/z.txt", lines));
+output(is_null(fs##read_lines(dir)));
+
+// 空文件
+var fh2 = file_open(dir + "/empty.txt", "w");
+file_close(fh2);
+output(arr_len(fs##read_lines(dir + "/empty.txt")));
+
+// 子目录文件（walk 的数据源）
+var fh3 = file_open(dir + "/sub/inner.txt", "w");
+file_write(fh3, "inner");
+file_close(fh3);
+
+// walk（先序；目录带 / 尾）
+var w = fs##walk(dir);
+output(arr_len(w));
+output(arr_get(w, 0));
+output(arr_get(w, 1));
+output(arr_get(w, 2));
+output(arr_get(w, 3));
+output(arr_get(w, 4));
+
+// glob
+var g1 = fs##glob(dir, "*.txt");
+output(arr_len(g1));
+output(arr_get(g1, 0));
+var g2 = fs##glob(dir, "a*");
+output(arr_len(g2));
+output(arr_get(g2, 0));
+var g3 = fs##glob(dir, "??mpty.txt");
+output(arr_len(g3));
+var g4 = fs##glob(dir, "sub");
+output(arr_len(g4));
+output(is_null(fs##glob(dir + "/nope", "*")));
+
+// 清场（保持用例幂等；walk 已在上面取证）
+file_remove(dir + "/a.txt");
+file_remove(dir + "/crlf.txt");
+file_remove(dir + "/empty.txt");
+file_remove(dir + "/sub/inner.txt");
+dir_remove(dir + "/sub");
+dir_remove(dir);

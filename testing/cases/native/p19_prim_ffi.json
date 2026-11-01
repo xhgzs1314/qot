@@ -1,0 +1,8 @@
+{
+ "name": "p19_prim_ffi",
+ "runs_on": "native",
+ "compile": { "args": [], "expect_ok": true },
+ "expect": { "exit": 0, "stderr_empty": true },
+ "tags": ["ffi", "primitive", "p0.3", "m7"],
+ "note": "CP-4：P0-L FFI 差分 + B3 真实演示（msvcrt：sqrt/strlen/atoi）。【M7  v2 修订】混族分派器：同族限制废除（ldexp f64+i32 真实混调 / 多余实参忽略 / 未知类型码仍拒），ffi_abi_version 1→2。句柄不打印裸值；ffi_last_error 只断非空（两侧各自持有，S-13）。冻结文档 docs/。"
+}

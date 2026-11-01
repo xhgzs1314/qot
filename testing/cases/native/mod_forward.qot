@@ -1,0 +1,6 @@
+// 模块内前向互调差分钉（P1030-2）：entry 先声明先调用后声明的 double_it。
+// golden 按 native 口径；oracle 裁判做零分歧对账（test_primitive_oracle_diff）。
+require "../../modules/fw_lib.qot";
+
+output(fw_lib##entry(21));
+output(fw_lib##double_it(10));

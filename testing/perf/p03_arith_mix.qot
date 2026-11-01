@@ -1,0 +1,7 @@
+var acc = 1;
+var n = 200000;
+loop (n > 0) {
+    acc = acc * 2 + n % 7 - n / 3;
+    n = n - 1;
+}
+output(acc);

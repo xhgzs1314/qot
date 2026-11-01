@@ -1,0 +1,6 @@
+// F0（S-15 根治）：native 编译期 require .qot 模块 —— 多文件程序
+require "lib/f0_mod.qot";
+
+output(_f0_mod##square(6));
+output(_f0_mod##shout("hi"));
+output(_f0_mod##MOD_CONST);

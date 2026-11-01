@@ -1,0 +1,17 @@
+{
+ "name": "p11_prim_num",
+ "runs_on": "native",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stderr_empty": true
+ },
+ "tags": [
+  "primitive",
+  "number"
+ ],
+ "note": "P0.1 CP-2：数字原语差分（P0-D）。"
+}

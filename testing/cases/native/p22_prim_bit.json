@@ -1,0 +1,8 @@
+{
+ "name": "p22_prim_bit",
+ "runs_on": "native",
+ "compile": { "args": [], "expect_ok": true },
+ "expect": { "exit": 0, "stderr_empty": true },
+ "tags": ["primitive", "p0-d", "bit"],
+ "note": "P0-D 补：位运算 6 条（bit_and/or/xor/not/shl/shr）差分。口径：int64 域、严格整数化（非整 -1）、shl = uint64 承载高位截断（有符号左移在 C 是 UB）、shr = 算术右移符号跟随、移位数 ∈ [0,63] 越域 -1（拒绝不钳制）、-1 哨兵与合法结果同形（int_div 同族既定定价）。位型输出走 int_to_str 逐字节。运算符形态（& | << 等）按 R15 机制先行登记等触发。"
+}

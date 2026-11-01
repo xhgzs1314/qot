@@ -1,6 +1,7 @@
 #ifndef BUILTIN_H
 #define BUILTIN_H
 #include "vm_types.h"
+#include "vm_profile.h"
 #include <iostream>
 #include <unordered_map>
 #include <functional>
@@ -20,6 +21,7 @@ namespace qot
         }
         bool hasFunction(const std::string &name) const
         {
+            QOT_PROF_ADD(builtinNameLookups, 1);
             return m_functions.find(name) != m_functions.end();
         }
         const BuiltinFunction &getFunction(const std::string &name) const
@@ -34,6 +36,7 @@ namespace qot
         }
         Value call(const std::string &name, const std::vector<Value> &args)
         {
+            QOT_PROF_ADD(builtinNameLookups, 1);
             auto it = m_functions.find(name);
             if (it != m_functions.end() && it->second)
             {

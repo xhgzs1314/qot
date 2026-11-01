@@ -1,0 +1,28 @@
+{
+ "name": "for_range_step",
+ "runs_on": "native",
+ "compile": { "args": [], "expect_ok": true },
+ "expect": {
+  "exit": 0,
+  "stderr_empty": true,
+  "stdout": [
+   "0,1,2,3,4,",
+   "10,8,6,4,2,",
+   "0,3,6,9,",
+   "0,0.250000,0.500000,0.750000,",
+   "0.000000",
+   "25.000000",
+   "00 10 11 20 21 22",
+   "10,30,50,",
+   "50,40,30,20,10,",
+   "ace",
+   "eca",
+   "x,z,y,",
+   "0,4,8,",
+   "0.000000",
+   "5.000000"
+  ]
+ },
+ "tags": ["control-flow", "for", "range", "G-04", "M3"],
+ "note": "G-04 钉（）：for-in 区间 A..B [by S] 与序列步长 E by S。半开区间（B 不含，for(i in N) ≡ 0..N）；by 符号定方向；by 0/非字面量 = 编译期致命（G-10 律，负例见 for_step_fatal 族）；序列 by S<0 倒序；数字 E by S ≡ 0..E by S。隐藏计数器纪律：体内改循环变量不影响迭代次数（5 次不变）。字典键倒序 = native 槽序的逆（确定性），interp 为插入序的逆（D-JSON-ORDER 登记分歧族）。"
+}

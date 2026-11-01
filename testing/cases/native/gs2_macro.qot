@@ -1,0 +1,70 @@
+// 【GOD-SELF-G2 钉 】编译期宏（AST→AST）。本例验收面：
+//   * 官方宏 swap!（引用语义涌现：真实交换两个变量）与 unless!(cond){...}
+//     （控制流涌现：展开 = if (cond) {} else {...}）；
+//   * 用户宏三种形态：表达式宏（twice!）、体内调用其他宏（inc2! 的体在
+//     注册期先展开 inc!）、块形态宏（repeat!(n){...}，块语句列表绑定到
+//     最后一个形参）；
+//   * 嵌套调用（twice!(twice!(3))——实参先展开再展开外层）；
+//   * 展开产物与手写等价（双引擎逐字节同果，oracle 零分歧）。
+// 数字串化走 int_to_str（确定性）。
+// —— 用户表达式宏：twice!(e) = e + e ——
+macro twice(x) {
+    return &< "kind": "binary_op", "op": "+", "left": x, "right": x >&;
+}
+// —— 用户宏·体内调宏：inc2!(e) = inc!(inc!(e))（体的预展开路径）——
+macro inc(x) {
+    return &< "kind": "binary_op", "op": "+", "left": x,
+              "right": &< "kind": "literal", "value": 1 >& >&;
+}
+macro inc2(x) {
+    return inc!(inc!(x));
+}
+// —— 用户块形态宏：repeat!(n) { body }（块绑到最后形参 body）——
+macro repeat(n, body) {
+    return [&< "kind": "for_statement", "var": "_m_i", "range": n,
+               "body": body >&];
+}
+number_t func addten(v) {
+    // 官方宏 swap! 在函数体内（嵌套块语句拼接）
+    var lo = v;
+    var hi = v + 10;
+    swap!(lo, hi);
+    return lo + hi;
+}
+// —— 表达式宏 ——
+output(int_to_str(twice!(21)));
+output(int_to_str(twice!(twice!(3))));
+output(int_to_str(inc2!(5)));
+// 展开产物参与更大表达式（静态展开 = 手写等价）
+output(int_to_str(twice!(4) * 10));
+// —— 官方宏 swap!：真实交换（C6 引用语义涌现）——
+var x = 1;
+var y = 2;
+swap!(x, y);
+output(int_to_str(x));
+output(int_to_str(y));
+// 数组元素也能换（标识符形态以外的宏不可换 —— swap! 的契约面）
+var a = 100;
+var b = 200;
+swap!(b, a);
+output(int_to_str(a));
+output(int_to_str(b));
+output(int_to_str(addten(5)));
+// —— 官方宏 unless!：控制流涌现（then 空块 + else 承载）——
+var t = 0;
+unless!(t == 1) {
+    output("t-not-1");
+    t = t + 5;
+}
+output(int_to_str(t));
+unless!(t == 5) {
+    output("BAD");
+}
+output("unless-skip-ok");
+// —— 用户块形态宏 ——
+var acc = 0;
+repeat!(3) {
+    acc = acc + 10;
+}
+output(int_to_str(acc));
+output("GS2-END");

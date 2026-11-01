@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>类与对象 · QOT</title>
+    <link rel="stylesheet" href="assets/doc.css">
+</head>
+
+<body>
+    <div class="doc">
+        <div class="doc-head">
+            <span class="eyebrow">QOT 语言手册</span>
+            <h1>类与对象</h1>
+            <p>
+                QOT 的对象模型是<strong>最小但完整</strong>的：类、字段、方法、构造器。没有继承、没有类层级、没有接口声明——
+                多态与接口由「协议元语 + 组合」在库层解决，见
+                <a href="protocols.html" style="color:#fff;text-decoration:underline">协议元语</a>。
+            </p>
+        </div>
+
+        <div class="doc-body">
+            <h2>1. 声明一个类</h2>
+            <p>类只能声明在顶层（函数体内不允许声明类）。字段按<strong>声明序</strong>固定布局，可以带默认值，也可以不带（默认
+                <code>null</code>）。</p>
+            <pre><code>class Point {
+    var x = 0;                     // 字段（声明序 = 布局偏移）
+    var y = 0;
+    var label = "";                // 字段默认值可以是任意字面量
+
+    func init(ax, ay) {            // init = 构造器（可选）
+        this->x = ax;
+        this->y = ay;
+    }
+
+    number_t func dist2() {        // 方法（返回类型可省略 = 隐式 any_t）
+        return this->x * this->x + this->y * this->y;
+    }
+}</code></pre>
+
+            <h2>2. 构造、读字段、写字段</h2>
+            <pre><code>var p = Point(3, 4);      // 构造：字段默认值 → init 体 → 恒返回实例
+output(p->x);               // 3        字段读
+p->x = 5;                   // 字段写
+p->y += 10;                 // 复合赋值同样支持
+output(p->dist2());         // 25       方法调用（类型表分派）
+output(p->label);           // ""       未赋值的字段 = 声明时的默认值</code></pre>
+
+            <h3>构造顺序</h3>
+            <ol>
+                <li>按声明序写入字段默认值；</li>
+                <li>执行 <code>init</code> 体（<code>this</code> 已绑定到实例）；</li>
+                <li><strong>恒返回实例</strong>——<code>init</code> 里不能 <code>return</code>（编译期致命）。</li>
+            </ol>
+            <p>没有 <code>init</code> 也可以构造：<code>Point()</code> 只会写字段默认值。</p>
+
+            <h2>3. this</h2>
+            <p><code>this</code> 在方法体内恒指接收者，并<strong>遮蔽</strong>外层同名变量。它可以在方法内的
+                lambda / 嵌套函数里捕获（走闭包机制）。</p>
+            <pre><code>class Counter {
+    var n = 0;
+    func init() { this->n = 0; }
+    func bump() { this->n += 1; return this->n; }
+    func make_stepper() {
+        var self = this;
+        return func() -> self->n;      // 捕获 this
+    }
+}</code></pre>
+
+            <h2>4. 定价细则</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>场景</th>
+                        <th>行为</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>读未声明字段</td>
+                        <td><code>null</code>（不报错）</td>
+                    </tr>
+                    <tr>
+                        <td>写未声明字段</td>
+                        <td>被忽略（不报错）</td>
+                    </tr>
+                    <tr>
+                        <td>调用对象上不存在的方法</td>
+                        <td><code>null</code>（不报错）</td>
+                    </tr>
+                    <tr>
+                        <td>非对象接收者 <code>x->m(a)</code></td>
+                        <td>退化为「receiver 前置」的普通调用：等价于 <code>m(x, a)</code></td>
+                    </tr>
+                    <tr>
+                        <td>两个对象比较（<code>==</code>）</td>
+                        <td>引用同一性——同一个实例才相等</td>
+                    </tr>
+                    <tr>
+                        <td><code>gtypes(obj)</code> / <code>type(obj)</code></td>
+                        <td><code>"object"</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>str(obj)</code></td>
+                        <td><code>"&lt;类名&gt;"</code>（确定性输出，不含地址）</td>
+                    </tr>
+                    <tr>
+                        <td>方法返回值</td>
+                        <td>可以继续链式调用：<code>c->inc()->inc()->value()</code></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <blockquote class="note">
+                <strong>为什么对象不是字典？</strong>字段按声明序固定布局，访问是「类型表偏移查表 + 直接下标」，
+                与数组下标同族（热循环内每字段读约 7ns 量级）。需要动态属性请用字典。
+            </blockquote>
+
+            <h2>5. 与协议配合：让对象参与运算与迭代</h2>
+            <p>类本身只提供「字段 + 方法」。想让对象支持 <code>+</code>、<code>==</code>、下标、for-in、字符串化，
+                写对应的<strong>协议方法</strong>即可——编译器会在类型可知时直接绑定它们。</p>
+            <pre><code>class Vec2 {
+    var x = 0;  var y = 0;
+    func init(ax, ay) { this->x = ax; this->y = ay; }
+    func __add__(o) { return Vec2(this->x + o->x, this->y + o->y); }
+    func __eq__(o)  { return this->x == o->x && this->y == o->y ? 1 : 0; }
+    func __to_str() { return "(" + int_to_str(this->x) + "," + int_to_str(this->y) + ")"; }
+}
+
+var s = Vec2(1, 2) + Vec2(10, 20);
+output(s);                 // (11,22)
+output(s == Vec2(11, 22));  // 1</code></pre>
+            <p>协议方法的完整清单与绑定规则见 <a href="protocols.html">协议元语</a>。</p>
+
+            <h2>6. 组合代替继承</h2>
+            <p>QOT 没有继承与类层级。需要「is-a」之外的行为组合时，用字段持有另一个对象即可——这也是协议化多态的常见落地方式。</p>
+            <pre><code>class Engine {
+    var kind = "";
+    func init(k) { this->kind = k; }
+    func sound() { return this->kind + "-hum"; }
+}
+
+class Robot {
+    var name = "";
+    var engine = null;              // 组合
+    func init(n) {
+        this->name = n;
+        this->engine = Engine("ion");
+    }
+    func speak() { return this->name + ": " + this->engine->sound(); }
+}
+
+output(Robot("R7")->speak());      // R7: ion-hum</code></pre>
+
+            <h2>7. 类的声明顺序</h2>
+            <p>类必须先声明、后使用：<code>Robot</code> 的 <code>init</code> 里用到的 <code>Engine</code> 要在它之前声明。
+                方法体内的调用可以引用后声明的类，但<strong>构造点</strong>不行。</p>
+            <blockquote class="warn">
+                <strong>不要用 <code>__</code> 开头的名字。</strong>双下划线前缀是编译器内部保留的（隐藏临时变量、
+                协议绑定脱糖产物、方法接收者改写）。用户自己声明的全局变量若用了这个前缀，在函数体内读取会被编译成局部槽，
+                读到的将是 <code>null</code>。库代码约定用单下划线前缀（如 <code>_m_emit</code>）。
+            </blockquote>
+        </div>
+
+        <div class="doc-foot">
+            <span>QOT 文档中心</span>
+            <span>
+                <a href="index.html">返回目录</a> ·
+                <a href="doc.html">语言总述</a> ·
+                <a href="protocols.html">协议元语</a> ·
+                <a href="macros.html">编译期宏</a>
+            </span>
+        </div>
+    </div>
+</body>
+
+</html>

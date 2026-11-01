@@ -1,0 +1,23 @@
+{
+ "name": "err_macro_undefined",
+ "runs_on": "none",
+ "compile": {
+  "args": [],
+  "expect_ok": false
+ },
+ "expect": {
+  "exit_not": 0,
+  "stderr_contains": [
+   "[4000]",
+   "宏 'nosuch' 未定义"
+  ],
+  "artifact": null
+ },
+ "tags": [
+  "syntax",
+  "negative",
+  "GOD-SELF",
+  "macro"
+ ],
+ "note": "GOD-SELF-G2 边界面（§8.24-C）：非宏的 name!() 调用 = 编译期报错（宏未定义）。错误码 [4000]（ERR_COMPILE_GENERAL 通道），stderr 含宏名与「未定义」。"
+}

@@ -1,0 +1,17 @@
+{
+ "name": "t06_logic",
+ "runs_on": "vm",
+ "compile": {
+  "args": [],
+  "expect_ok": true
+ },
+ "expect": {
+  "exit": 0,
+  "stderr_empty": true
+ },
+ "tags": [
+  "logic",
+  "compare"
+ ],
+ "note": ""
+}
