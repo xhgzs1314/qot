@@ -1,0 +1,98 @@
+// ===========================================================================
+// dialog_demo.qot —— vgui v3
+//
+// 覆盖：
+//   1. 模态对话框全流程：帧驱动启动（等效点击链路见 callback_smoke）→
+//      vg_show_dialog 阻塞 → 对话框按钮回调设结果 + 关窗 → 拿到结果码；
+//   2. 对话框内按钮事件经模态循环的 drain 派发（延迟一跳）；
+//   3. 菜单 id 语义：创建 / 加项递增 / 分隔线 / 销毁；
+//   4. vg_on_menu 绑定 token；toast 返回值。
+// 注：vg_menu_popup 的真实交互（弹出 → 选择 → 回传）需要真实鼠标输入，
+//     不纳入无人值守脚本（C 层为 Win32 TPM_RETURNCMD 直通，手动验一次，
+//     见 docs 注释）；本脚本验收其余全部链路。30 帧后自动关窗。
+// ===========================================================================
+
+var w = vg_create_window("dialog demo", 480, 340);
+var status = vg_create_label(w, "待启动", 20, 20, 440, 26);
+
+var cnt = [0, -999];        // [帧数, 对话框结果码]
+var dlg = [0];              // [对话框窗口 id]
+
+// ---- 菜单 id 语义（自动断言部分）----
+var mid = vg_create_menu();
+var m1 = vg_menu_add_item(mid, "新建");
+var m2 = vg_menu_add_item(mid, "打开");
+vg_menu_separator(mid);
+var m3 = vg_menu_add_item(mid, "退出");
+
+var menuHit = [0];
+
+any_t func menu_cmd(id, value, x, y) {
+    menuHit[0] = value;
+}
+
+// on_menu 绑定（popup 事件路径；真实弹出来自手动测试）
+vg_on_menu(w, func(id, value, x, y) -> menu_cmd(id, value, x, y));
+
+// ---- 模态对话框 ----
+any_t func dlg_choose(code) {
+    vg_set_dialog_result(dlg[0], code);
+    vg_close_window(dlg[0]);
+}
+
+any_t func open_dialog() {
+    var d = vg_create_window("对话框", 320, 180);
+    dlg[0] = d;
+    vg_set_window_bg_gradient(d, [0.09, 0.09, 0.16, 1], [0.13, 0.11, 0.22, 1]);
+    vg_create_label(d, "模态对话框（父窗已冻结）", 20, 24, 280, 24);
+    var ok = vg_create_button(d, "确定(42)", 26, 96, 120, 38);
+    var cancel = vg_create_button(d, "取消(7)", 174, 96, 120, 38);
+    vg_bind(ok, 1, func(id, v, x, y) -> dlg_choose(42));
+    vg_bind(cancel, 1, func(id, v, x, y) -> dlg_choose(7));
+    // 阻塞至对话框关闭；期间父窗冻结、对话框事件照常派发
+    var code = vg_show_dialog(d, w);
+    cnt[1] = code;
+    vg_label_set_text(status, "对话框返回 " + str(code));
+}
+
+any_t func on_frame(dt) {
+    cnt[0] = cnt[0] + 1;
+    if (cnt[0] == 2) {
+        open_dialog();     // 帧驱动启动（真实鼠标点击链路由 callback_smoke 覆盖）
+        vg_toast(w, "对话框已关闭 · toast 轻提示", 800);
+    }
+    if (cnt[0] >= 30) {
+        vg_close_window(w);
+    } else {
+        vg_request_frame();
+    }
+}
+
+vg_on_frame(func(dt) -> on_frame(dt));
+vg_show_window(w);
+vg_run();
+
+// ---- 断言（关窗前已存 cnt；菜单/绑定语义在此验证）----
+var fails = [0];
+var checks = [0];
+
+any_t func expect(cond, tag) {
+    checks[0] = checks[0] + 1;
+    if (!cond) {
+        fails[0] = fails[0] + 1;
+        output("FAIL " + tag);
+    }
+}
+
+expect(cnt[1] == 42, "dialog result code (got " + str(cnt[1]) + ")");
+expect(m1 > 0 && m2 == m1 + 1 && m3 == m2 + 1, "menu item ids increment");
+expect(vg_menu_separator(mid) == 1, "menu separator");
+expect(vg_menu_destroy(mid) == 1, "menu destroy");
+expect(vg_create_menu() > 0, "second menu created");
+
+if (fails[0] == 0) {
+    output("dialog-demo-ok checks=" + str(checks[0]) + " frames=" + str(cnt[0]) +
+           " result=" + str(cnt[1]));
+} else {
+    output("dialog-demo-FAILED checks=" + str(checks[0]) + " fails=" + str(fails[0]));
+}

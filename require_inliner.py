@@ -472,7 +472,6 @@ class RequireInliner:
         # 【QOT-CI · 0】`mod##name → name` 的改写统一在**顶层单遍**
         # 完成（原实现每层递归都对"当时已处理的模块集"重读文件 + 重提导出 +
         # 全文重扫 —— 各层的改写集合互为子集且模式互不相交，全部被顶层
-        # 一次覆盖；深链复杂度 O(N³)→O(N)，实测 48 模块链 ~30s → 亚秒）。
         exports_by_module = {}
         for m in self.modules:
             if m.get('main'):

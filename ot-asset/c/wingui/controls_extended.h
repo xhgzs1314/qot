@@ -77,28 +77,36 @@ public:
     
     void Draw(Renderer* renderer) override {
         if (!m_visible || !renderer) return;
-        
-        
+        // v4：owner-draw 接管（下拉列表展开态也交回调）
+        if (m_paintFn) {
+            m_paintFn(renderer, m_bounds.Width(), m_bounds.Height(), StyleFlags());
+            return;
+        }
+        unsigned flags = StyleFlags();
+
         RoundedRect mainRect;
         mainRect.rect = m_bounds;
-        mainRect.radiusX = m_borderRadius;
-        mainRect.radiusY = m_borderRadius;
-        renderer->FillRoundedRect(mainRect, m_backgroundColor);
-        renderer->DrawRoundedRect(mainRect, m_borderColor, 1.0f);
-        
-        
+        mainRect.radiusX = m_style.radiusSet ? m_style.radius : m_borderRadius;
+        mainRect.radiusY = mainRect.radiusX;
+        Color bg;
+        if (!ResolvedStateBg(flags, bg)) bg = m_backgroundColor;
+        renderer->FillRoundedRect(mainRect, bg);
+        renderer->DrawRoundedRect(mainRect, m_style.borderSet ? m_style.borderColor : m_borderColor,
+                                  m_style.borderSet ? m_style.borderWidth : 1.0f);
+
         std::wstring displayText = m_selectedIndex >= 0 ? m_items[m_selectedIndex].text : m_placeholder;
-        Color textColor = m_selectedIndex >= 0 ? m_textColor : Color(0.5f, 0.5f, 0.6f, 1.0f);
+        Color textColor;
+        if (!ResolvedStateText(flags, textColor))
+            textColor = m_selectedIndex >= 0 ? m_textColor : Color(0.5f, 0.5f, 0.6f, 1.0f);
         Rect textRect = m_bounds;
         textRect.left += 10;
         textRect.right -= 30;
         renderer->DrawText(displayText, textRect, textColor, m_fontSize, false, false);
-        
-        
+
         float arrowX = m_bounds.right - 20;
         float arrowY = m_bounds.top + m_bounds.Height() / 2;
-        renderer->DrawLine(Point(arrowX - 5, arrowY - 3), Point(arrowX, arrowY + 2), m_textColor, 1.5f);
-        renderer->DrawLine(Point(arrowX + 5, arrowY - 3), Point(arrowX, arrowY + 2), m_textColor, 1.5f);
+        renderer->DrawLine(Point(arrowX - 5, arrowY - 3), Point(arrowX, arrowY + 2), textColor, 1.5f);
+        renderer->DrawLine(Point(arrowX + 5, arrowY - 3), Point(arrowX, arrowY + 2), textColor, 1.5f);
         
         
         if (m_isExpanded && m_animProgress > 0.01f) {
@@ -270,10 +278,18 @@ public:
     
     void Draw(Renderer* renderer) override {
         if (!m_visible || !renderer) return;
-        
-        
-        renderer->FillRect(m_bounds, m_backgroundColor);
-        renderer->DrawRect(m_bounds, Color(0.25f, 0.25f, 0.35f, 1.0f), 1.0f);
+        // v4：owner-draw 接管（行渲染全交回调；滚轮/选择/双击语义不变）
+        if (m_paintFn) {
+            m_paintFn(renderer, m_bounds.Width(), m_bounds.Height(), StyleFlags());
+            return;
+        }
+        unsigned flags = StyleFlags();
+
+        Color bg;
+        if (!ResolvedStateBg(flags, bg)) bg = m_backgroundColor;
+        renderer->FillRect(m_bounds, bg);
+        renderer->DrawRect(m_bounds, m_style.borderSet ? m_style.borderColor : Color(0.25f, 0.25f, 0.35f, 1.0f),
+                           m_style.borderSet ? m_style.borderWidth : 1.0f);
         
         
         int startIndex = (int)(m_scrollOffset / m_itemHeight);
@@ -297,10 +313,12 @@ public:
             
             renderer->FillRect(itemRect, bgColor);
             
-            
+
             Rect textRect = itemRect;
             textRect.left += 8;
-            renderer->DrawText(m_items[i].text, textRect, m_textColor, m_fontSize, false, false);
+            Color tc;
+            if (!ResolvedStateText(flags, tc)) tc = m_textColor;
+            renderer->DrawText(m_items[i].text, textRect, tc, m_fontSize, false, false);
         }
     }
     
@@ -350,8 +368,10 @@ public:
         return false;
     }
     
-    bool HandleMouseWheel(float delta) {
+    bool HandleMouseWheel(float delta, const Point& mousePos) override {
         if (!m_enabled || !m_visible) return false;
+        if (mousePos.x < m_bounds.left || mousePos.x > m_bounds.right ||
+            mousePos.y < m_bounds.top || mousePos.y > m_bounds.bottom) return false;
         float maxScroll = std::max(0.0f, (float)m_items.size() * m_itemHeight - m_bounds.Height());
         m_scrollOffset -= delta * 30.0f;
         m_scrollOffset = std::max(0.0f, std::min(maxScroll, m_scrollOffset));
@@ -442,11 +462,18 @@ public:
     
     void Draw(Renderer* renderer) override {
         if (!m_visible || !renderer) return;
-        
-        
+        // v4：owner-draw 接管（tab 头 + 内容区全交回调；切换/子组件语义不变——
+        // 接管时活动页子组件仍在回调后照常绘制）
+        if (m_paintFn) {
+            m_paintFn(renderer, m_bounds.Width(), m_bounds.Height(), StyleFlags());
+        }
+        else {
         Rect contentRect = GetContentRect();
-        renderer->FillRect(contentRect, m_backgroundColor);
-        renderer->DrawRect(contentRect, Color(0.25f, 0.25f, 0.35f, 1.0f), 1.0f);
+        Color bg;
+        if (!ResolvedStateBg(StyleFlags(), bg)) bg = m_backgroundColor;
+        renderer->FillRect(contentRect, bg);
+        renderer->DrawRect(contentRect, m_style.borderSet ? m_style.borderColor : Color(0.25f, 0.25f, 0.35f, 1.0f),
+                           m_style.borderSet ? m_style.borderWidth : 1.0f);
         
         
         float tabWidth = 120.0f;
@@ -482,6 +509,7 @@ public:
             for (auto& comp : m_pages[m_selectedIndex].components) {
                 comp->Draw(renderer);
             }
+        }
         }
     }
     
@@ -660,7 +688,13 @@ public:
     void Stop() { m_running = false; }
     
     void Draw(Renderer* renderer) override {
-        if (!m_visible || !renderer || !m_running) return;
+        if (!m_visible || !renderer) return;
+        // v4：owner-draw 接管（停止态也交回调，loading 视觉自由定制）
+        if (m_paintFn) {
+            m_paintFn(renderer, m_bounds.Width(), m_bounds.Height(), StyleFlags());
+            return;
+        }
+        if (!m_running) return;
         
         float cx = (m_bounds.left + m_bounds.right) / 2;
         float cy = (m_bounds.top + m_bounds.bottom) / 2;
@@ -682,7 +716,8 @@ public:
             float y = cy + sinf(rad) * m_radius;
             
             Ellipse dot(x, y, m_thickness);
-            renderer->FillEllipse(dot, Color(m_color.r, m_color.g, m_color.b, opacity));
+            Color dotC = m_style.bgSet ? m_style.bg : m_color;
+            renderer->FillEllipse(dot, Color(dotC.r, dotC.g, dotC.b, opacity));
         }
     }
     

@@ -1,0 +1,91 @@
+// ===========================================================================
+// scroll_demo.qot —— vgui v3
+//
+// 覆盖：
+//   1. ScrollPane：内容虚高 + attach 控件 + 程序化滚动（offset 读回断言）；
+//   2. kind=16 滚动事件：编程滚动也发事件（绑定即收）；
+//   3. VirtualList 10000 行虚拟化：30 帧逐帧滚动，累计绘制行数只随可视区
+//      增长（draws < 5000 ≪ 全量 30×10000）—— 虚拟化硬自证；
+//   4. 行数据回调模式（vg_list_on_data，零拷贝）。
+// 30 帧后自动关窗（无人值守可跑）。
+// ===========================================================================
+
+var w = vg_create_window("scroll demo", 540, 420);
+
+// ---- ScrollPane：3 个控件 attach 进 900px 高的内容 ----
+var sp = vg_create_scrollpane(w, 20, 20, 230, 320);
+vg_scroll_content(sp, 900);
+var la = vg_create_label(w, "顶部标签", 0, 0, 180, 28);
+var lb = vg_create_button(w, "中部按钮", 0, 0, 180, 40);
+var lc = vg_create_label(w, "底部标签", 0, 0, 180, 28);
+vg_scroll_attach(sp, la, 10, 10, 180, 28);
+vg_scroll_attach(sp, lb, 10, 380, 180, 40);
+vg_scroll_attach(sp, lc, 10, 850, 180, 28);
+
+// ---- VirtualList：10000 行，回调供数 ----
+var vl = vg_create_vlist(w, 270, 20, 250, 320);
+vg_list_set_count(vl, 10000);
+
+var cnt = [0, 0, 0, 0];   // [frames, scrolls, d0, 圈存]
+
+any_t func rowdata(r) {
+    return "row " + str(r);
+}
+vg_list_on_data(vl, func(r) -> rowdata(r));
+
+var sp_events = [0];
+
+any_t func on_scroll_evt(id, value, x, y) {
+    sp_events[0] = sp_events[0] + 1;
+}
+
+any_t func on_frame(dt) {
+    cnt[0] = cnt[0] + 1;
+    vg_scroll_to(sp, cnt[0] * 12);     // 每帧 12px，30 帧 = 360
+    vg_scroll_to(vl, cnt[0] * 60);     // 每帧 60px ≈ 2.3 行
+    if (cnt[0] >= 30) {
+        // 关窗前快照（关窗后控件注册表随 reap 清空，读数不再有效）
+        cnt[2] = vg_list_draw_count(vl);
+        cnt[3] = vg_scroll_offset(vl);
+        vg_close_window(w);            // 无人值守：30 帧后自动关窗
+    } else {
+        vg_request_frame();
+    }
+}
+
+vg_on_scroll(sp, func(id, value, x, y) -> on_scroll_evt(id, value, x, y));
+vg_on_frame(func(dt) -> on_frame(dt));
+
+// attach 完成性检查（顶层控件被滚动区收编后按内容坐标滚动）
+vg_scroll_to(sp, 100);
+var so = vg_scroll_offset(sp);
+
+vg_show_window(w);
+vg_run();                              // 控制权交给消息循环，全关后返回
+
+var draws = cnt[2];                    // 关窗前快照（run 返回后注册表已清）
+var voff = cnt[3];
+
+var fails = [0];
+var checks = [0];
+
+any_t func expect(cond, tag) {
+    checks[0] = checks[0] + 1;
+    if (!cond) {
+        fails[0] = fails[0] + 1;
+        output("FAIL " + tag);
+    }
+}
+
+expect(so == 100, "scrollpane offset after scroll_to");
+expect(voff == 1800, "vlist offset = 30 frames * 60px");
+expect(draws > 0, "vlist drew visible rows");
+expect(draws < 5000, "virtualization: draws(" + str(draws) + ") << 30x10000");
+expect(sp_events[0] > 0, "kind=16 scroll events fired (" + str(sp_events[0]) + ")");
+
+if (fails[0] == 0) {
+    output("scroll-demo-ok checks=" + str(checks[0]) + " frames=" + str(cnt[0]) +
+           " draws=" + str(draws) + " scroll_evts=" + str(sp_events[0]));
+} else {
+    output("scroll-demo-FAILED checks=" + str(checks[0]) + " fails=" + str(fails[0]));
+}

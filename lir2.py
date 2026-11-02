@@ -31,7 +31,7 @@ from lir import (
     INDEX_GET, INDEX_SET, MAKE_ARRAY, MAKE_DICT, REQUIRE, STOP, NOP,
     GUARD_NUM, GLOBAL_BIT, ARENA_PUSH, ARENA_RESET,
     THROW, TRY_PUSH, TRY_POP, ENV_NEW, MAKE_CLOSURE, THROWVAL, UPVAL_BIT,
-    FIELD_GET, FIELD_SET, CALL_OMETHOD,
+    FIELD_GET, FIELD_SET, CALL_OMETHOD, GUARD_TYPE,
 )
 
 # 终结器：块内最后一条；块内不再有其它控制流指令
@@ -104,7 +104,7 @@ def slot_ops(i):
         return (i.dst,), tuple(i.args), (), ()
     if op == REQUIRE:
         return (i.dst,), (), (), ()
-    if op == GUARD_NUM:
+    if op in (GUARD_NUM, GUARD_TYPE):
         return (), tuple(i.args), (), ()
     if op == THROW:
         return (), (i.a,), (), ()
@@ -137,7 +137,7 @@ _V_USE_AC = (FIELD_SET,)
 _V_USE_ARGS = (CALL_USER, CALL_BUILTIN, CALL_MODULE, MAKE_ARRAY, MAKE_DICT,
                CALL_OMETHOD)
 _V_USE_A_ARGS = (CALL_DYNAMIC,)
-_V_USE_ARGS_ONLY = (GUARD_NUM,)
+_V_USE_ARGS_ONLY = (GUARD_NUM, GUARD_TYPE)
 
 
 def replace_vuse(i, x, y):
@@ -323,7 +323,7 @@ class Func2(object):
             b.preds = []
         for b in self.blocks:
             for i in b.instrs:
-                if i.op == GUARD_NUM or i.op == TRY_PUSH:
+                if i.op in (GUARD_NUM, GUARD_TYPE) or i.op == TRY_PUSH:
                     self.link(b, self.blocks[i.target])
             if b.term is not None and b.term.op in BRANCHES:
                 self.link(b, self.blocks[b.term.target])
@@ -542,7 +542,7 @@ def from_v1(f):
 
     leaders = set([0])
     for pc, i in enumerate(f.instrs):
-        if i.op in BRANCHES or i.op in (GUARD_NUM, TRY_PUSH):
+        if i.op in BRANCHES or i.op in (GUARD_NUM, GUARD_TYPE, TRY_PUSH):
             leaders.add(i.target)
             if i.op in BRANCHES and pc + 1 < n:
                 leaders.add(pc + 1)
@@ -593,7 +593,7 @@ def from_v1(f):
     # 块内 GUARD_NUM / TRY_PUSH：target 从「指令下标」改写为「块号」
     for k, (_body, _term) in enumerate(protos):
         for i in f2.blocks[ids[k][0]].instrs:
-            if i.op == GUARD_NUM or i.op == TRY_PUSH:
+            if i.op in (GUARD_NUM, GUARD_TYPE) or i.op == TRY_PUSH:
                 i.target = ids[start_of[i.target]][0]
     f2.rebuild_cfg()
     return f2
@@ -666,7 +666,7 @@ def to_v1(f2, f):
         # GUARD_NUM / TRY_PUSH 是**块内**跳转（不在 term 上）——漏了就会把
         # 块号当成指令下标（跳进别的块中间），必须和 term 一起重映射。
         for i in b.instrs:
-            if i.op == GUARD_NUM or i.op == TRY_PUSH:
+            if i.op in (GUARD_NUM, GUARD_TYPE) or i.op == TRY_PUSH:
                 i.target = start[i.target]
         if b.term is not None and b.term.op in BRANCHES:
             b.term.target = start[b.term.target]
@@ -755,7 +755,7 @@ def rename_instr(i, vmap, fmap, nmap=None):
         i.args = [rv(s) for s in i.args]
     elif op == REQUIRE:
         i.dst = rv(i.dst)
-    elif op == GUARD_NUM:
+    elif op in (GUARD_NUM, GUARD_TYPE):
         i.args = [rv(s) for s in i.args]
     elif op in (JMP, STOP, NOP, ARENA_PUSH, ARENA_RESET):
         pass
@@ -780,4 +780,5 @@ def clone_instr(i):
     c.args = list(i.args)
     c._src_op = getattr(i, '_src_op', None)
     c._no_inline = getattr(i, '_no_inline', False)
+    c._spec_type = getattr(i, '_spec_type', -1)
     return c

@@ -63,6 +63,8 @@ QOT_NO_SWITCHES = (
     'QOT_NO_SSA', 'QOT_NO_FCOAL', 'QOT_NO_FCALL', 'QOT_NO_BICORE',
     'QOT_NO_APPEND', 'QOT_NO_IDXFUSE', 'QOT_NO_ARENA', 'QOT_NO_ALIAS',
     'QOT_NO_CONSTKEY', 'QOT_UNSAFE_INDEX',
+    # PROMAX（0）：新增 A/B 开关（类型不变量守卫 / 自制跳转原语回落）
+    'QOT_NO_TGUARD', 'QOT_NO_FAST_SJ',
 )
 
 # 影响 AOT 前端语义的源文件清单（L2 前端缓存 key 的一部分；改一个文件 =
@@ -605,8 +607,13 @@ def _static_link_flags() -> list:
 # ---------------------------------------------------------------- GUI（wingui）
 # 程序用到 vg_* 时，链接 wingui 的目标文件与 Direct2D/DirectWrite 库。
 # 不用 GUI 的程序不受影响（不付链接代价、也不改缓存键）。
+# v2：DComp 渲染栈（d3d11/dxgi）+ DWM 窗口原语（dwmapi）+ WIC 图片；
+# v3：+ shell32（文件拖放 DragAcceptFiles 系列）。
+# dcomp.dll 动态解析，不进导入表（老系统自动回退 HwndRT 路径）。
+# 注意：与 build_qotgui.py 的 LIBS、wingui/build.bat 三处保持同步。
 GUI_LIBS = ['-ld2d1', '-ldwrite', '-lole32', '-luuid', '-lcomctl32',
-            '-limm32', '-lgdi32', '-luser32']
+            '-limm32', '-lgdi32', '-luser32', '-ld3d11', '-ldxgi',
+            '-ldwmapi', '-lwindowscodecs', '-lshell32']
 _GUI_OBJS = None
 
 

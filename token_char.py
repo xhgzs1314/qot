@@ -4,9 +4,6 @@ import ply.lex as lex
 
 
 class LexerError(Exception):
-    """词法级硬错误（P1030-4 · D-01/D-02 摘钉）：由 parse_oning_gram 转成
-    编译错误。code 取 ErrorCode 语义（1008 未闭合串 / 1000 行内注解）。"""
-
     def __init__(self, code, msg, line=0):
         self.code = code
         self.msg = msg
@@ -60,25 +57,15 @@ class Lexer:
         self.keywords = {"if", "else","eif", "loop", "for", "in","func", "return", "var",
         "const", "null",'stop','number_t','string_t','boolean_t','array_t','any_t',
         "true","false","require","try","catch","throw",
-        # 【G-01 0】continue：跳过本轮（for 的步进照常执行 —— 否则死循环）
         "continue",
-        # 【G-04 0】by：for-in 的步长子句关键字（for (i in 10..0 by -2)）。
-        # 语料 24 段 + 全部用例零标识符使用（实测扫描），加关键字无迁移成本。
         "by",
-        # 【M4 0】class：最小对象模型（结构体+方法+构造）的声明关键字。
-        # 语料与用例零标识符使用（实测扫描）。`this` 保持普通标识符（上下文
-        # 语义：方法体内指向接收者，见 grammar/bytecode 的改写机制）。
         "class",
-        # 【GOD-SELF-G2 §8.24 0】macro：编译期宏声明的关键字。
-        # 语料与全部用例零标识符使用（扫描 cases/ std/ examples/ corpus 确认）。
         "macro"}
         self.unknown_char_warning_count = 0
         self.MAX_WARNINGS = 5
         self.filename = ""
     def t_ANNOTATION(self, t):
         r'@-@-@.*'
-        # 【D-02 摘钉】README 契约：注解必须独占一行 —— 行内注解（前一字符
-        # 非换行）此前被静默接受，现为词法硬错误。
         data = t.lexer.lexdata
         pos = t.lexpos
         if pos > 0 and data[pos - 1] not in '\r\n':
@@ -114,10 +101,6 @@ class Lexer:
         return t
 
     def t_UNTERMINATED_STRING(self, t):
-        # 【D-01 摘钉】引号开启但未闭合（同行无收口引号）—— 完整串已被
-        # t_STRING/t_WSTRING/t_USTRING 先吃，落到这里即未闭合。此前词法器
-        # 逐字符跳过并打「未知字符」警告，abc 被当标识符，编译照常成功
-        # （VM 得 null，解释器运行期才报 2001）—— 现为词法硬错误 1008。
         r'(?<!L)(?<!U)"([^"\\\n]|\\.)*|(?<!L)(?<!U)\'([^\'\\\n]|\\.)*'
         raise LexerError(1008, f"字符串未正确闭合（行 {t.lineno}）", t.lineno)
     def token(self):
@@ -196,10 +179,6 @@ class Lexer:
         t.type = 'DCOLON' 
         return t
     def t_OPERATOR(self,t):
-        # 【G-04 0】新增 `\.\.`（区间算子，`for (i in A..B by S)`）。
-        # 放在首位：单点 `.` 属 t_PUNCTUATOR（本就无处消费）；t_NUMBER 的
-        # `\d+\.\d+` 要求点后跟数字 → `10..0` 切成 10 / .. / 0，`1.5..2.5`
-        # 切成 1.5 / .. / 2.5（最长匹配语义实测）。
         r'\.\.|##|\+=|-=|\*=|/=|%=|==|!=|<=|>=|<<|>>|\+\+|--|->|&&|\|\||::|=|<|>|\+|-|\*|/|%|!|&|\||\^|~|\?|@|:'
         if t.value == '##':
             t.value = '.'  

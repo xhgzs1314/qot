@@ -1,0 +1,80 @@
+// ===========================================================================
+// callback_smoke.qot —— vgui v2 事件回调 
+//
+// 与 hello_gui.qot 的轮询范式对照：本脚本**没有轮询主循环**——
+//   vg_on_load  : 窗口首次显示时触发（生命周期入口）
+//   vg_on_frame : 每帧触发（rAF 模型，自己决定要不要下一帧）
+//   vg_on_click : 绑定即回调，事件触发时由消息循环线程反向调用
+//   vg_run()    : 控制权交给消息循环，全部窗口关闭后返回
+// 30 帧后自动关窗（无人值守可跑），结束输出计数报告。
+//
+// 注意（QOT 语义）：回调体内更新跨函数可见的计数要用**引用类型**
+// （数组下标 / arr_push）——函数内对全局名字直接赋值会创建局部变量。
+// ===========================================================================
+
+var w = vg_create_window("callback smoke", 460, 320);
+vg_set_window_bg_gradient(w, [0.06, 0.06, 0.13, 1], [0.11, 0.09, 0.2, 1]);
+
+var title = vg_create_label(w, "vgui v2 · 全回调驱动（无轮询主循环）", 24, 20, 400, 28);
+vg_label_set_font_size(title, 17);
+
+var status = vg_create_label(w, "帧计数：0", 24, 60, 400, 24);
+
+// Canvas：绘制原语自由作画（每帧重画，验证 vg_draw_* + 帧驱动）
+var cv = vg_create_canvas(w, 24, 96, 400, 150);
+
+// 引用类型计数：[loads, frames, clicks]
+var cnt = [0, 0, 0];
+
+any_t func draw_scene(cw, ch) {
+    // 底板 + 渐变
+    vg_draw_gradient_rect(0, 0, cw, ch, [0.10, 0.10, 0.22, 1], [0.16, 0.10, 0.30, 1], 1);
+    // 悬浮卡片（圆角 + 描边）
+    vg_draw_fill_round_rect(20, 20, cw - 40, ch - 40, 14, [0.14, 0.14, 0.26, 0.96]);
+    vg_draw_stroke_round_rect(20, 20, cw - 40, ch - 40, 14, [0.35, 0.42, 0.75, 0.8], 1.5);
+    // 随帧移动的圆（缓动插值：easing 驱动 x）
+    var t = cnt[1] % 60;
+    var e = vg_easing(t / 60, 10);          // 10 = ElasticOut
+    var px = 30 + e * (cw - 100);
+    vg_draw_fill_ellipse(px, ch / 2, 16, 16, [0.30, 0.75, 1, 0.95]);
+    vg_draw_fill_ellipse(px, ch / 2, 26, 26, [0.30, 0.75, 1, 0.18]);
+    // 文本
+    vg_draw_text("Canvas 原语绘制 · 帧驱动动画", 34, 32, 15, [0.85, 0.9, 1, 0.95]);
+    vg_draw_text("dt 驱动 + vg_easing 组合", 34, ch - 44, 12, [0.55, 0.62, 0.85, 0.9]);
+}
+
+any_t func on_load(id, value, x, y) {
+    arr_push(cnt, 0);            // 占位保持下标纪律（[loads, frames, clicks, fired]）
+    cnt[3] = 1;
+}
+
+any_t func on_frame(dt) {
+    cnt[1] = cnt[1] + 1;
+    if (cnt[1] % 5 == 0) {
+        vg_label_set_text(status, "帧计数：" + str(cnt[1]));
+    }
+    if (cnt[1] >= 30) {
+        vg_close_window(w);      // 无人值守：30 帧后自动关窗
+    } else {
+        vg_request_frame();      // 还要下一帧（rAF 模型）
+    }
+}
+
+any_t func on_click(id, value, x, y) {
+    cnt[2] = cnt[2] + 1;
+}
+
+// Canvas 每帧重画（lambda 单表达式委托命名函数 —— QOT 的函数值形态）
+vg_canvas_on_draw(cv, func(cw, ch) -> draw_scene(cw, ch));
+
+// 生命周期与交互（全回调，不轮询）
+vg_on_load(w, func(id, value, x, y) -> on_load(id, value, x, y));
+vg_on_frame(func(dt) -> on_frame(dt));
+vg_on_click(title, func(id, value, x, y) -> on_click(id, value, x, y));
+vg_on_click(cv, func(id, value, x, y) -> on_click(id, value, x, y));
+
+vg_show_window(w);
+vg_run();                        // 控制权交给消息循环，全关后返回
+
+output("callback-smoke-ok loads=" + str(cnt[3]) + " frames=" + str(cnt[1]) +
+       " clicks=" + str(cnt[2]));

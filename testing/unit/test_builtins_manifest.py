@@ -144,8 +144,6 @@ class TestMissingSideFailsBuild(unittest.TestCase):
         self.assertNotEqual(r.returncode, 0, r.out)
 
     def test_duplicate_alias_fails(self):
-        # 【S-11 终审 】split/trim 别名已摘除（曾挂在 interp-only 的
-        # parts/beair 上，暗示不存在的跨引擎支持）—— 重复别名示例改用 str。
         bad = _read_manifest().replace('aliases = ["len"]', 'aliases = ["str"]', 1)
         r = self._run_with(bad, 'import qot_builtins as q; q.alias_map()')
         self.assertNotEqual(r.returncode, 0, r.out)

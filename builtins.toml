@@ -35,11 +35,6 @@
 #   stub_hint 解释器报错桩的附加提示语
 #   desc      一句话说明
 #
-# 已知的三侧不一致：
-#   * `type` / `numbers` / `http_set_*` / `http_get_headers`：VM 侧有、
-#     解释器侧没有 → 解释器走 @unsupported 桩；
-#   * `parts` / `beair` 等 33 个：解释器特有（README §21.3），AOT 调用会在
-#     **编译期**报"引擎不支持"而不是静默降级成用户函数调用；
 # ============================================================================
 
 [[builtin]]
@@ -96,14 +91,15 @@ desc = "解包错误对象的 payload；非错误对象得 null"
 [[builtin]]
 name = "cinget"
 group = "io"
-engines = ["interp", "vm"]
+engines = ["interp", "vm", "native"]
 argc = -1
 args = ["any"]
 ret = "any"
 interp = "input_handler"
 vm = "builtin_input"
+native = "input"
 aliases = ["input"]
-desc = "读取一行输入"
+desc = "读取一行输入（提示=实参空格连接；EOF/空流得空串）"
 
 [[builtin]]
 name = "glen"
@@ -186,7 +182,7 @@ argc = -1
 args = ["string", "any"]
 ret = "array"
 interp = "str_advice_split"
-desc = "字符串切分【legacy interp 名，S-11 终审 ：规范形态 = str_split（interp+native）；别名 split 已摘除 —— 它曾挂在本 interp-only 条目上，暗示了不存在的跨引擎支持（§8.3 '三侧登记' 之说的例外）。parts 返回值已修为 list（ret='array' 的既定语义）】"
+desc = "字符串切分"
 
 [[builtin]]
 name = "fopen"
@@ -392,7 +388,7 @@ argc = 1
 args = ["string", "any"]
 ret = "string"
 interp = "str_trim_handler"
-desc = "去首尾空白【legacy interp 名，S-11 终审 ：规范形态 = str_trim（interp+native）；别名 trim 已摘除（同 parts/split 的理由）】"
+desc = "去首尾空白"
 
 [[builtin]]
 name = "strcase"
@@ -1735,6 +1731,1391 @@ interp = "vg_spinner_stop_handler"
 stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
 native = "vg_spinner_stop"
 desc = "GUI（vg 系列）控件函数"
+
+# ===========================================================================
+# v2 · GUI 事件回调 / 帧原语 / 绘制原语（DirectComposition 渲染栈）
+# 事件回调：vg_bind / vg_on_* —— 函数值注册，事件触发时由消息循环线程
+#           反向调用，外部语言不再轮询（与轮询并存，老代码不受影响）。
+# 帧原语：vg_on_frame + vg_request_frame（rAF 模型）+ vg_easing 纯函数。
+# 绘制原语：vg_draw_*（Canvas 回调期间用）—— 裁剪/变换/模糊/图片/渐变
+# ===========================================================================
+
+[[builtin]]
+name = "vg_bind"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_bind_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_bind"
+desc = "事件回调绑定：vg_bind(id, kinds_mask, fn) → token；id=0 绑全部来源；回调 fn(id, value, x, y)"
+
+[[builtin]]
+name = "vg_unbind"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_unbind_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_unbind"
+desc = "解绑事件回调：vg_unbind(token) → bool"
+
+[[builtin]]
+name = "vg_on_click"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_on_click_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_on_click"
+desc = "点击回调：vg_on_click(id, fn) → token"
+
+[[builtin]]
+name = "vg_on_change"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_on_change_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_on_change"
+desc = "值改变回调（滑块/勾选/开关）：vg_on_change(id, fn) → token"
+
+[[builtin]]
+name = "vg_on_select"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_on_select_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_on_select"
+desc = "选中回调（组合/列表/选项卡）：vg_on_select(id, fn) → token"
+
+[[builtin]]
+name = "vg_on_mouse"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_on_mouse_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_on_mouse"
+desc = "鼠标回调：vg_on_mouse(id, kind, fn)；kind 10 按下 11 抬起 12 移动 13 进入 14 离开 15 双击"
+
+[[builtin]]
+name = "vg_on_key"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_on_key_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_on_key"
+desc = "键盘回调：vg_on_key(id, fn)，value = 虚拟键码"
+
+[[builtin]]
+name = "vg_on_text"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_on_text_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_on_text"
+desc = "文本框实时内容回调：vg_on_text(id, fn)"
+
+[[builtin]]
+name = "vg_on_close"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_on_close_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_on_close"
+desc = "窗口关闭请求回调：vg_on_close(win, fn)；配合 vg_prevent_close 可否决关闭"
+
+[[builtin]]
+name = "vg_on_resize"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_on_resize_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_on_resize"
+desc = "窗口尺寸回调：vg_on_resize(win, fn)，x/y = 新客户区宽高"
+
+[[builtin]]
+name = "vg_on_load"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_on_load_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_on_load"
+desc = "窗口首次显示回调（生命周期入口）：vg_on_load(win, fn)"
+
+[[builtin]]
+name = "vg_on_scroll"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_on_scroll_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_on_scroll"
+desc = "滚动事件绑定（kind=16）：vg_on_scroll(id, fn) → token；fn(id, offset, x, y)"
+
+[[builtin]]
+name = "vg_on_menu"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_on_menu_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_on_menu"
+desc = "菜单命令绑定（kind=50）：vg_on_menu(win, fn) → token；fn(id, item_id, x, y)"
+
+[[builtin]]
+name = "vg_on_drop"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_on_drop_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_on_drop"
+desc = "拖放文件绑定（kind=51）：vg_on_drop(win, fn) → token；fn(id, 文件数, x, y)"
+
+# ===========================================================================
+# v3 · 模态对话框 / 右键菜单 / toast（ 3）
+# 模态 = 独立窗口 + 父窗冻结 + 自有消息循环（阻塞至关闭，返回结果码）。
+# 菜单 = Win32 popup（TPM_RETURNCMD 同步返回选中项）+ kind=50 事件。
+# ===========================================================================
+
+[[builtin]]
+name = "vg_show_dialog"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_show_dialog_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_show_dialog"
+desc = "模态对话框：vg_show_dialog(win, parent) → 结果码；阻塞至对话框关闭，父窗冻结"
+
+[[builtin]]
+name = "vg_set_dialog_result"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_set_dialog_result_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_set_dialog_result"
+desc = "设置对话框返回值：vg_set_dialog_result(win, code)（回调内调用）"
+
+[[builtin]]
+name = "vg_create_menu"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_create_menu_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_create_menu"
+desc = "创建右键菜单：vg_create_menu() → 菜单 id"
+
+[[builtin]]
+name = "vg_menu_add_item"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_menu_add_item_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_menu_add_item"
+desc = "菜单加项：vg_menu_add_item(mid, text) → 项 id"
+
+[[builtin]]
+name = "vg_menu_separator"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_menu_separator_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_menu_separator"
+desc = "菜单分隔线：vg_menu_separator(mid)"
+
+[[builtin]]
+name = "vg_menu_popup"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_menu_popup_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_menu_popup"
+desc = "弹出菜单（同步）：vg_menu_popup(mid, win, x, y) → 选中项 id（0=取消）；并发 kind=50 事件"
+
+[[builtin]]
+name = "vg_menu_destroy"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_menu_destroy_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_menu_destroy"
+desc = "销毁菜单：vg_menu_destroy(mid)"
+
+[[builtin]]
+name = "vg_toast"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_toast_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_toast"
+desc = "轻提示：vg_toast(win, text[, ms=2200])——底部居中卡片自动淡出，不挡输入"
+
+# ===========================================================================
+# v3 · 文本富能力（ 4）：粗体/对齐/自动换行/省略号 + 换行测量
+# ===========================================================================
+
+[[builtin]]
+name = "vg_draw_text_ex"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_draw_text_ex_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_draw_text_ex"
+desc = "富文本：vg_draw_text_ex(text, x, y, w, h, size, color, bold, halign, valign[, wrap[, ellipsis]])；对齐 0起 1中 2末；Canvas 回调期间可用"
+
+[[builtin]]
+name = "vg_draw_measure_text_ex"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_draw_measure_text_ex_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_draw_measure_text_ex"
+desc = "富测量：vg_draw_measure_text_ex(text, size[, bold[, wrap[, maxw]]]) → [w, h]；wrap 时返回换行后的宽高"
+
+# ===========================================================================
+# v3 · 系统集成：剪贴板 / 文件拖放 / 任务栏进度
+# ===========================================================================
+
+[[builtin]]
+name = "vg_clipboard_set"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_clipboard_set_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_clipboard_set"
+desc = "写剪贴板文本：vg_clipboard_set(text) → bool"
+
+[[builtin]]
+name = "vg_clipboard_get"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_clipboard_get_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_clipboard_get"
+desc = "读剪贴板文本：vg_clipboard_get() → str（无文本返回空串）"
+
+[[builtin]]
+name = "vg_window_accept_files"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_window_accept_files_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_window_accept_files"
+desc = "拖放开关联动：vg_window_accept_files(win, on) → bool；文件落入发 kind=51 事件"
+
+[[builtin]]
+name = "vg_take_drop_file"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_take_drop_file_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_take_drop_file"
+desc = "取拖放文件路径：vg_take_drop_file(i) → str（kind=51 回调里立刻取，i < 文件数）"
+
+[[builtin]]
+name = "vg_taskbar_progress"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_taskbar_progress_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_taskbar_progress"
+desc = "任务栏进度：vg_taskbar_progress(win, done, total) → bool"
+
+[[builtin]]
+name = "vg_taskbar_state"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_taskbar_state_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_taskbar_state"
+desc = "任务栏状态：vg_taskbar_state(win, state)；0 无 1 不确定 2 正常 3 错误 4 暂停"
+
+# ===========================================================================
+# v4 · 样式原语（通用组件样式叠加 + 绘制接管 + 自绘菜单样式）
+# 未设置的属性走组件默认（零定制 = 行为不变）。
+# 状态：1 悬停 2 按下 3 禁用 4 焦点；状态位：0x1/0x2/0x4/0x8。
+# ===========================================================================
+
+[[builtin]]
+name = "vg_style_bg"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_style_bg_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_style_bg"
+desc = "背景色叠加：vg_style_bg(id, [r,g,b,a]) → bool"
+
+[[builtin]]
+name = "vg_style_bg_gradient"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_style_bg_gradient_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_style_bg_gradient"
+desc = "渐变背景叠加：vg_style_bg_gradient(id, c1, c2[, vertical=true]) → bool"
+
+[[builtin]]
+name = "vg_style_border"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_style_border_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_style_border"
+desc = "边框叠加：vg_style_border(id, [r,g,b,a], width) → bool"
+
+[[builtin]]
+name = "vg_style_radius"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_style_radius_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_style_radius"
+desc = "圆角叠加：vg_style_radius(id, radius) → bool"
+
+[[builtin]]
+name = "vg_style_padding"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_style_padding_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_style_padding"
+desc = "内边距叠加：vg_style_padding(id, l, t, r, b) → bool"
+
+[[builtin]]
+name = "vg_style_text"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_style_text_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_style_text"
+desc = "文字样式叠加：vg_style_text(id, [r,g,b,a], size[, bold]) → bool"
+
+[[builtin]]
+name = "vg_style_state_bg"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_style_state_bg_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_style_state_bg"
+desc = "状态背景叠加：vg_style_state_bg(id, which, [r,g,b,a])；which 1悬停 2按下 3禁用 4焦点"
+
+[[builtin]]
+name = "vg_style_state_text"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_style_state_text_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_style_state_text"
+desc = "状态文字色叠加：vg_style_state_text(id, which, [r,g,b,a])"
+
+[[builtin]]
+name = "vg_style_reset"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_style_reset_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_style_reset"
+desc = "清空样式叠加：vg_style_reset(id) → 回默认外观"
+
+[[builtin]]
+name = "vg_style_flags"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_style_flags_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_style_flags"
+desc = "查状态位：vg_style_flags(id) → 0x1悬停 0x2按下 0x4禁用 0x8焦点"
+
+[[builtin]]
+name = "vg_on_paint"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_on_paint_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_on_paint"
+desc = "绘制接管：vg_on_paint(id, fn)；每帧 fn(w, h, state)，回调内 vg_draw_* 自由作画（坐标=组件本地），输入语义不变；容器类不支持"
+
+[[builtin]]
+name = "vg_toast_style"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_toast_style_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_toast_style"
+desc = "Toast 样式：vg_toast_style(win, bg, text, border, radius)"
+
+[[builtin]]
+name = "vg_scroll_style"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_scroll_style_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_scroll_style"
+desc = "滚动条样式：vg_scroll_style(id, track, thumb, width)（作用于 ScrollPane）"
+
+[[builtin]]
+name = "vg_menu_bg"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_menu_bg_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_menu_bg"
+desc = "菜单背景色（自绘菜单）：vg_menu_bg(mid, [r,g,b,a])"
+
+[[builtin]]
+name = "vg_menu_hover_bg"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_menu_hover_bg_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_menu_hover_bg"
+desc = "菜单悬停高亮色：vg_menu_hover_bg(mid, [r,g,b,a])"
+
+[[builtin]]
+name = "vg_menu_text_color"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_menu_text_color_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_menu_text_color"
+desc = "菜单文字色：vg_menu_text_color(mid, [r,g,b,a])"
+
+[[builtin]]
+name = "vg_menu_border"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_menu_border_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_menu_border"
+desc = "菜单描边：vg_menu_border(mid, [r,g,b,a], width)"
+
+[[builtin]]
+name = "vg_on_frame"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_on_frame_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_on_frame"
+desc = "帧原语：vg_on_frame(fn) → token；每帧绘制前调 fn(dt)，需下一帧再 vg_request_frame()"
+
+[[builtin]]
+name = "vg_off_frame"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_off_frame_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_off_frame"
+desc = "注销帧回调：vg_off_frame(token) → bool"
+
+[[builtin]]
+name = "vg_request_frame"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_request_frame_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_request_frame"
+desc = "请求下一帧（rAF 模型；不请求即自然停帧，零空转）"
+
+[[builtin]]
+name = "vg_easing"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_easing_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_easing"
+desc = "缓动纯函数：vg_easing(t, kind) → 0..1；kind 0 线性 1-3 二次 4-6 三次 7-9 正弦 10 弹性 11 弹跳"
+
+[[builtin]]
+name = "vg_window_transparent"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_window_transparent_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_window_transparent"
+desc = "窗口透明能力原语：vg_window_transparent(win, on)；配合半透明背景色自制玻璃/悬浮效果"
+
+[[builtin]]
+name = "vg_window_backdrop"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_window_backdrop_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_window_backdrop"
+desc = "系统合成器背景模糊原语：vg_window_backdrop(win, on[, tint_alpha])（模糊的是桌面）"
+
+[[builtin]]
+name = "vg_set_window_round"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_set_window_round_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_set_window_round"
+desc = "窗口圆角（Win11）：vg_set_window_round(win, on) → bool"
+
+[[builtin]]
+name = "vg_set_window_borderless"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_set_window_borderless_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_set_window_borderless"
+desc = "无边框窗口（保留边缘缩放）：vg_set_window_borderless(win, on)；拖动配 vg_window_drag"
+
+[[builtin]]
+name = "vg_set_window_topmost"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_set_window_topmost_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_set_window_topmost"
+desc = "窗口置顶：vg_set_window_topmost(win, on)"
+
+[[builtin]]
+name = "vg_prevent_close"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_prevent_close_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_prevent_close"
+desc = "否决窗口关闭：vg_prevent_close(win, on)；on 时点 X 只发 close 事件不关窗"
+
+[[builtin]]
+name = "vg_window_drag"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_window_drag_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_window_drag"
+desc = "启动系统拖动（无边框窗口客户区用）：vg_window_drag(win)"
+
+[[builtin]]
+name = "vg_window_minimize"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_window_minimize_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_window_minimize"
+desc = "最小化窗口：vg_window_minimize(win)"
+
+[[builtin]]
+name = "vg_window_maximize"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_window_maximize_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_window_maximize"
+desc = "最大化窗口：vg_window_maximize(win)"
+
+[[builtin]]
+name = "vg_window_restore"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_window_restore_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_window_restore"
+desc = "还原窗口：vg_window_restore(win)"
+
+[[builtin]]
+name = "vg_set_window_bg_rgba"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_set_window_bg_rgba_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_set_window_bg_rgba"
+desc = "带透明度的窗口背景渐变：vg_set_window_bg_rgba(win, [r,g,b,a], [r,g,b,a])；透明窗口自制玻璃用"
+
+[[builtin]]
+name = "vg_set_theme"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_set_theme_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_set_theme"
+desc = "窗口主题：vg_set_theme(win, theme)；0 深色 1 浅色 2 蓝"
+
+[[builtin]]
+name = "vg_set_font"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_set_font_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_set_font"
+desc = "全局字体族：vg_set_font(family)，如 'Segoe UI'/'Microsoft YaHei'"
+
+[[builtin]]
+name = "vg_set_opacity"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_set_opacity_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_set_opacity"
+desc = "组件透明度：vg_set_opacity(id, a)，0~1（淡入淡出动画用）"
+
+[[builtin]]
+name = "vg_animate"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_animate_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_animate"
+desc = "属性动画糖：vg_animate(id, prop, from, to, ms, easing) → 动画 id；prop 0 x 1 y 2 w 3 h 4 透明度；完成发 kind=8"
+
+[[builtin]]
+name = "vg_animate_stop"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_animate_stop_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_animate_stop"
+desc = "停止属性动画：vg_animate_stop(anim_id) → bool"
+
+[[builtin]]
+name = "vg_create_canvas"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_create_canvas_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_create_canvas"
+desc = "创建画布组件：vg_create_canvas(win, x, y, w, h) → id；配 vg_canvas_on_draw 自由绘制"
+
+[[builtin]]
+name = "vg_canvas_on_draw"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_canvas_on_draw_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_canvas_on_draw"
+desc = "画布绘制回调：vg_canvas_on_draw(id, fn)；每帧调 fn(w, h)，回调内用 vg_draw_* 原语作画"
+
+[[builtin]]
+name = "vg_create_image"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_create_image_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_create_image"
+desc = "创建图片组件：vg_create_image(win, path, x, y, w, h) → id（PNG/JPG/BMP）"
+
+[[builtin]]
+name = "vg_image_load"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_image_load_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_image_load"
+desc = "加载图片资源：vg_image_load(path) → 图片 id（vg_draw_image 用）；失败 null"
+
+[[builtin]]
+name = "vg_image_free"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_image_free_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_image_free"
+desc = "释放图片资源：vg_image_free(img_id)"
+
+[[builtin]]
+name = "vg_image_size"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_image_size_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_image_size"
+desc = "图片原始尺寸：vg_image_size(img_id) → [w, h] | null"
+
+[[builtin]]
+name = "vg_draw_fill_rect"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_draw_fill_rect_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_draw_fill_rect"
+desc = "绘制原语：vg_draw_fill_rect(x, y, w, h, [r,g,b,a])（Canvas 回调内用）"
+
+[[builtin]]
+name = "vg_draw_stroke_rect"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_draw_stroke_rect_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_draw_stroke_rect"
+desc = "绘制原语：vg_draw_stroke_rect(x, y, w, h, [r,g,b,a], width)"
+
+[[builtin]]
+name = "vg_draw_fill_round_rect"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_draw_fill_round_rect_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_draw_fill_round_rect"
+desc = "绘制原语：vg_draw_fill_round_rect(x, y, w, h, radius, [r,g,b,a])"
+
+[[builtin]]
+name = "vg_draw_stroke_round_rect"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_draw_stroke_round_rect_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_draw_stroke_round_rect"
+desc = "绘制原语：vg_draw_stroke_round_rect(x, y, w, h, radius, [r,g,b,a], width)"
+
+[[builtin]]
+name = "vg_draw_fill_ellipse"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_draw_fill_ellipse_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_draw_fill_ellipse"
+desc = "绘制原语：vg_draw_fill_ellipse(cx, cy, rx, ry, [r,g,b,a])"
+
+[[builtin]]
+name = "vg_draw_stroke_ellipse"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_draw_stroke_ellipse_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_draw_stroke_ellipse"
+desc = "绘制原语：vg_draw_stroke_ellipse(cx, cy, rx, ry, [r,g,b,a], width)"
+
+[[builtin]]
+name = "vg_draw_line"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_draw_line_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_draw_line"
+desc = "绘制原语：vg_draw_line(x1, y1, x2, y2, [r,g,b,a], width)"
+
+[[builtin]]
+name = "vg_draw_text"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_draw_text_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_draw_text"
+desc = "绘制原语：vg_draw_text(text, x, y, size, [r,g,b,a])（\n 分行）"
+
+[[builtin]]
+name = "vg_draw_measure_text"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_draw_measure_text_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_draw_measure_text"
+desc = "文本测量：vg_draw_measure_text(text, size) → [w, h]"
+
+[[builtin]]
+name = "vg_draw_gradient_rect"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_draw_gradient_rect_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_draw_gradient_rect"
+desc = "绘制原语：vg_draw_gradient_rect(x, y, w, h, [c0], [c1], vertical)；两停靠点线性渐变"
+
+[[builtin]]
+name = "vg_draw_push_clip"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_draw_push_clip_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_draw_push_clip"
+desc = "绘制原语：vg_draw_push_clip(x, y, w, h)；矩形裁剪（可嵌套），配 vg_draw_pop_clip"
+
+[[builtin]]
+name = "vg_draw_pop_clip"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_draw_pop_clip_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_draw_pop_clip"
+desc = "绘制原语：vg_draw_pop_clip()；弹出裁剪"
+
+[[builtin]]
+name = "vg_draw_push_translate"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_draw_push_translate_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_draw_push_translate"
+desc = "绘制原语：vg_draw_push_translate(dx, dy)；平移变换（可嵌套），配 vg_draw_pop_transform"
+
+[[builtin]]
+name = "vg_draw_push_rotate"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_draw_push_rotate_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_draw_push_rotate"
+desc = "绘制原语：vg_draw_push_rotate(cx, cy, radians)；绕点旋转变换"
+
+[[builtin]]
+name = "vg_draw_push_scale"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_draw_push_scale_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_draw_push_scale"
+desc = "绘制原语：vg_draw_push_scale(cx, cy, sx, sy)；绕点缩放变换"
+
+[[builtin]]
+name = "vg_draw_pop_transform"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_draw_pop_transform_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_draw_pop_transform"
+desc = "绘制原语：vg_draw_pop_transform()；弹出变换"
+
+[[builtin]]
+name = "vg_draw_image"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_draw_image_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_draw_image"
+desc = "绘制原语：vg_draw_image(img_id, x, y, w, h, alpha)；图片 id 来自 vg_image_load"
+
+[[builtin]]
+name = "vg_draw_push_blur"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_draw_push_blur_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_draw_push_blur"
+desc = "绘制原语：vg_draw_push_blur(radius, x, y, w, h)；层模糊（合成路径可用），配 vg_draw_pop_blur"
+
+[[builtin]]
+name = "vg_draw_pop_blur"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_draw_pop_blur_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_draw_pop_blur"
+desc = "绘制原语：vg_draw_pop_blur()；模糊层生效并弹出"
+
+# ===========================================================================
+# v3 · 布局系统：脚本层自动布局 + 窗口拉伸自动重排
+# 流程：vg_layout_begin(win,"vbox") → vg_layout_add(win,id)... →
+#       vg_layout_props(id,...)（可选）→ vg_layout_end(win) 立即重排。
+# 此后窗口 resize 自动重排；absolute 模式 = 关闭布局恢复绝对坐标。
+# ===========================================================================
+
+[[builtin]]
+name = "vg_layout_begin"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_layout_begin_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_layout_begin"
+desc = "布局声明：vg_layout_begin(win, mode)；mode = vbox/hbox/grid/absolute（关闭布局）"
+
+[[builtin]]
+name = "vg_layout_add"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_layout_add_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_layout_add"
+desc = "布局登记：vg_layout_add(win, id)；登记顺序即布局顺序"
+
+[[builtin]]
+name = "vg_layout_spacing"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_layout_spacing_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_layout_spacing"
+desc = "布局间距：vg_layout_spacing(win, n)；条目间空隙（默认 8）"
+
+[[builtin]]
+name = "vg_layout_padding"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_layout_padding_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_layout_padding"
+desc = "布局内边距：vg_layout_padding(win, all | lr,tb | l,t,r,b)"
+
+[[builtin]]
+name = "vg_layout_cols"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_layout_cols_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_layout_cols"
+desc = "网格列数：vg_layout_cols(win, n)（grid 模式用，默认 2）"
+
+[[builtin]]
+name = "vg_layout_props"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_layout_props_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_layout_props"
+desc = "控件布局属性：vg_layout_props(id, margin, fill, align, weight)；margin=[l,t,r/b 或标量；fill 0 自然 1 交叉轴拉伸 2 全拉伸；align 0 起 1 中 2 末；weight 主轴伸展权重"
+
+[[builtin]]
+name = "vg_layout_end"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_layout_end_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_layout_end"
+desc = "布局收口：vg_layout_end(win)；立即重排，此后窗口拉伸自动重排"
+
+[[builtin]]
+name = "vg_get_pos"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_get_pos_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_get_pos"
+desc = "读回控件左上角：vg_get_pos(id) → [x, y]"
+
+[[builtin]]
+name = "vg_get_size"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_get_size_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_get_size"
+desc = "读回控件尺寸：vg_get_size(id) → [w, h]"
+
+[[builtin]]
+name = "vg_window_client_size"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_window_client_size_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_window_client_size"
+desc = "读回窗口客户区：vg_window_client_size(win) → [w, h]"
+
+# ===========================================================================
+# v3 · 滚动容器与虚拟化列表（ 2）
+# ScrollPane：内容虚高 + 滚轮/拖拽滚动；vg_scroll_attach 把控件装进去。
+# VirtualList：万行级虚拟化——只画可视窗口内的行；行文本回调式或数组式。
+# ===========================================================================
+
+[[builtin]]
+name = "vg_create_scrollpane"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_create_scrollpane_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_create_scrollpane"
+desc = "滚动容器：vg_create_scrollpane(win, x, y, w, h) → id；滚轮/拖拽滚动，发 kind=16 事件"
+
+[[builtin]]
+name = "vg_scroll_content"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_scroll_content_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_scroll_content"
+desc = "滚动区内容虚高：vg_scroll_content(id, content_h)"
+
+[[builtin]]
+name = "vg_scroll_attach"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_scroll_attach_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_scroll_attach"
+desc = "控件装进滚动区：vg_scroll_attach(sp, id, x, y, w, h)；x/y = 内容坐标"
+
+[[builtin]]
+name = "vg_scroll_offset"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_scroll_offset_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_scroll_offset"
+desc = "读当前滚动偏移：vg_scroll_offset(id) → 数值（滚动区/虚拟列表通用）"
+
+[[builtin]]
+name = "vg_scroll_to"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_scroll_to_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_scroll_to"
+desc = "滚动到指定偏移：vg_scroll_to(id, offset)"
+
+[[builtin]]
+name = "vg_create_vlist"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_create_vlist_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_create_vlist"
+desc = "虚拟化列表：vg_create_vlist(win, x, y, w, h) → id；万行级数据只画可视行"
+
+[[builtin]]
+name = "vg_list_set_count"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_list_set_count_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_list_set_count"
+desc = "虚拟列表数据条数：vg_list_set_count(id, n)（回调模式下与可视项解耦）"
+
+[[builtin]]
+name = "vg_list_add_item"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_list_add_item_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_list_add_item"
+desc = "虚拟列表加行（数组模式）：vg_list_add_item(id, text)"
+
+[[builtin]]
+name = "vg_list_draw_count"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_list_draw_count_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_list_draw_count"
+desc = "虚拟列表累计已绘制行数：vg_list_draw_count(id)（虚拟化自证指标）"
+
+[[builtin]]
+name = "vg_list_on_data"
+group = "gui"
+engines = ["interp", "native"]
+argc = -1
+args = ["any"]
+ret = "any"
+interp = "vg_list_on_data_handler"
+stub_hint = "GUI 函数：解释器经 qotgui.dll、原生程序链接同一份 wingui 实现"
+native = "vg_list_on_data"
+desc = "虚拟列表行数据回调：vg_list_on_data(id, fn)；fn(row) → 行文本（大数据零拷贝）"
 
 [[builtin]]
 name = "vg_set_position"
@@ -4863,6 +6244,17 @@ ret = "string"
 interp = "socket_udp_recv_handler"
 native = "socket_udp_recv"
 desc = "收数据报（至多 len 字节；对端记入 remote_addr）；超时/失败 \"\""
+
+[[builtin]]
+name = "socket_select"
+group = "net"
+engines = ["interp", "native"]
+argc = 2
+args = ["any", "number"]
+ret = "array"
+interp = "socket_select_handler"
+native = "socket_select"
+desc = "select 多路复用：句柄数组+超时ms → 就绪句柄数组（读就绪面；非法项跳过；超时/错误空数组；入参非数组 null；句柄上限 FD_SETSIZE-1）"
 
 
 

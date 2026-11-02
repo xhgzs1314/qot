@@ -31,9 +31,20 @@ public:
     bool IsWordWrap() const { return m_wordWrap; }
 
     void Draw(Renderer* renderer) override {
+        if (!m_visible) return;
+        // v4：owner-draw 接管
+        if (m_paintFn) {
+            m_paintFn(renderer, m_bounds.Width(), m_bounds.Height(), StyleFlags());
+            return;
+        }
         if (!m_text.empty()) {
-            renderer->DrawTextAligned(m_text, m_bounds, m_textColor, m_fontSize,
-                                      m_bold, m_halign == HAlign::Left ? 0
+            // v4 样式叠加：文字色/字号/粗体（isSet 优先）
+            Color tc = m_textColor;
+            float fs = m_fontSize;
+            bool bd = m_bold;
+            if (m_style.textSet) { tc = m_style.textColor; fs = m_style.textSize; bd = m_style.textBold; }
+            renderer->DrawTextAligned(m_text, m_bounds, tc, fs,
+                                      bd, m_halign == HAlign::Left ? 0
                                             : (m_halign == HAlign::Center ? 1 : 2),
                                       m_valign == VAlign::Top ? 0
                                             : (m_valign == VAlign::Middle ? 1 : 2),

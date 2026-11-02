@@ -47,17 +47,26 @@ namespace gui
         {
             if (!m_visible || !renderer)
                 return;
+            // v4：owner-draw 接管（勾选动画进度可经 StyleFlags 之外的原语自绘）
+            if (m_paintFn) {
+                m_paintFn(renderer, m_bounds.Width(), m_bounds.Height(), StyleFlags());
+                return;
+            }
+            unsigned flags = StyleFlags();
 
             float boxX = m_bounds.left;
             float boxY = m_bounds.top + (m_bounds.Height() - m_boxSize) / 2;
 
-            
+
             RoundedRect boxRect;
             boxRect.rect = Rect(boxX, boxY, boxX + m_boxSize, boxY + m_boxSize);
-            boxRect.radiusX = m_borderRadius;
-            boxRect.radiusY = m_borderRadius;
-            renderer->FillRoundedRect(boxRect, m_boxColor);
-            renderer->DrawRoundedRect(boxRect, Color(0.4f, 0.4f, 0.5f, 0.5f), 1.0f);
+            boxRect.radiusX = m_style.radiusSet ? m_style.radius : m_borderRadius;
+            boxRect.radiusY = boxRect.radiusX;
+            Color boxBg;
+            if (!ResolvedStateBg(flags, boxBg)) boxBg = m_boxColor;
+            renderer->FillRoundedRect(boxRect, boxBg);
+            renderer->DrawRoundedRect(boxRect, m_style.borderSet ? m_style.borderColor : Color(0.4f, 0.4f, 0.5f, 0.5f),
+                                      m_style.borderSet ? m_style.borderWidth : 1.0f);
 
             
             if (m_checkProgress > 0.01f)
@@ -78,9 +87,19 @@ namespace gui
                 renderer->DrawLine(p2, p3, m_checkColor, 2.0f);
             }
 
-            
+
             Rect textRect(boxX + m_boxSize + 8, m_bounds.top, m_bounds.right, m_bounds.bottom);
-            renderer->DrawText(m_text, textRect, m_textColor, m_fontSize, false, false);
+            Color tc;
+            if (!ResolvedStateText(flags, tc)) tc = m_textColor;
+            renderer->DrawText(m_text, textRect, tc, m_fontSize, false, false);
+        }
+
+        // v4：状态位（hover 补充基类 disabled）
+        unsigned StyleFlags() const override
+        {
+            unsigned f = UIComponent::StyleFlags();
+            if (m_isHovered) f |= 0x1;
+            return f;
         }
 
         void Update(float deltaTime) override
@@ -164,18 +183,24 @@ namespace gui
         void SetSelectedColor(const Color &color) { m_selectedColor = color; }
         void OnSelected(StateCallback callback) { m_callback = callback; }
 
-        
+
         void Draw(Renderer *renderer) override
         {
             if (!m_visible || !renderer)
                 return;
+            if (m_paintFn) {
+                m_paintFn(renderer, m_bounds.Width(), m_bounds.Height(), StyleFlags());
+                return;
+            }
 
             float cx = m_bounds.left + m_circleSize / 2;
             float cy = m_bounds.top + (m_bounds.Height() - m_circleSize) / 2 + m_circleSize / 2;
 
-            
+
             Ellipse outer(cx, cy, m_circleSize / 2);
-            renderer->FillEllipse(outer, m_circleColor);
+            Color circleBg;
+            if (!ResolvedStateBg(StyleFlags(), circleBg)) circleBg = m_circleColor;
+            renderer->FillEllipse(outer, circleBg);
             renderer->DrawEllipse(outer, Color(0.4f, 0.4f, 0.5f, 0.5f), 1.0f);
 
             
@@ -293,17 +318,23 @@ namespace gui
         {
             if (!m_visible || !renderer)
                 return;
+            if (m_paintFn) {
+                m_paintFn(renderer, m_bounds.Width(), m_bounds.Height(), StyleFlags());
+                return;
+            }
 
             float cx = m_bounds.left + m_width / 2;
             float cy = m_bounds.top + (m_bounds.Height() - m_height) / 2 + m_height / 2;
 
-            
+
             RoundedRect bgRect;
             bgRect.rect = Rect(m_bounds.left, cy - m_height / 2, m_bounds.left + m_width, cy + m_height / 2);
-            bgRect.radiusX = m_borderRadius;
-            bgRect.radiusY = m_borderRadius;
+            bgRect.radiusX = m_style.radiusSet ? m_style.radius : m_borderRadius;
+            bgRect.radiusY = bgRect.radiusX;
 
-            Color bgColor = Color::Lerp(m_offColor, m_onColor, m_thumbOffset);
+            Color bgColor;
+            if (!ResolvedStateBg(StyleFlags(), bgColor))
+                bgColor = Color::Lerp(m_offColor, m_onColor, m_thumbOffset);
             renderer->FillRoundedRect(bgRect, bgColor);
 
             
@@ -443,17 +474,27 @@ public:
 
     void Draw(Renderer* renderer) override {
         if (!m_visible || !renderer) return;
-        
-        
+        // v4：owner-draw 接管（文字/caret/IME 高级定制全交回调；
+        // state 0x8 focused 可用，文本与光标自绘）
+        if (m_paintFn) {
+            m_paintFn(renderer, m_bounds.Width(), m_bounds.Height(), StyleFlags());
+            return;
+        }
+
+
         RoundedRect bgRect;
         bgRect.rect = m_bounds;
-        bgRect.radiusX = m_borderRadius;
-        bgRect.radiusY = m_borderRadius;
-        renderer->FillRoundedRect(bgRect, m_backgroundColor);
-        
-        
-        Color borderColor = m_hasFocus ? m_focusedBorderColor : m_borderColor;
-        renderer->DrawRoundedRect(bgRect, borderColor, 1.5f);
+        bgRect.radiusX = m_style.radiusSet ? m_style.radius : m_borderRadius;
+        bgRect.radiusY = bgRect.radiusX;
+        Color bg;
+        if (!ResolvedStateBg(StyleFlags(), bg)) bg = m_backgroundColor;
+        renderer->FillRoundedRect(bgRect, bg);
+
+
+        Color borderColor;
+        if (m_style.borderSet) borderColor = m_style.borderColor;
+        else borderColor = m_hasFocus ? m_focusedBorderColor : m_borderColor;
+        renderer->DrawRoundedRect(bgRect, borderColor, m_style.borderSet ? m_style.borderWidth : 1.5f);
         
         
         Rect textRect = m_bounds;
@@ -561,6 +602,23 @@ private:
         return p.x >= m_bounds.left && p.x <= m_bounds.right &&
                p.y >= m_bounds.top && p.y <= m_bounds.bottom;
     }
+
+    // v4：生效文字色（style/state 叠加 > 组件默认）
+    Color TextColorEff() const {
+        Color c;
+        if (ResolvedStateText(StyleFlags(), c)) return c;
+        return m_textColor;
+    }
+
+public:
+    // v4：状态位（focused 补充基类 disabled）
+    unsigned StyleFlags() const override {
+        unsigned f = UIComponent::StyleFlags();
+        if (m_hasFocus) f |= 0x8;
+        return f;
+    }
+
+private:
     
     
     float GetTextWidthBeforeCursor() {
@@ -648,11 +706,11 @@ private:
         if (m_text.empty()) {
             renderer->DrawText(m_placeholder, textRect, m_placeholderColor, m_fontSize, false, false);
         } else {
-            
+
             Rect scrolledRect = textRect;
             scrolledRect.left -= m_scrollOffset;
             scrolledRect.right -= m_scrollOffset;
-            renderer->DrawText(m_text, scrolledRect, m_textColor, m_fontSize, false, false);
+            renderer->DrawText(m_text, scrolledRect, TextColorEff(), m_fontSize, false, false);
         }
     }
     
@@ -665,17 +723,17 @@ private:
         scrolledRect.left -= m_scrollOffset;
         scrolledRect.right -= m_scrollOffset;
         
-        
-        renderer->DrawText(m_text, scrolledRect, m_textColor, m_fontSize, false, false);
-        
-        
+
+        renderer->DrawText(m_text, scrolledRect, TextColorEff(), m_fontSize, false, false);
+
+
         if (showCursor) {
             float cursorX = GetTextWidthBeforeCursor() - m_scrollOffset + textRect.left;
             if (cursorX >= textRect.left - 2 && cursorX <= textRect.right + 2) {
                 renderer->DrawLine(
                     Point(cursorX, textRect.top + 2),
                     Point(cursorX, textRect.bottom - 2),
-                    m_textColor, 1.5f);
+                    TextColorEff(), 1.5f);
             }
         }
     }
@@ -689,7 +747,7 @@ private:
             Rect scrolledRect = textRect;
             scrolledRect.left -= m_scrollOffset;
             scrolledRect.right -= m_scrollOffset;
-            renderer->DrawText(m_text, scrolledRect, m_textColor, m_fontSize, false, false);
+            renderer->DrawText(m_text, scrolledRect, TextColorEff(), m_fontSize, false, false);
         }
         
         

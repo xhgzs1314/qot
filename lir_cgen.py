@@ -26,7 +26,7 @@ from lir import (
     INDEX_GET, INDEX_SET, MAKE_ARRAY, MAKE_DICT, REQUIRE, STOP, NOP,
     GUARD_NUM, GLOBAL_BIT, ARENA_PUSH, ARENA_RESET,
     THROW, TRY_PUSH, TRY_POP, ENV_NEW, MAKE_CLOSURE, THROWVAL, UPVAL_BIT,
-    FIELD_GET, FIELD_SET, CALL_OMETHOD,
+    FIELD_GET, FIELD_SET, CALL_OMETHOD, GUARD_TYPE,
 )
 
 
@@ -161,10 +161,12 @@ class Cg(object):
             return 'g[%d]' % (slot & ~GLOBAL_BIT)
         if _is_upval(slot):
             lv, ix = _upval_levels(slot), _upval_idx(slot)
+            # PROMAX-U1：寻址走内联快路径（env_up2/env_at2 —— gcc 内联后
+            # 同级链 CSE，每次 upval 访问省 2 次函数调用；慢形态回落原函数）
             env_expr = self._cur_env0 or '0'
             if lv > 0:
-                env_expr = 'qotrt_env_up(%s, %d)' % (env_expr, lv)
-            return '(*qotrt_env_at(%s, %d))' % (env_expr, ix)
+                env_expr = 'qotrt_env_up2(%s, %d)' % (env_expr, lv)
+            return '(*qotrt_env_at2(%s, %d))' % (env_expr, ix)
         return 's%d' % slot
 
     def _va(self, slot):
@@ -177,10 +179,11 @@ class Cg(object):
 
     def _vref_addr_of_upval(self, slot):
         lv, ix = _upval_levels(slot), _upval_idx(slot)
+        # PROMAX-U1：同 _vref（内联快路径寻址）
         env_expr = self._cur_env0 or '0'
         if lv > 0:
-            env_expr = 'qotrt_env_up(%s, %d)' % (env_expr, lv)
-        return 'qotrt_env_at(%s, %d)' % (env_expr, ix)
+            env_expr = 'qotrt_env_up2(%s, %d)' % (env_expr, lv)
+        return 'qotrt_env_at2(%s, %d)' % (env_expr, ix)
 
     def emit(self, s):
         self.lines.append(s)
@@ -237,9 +240,11 @@ class Cg(object):
         没有其它观察者，语义不变（test_s03_limits 守卫）。
         """
         if i.target <= pc:
-            out.append('  if (qotrt_tick_limit >= 0) { ++qotrt_ticks;')
-            out.append('    if (qotrt_ticks > qotrt_tick_limit) '
-                       'qotrt_fail_timeout(qotrt_tick_limit / 200000LL); }')
+            # PROMAX-T1：qot_tk_lim 是函数头快照（const 局部，见 emit_func）；
+            # 未设超时 → 每回边只剩一次已完美预测的比较，无全局内存往返。
+            out.append('  if (qot_tk_lim >= 0) { ++qotrt_ticks;')
+            out.append('    if (qotrt_ticks > qot_tk_lim) '
+                       'qotrt_fail_timeout(qot_tk_lim / 200000LL); }')
 
     def emit_func(self, f, symbol, is_main=False):
         nt = getattr(f, 'name_table', None) or []
@@ -295,6 +300,11 @@ class Cg(object):
         if has_try:
             # 函数入口的着陆基准：RET/STOP/跨 try 跳转按它对齐摘除
             self.emit('  void *qot_ldbase = (void *)qotrt_landings;')
+        # PROMAX-T1：超时阈值快照（qotrt_init_limits 在 main() 内先于一切用户
+        # 代码执行，此后恒定不写）。循环回边检查从「全局 load + cmp」缩为
+        # 「const 局部 cmp」——gcc 对含函数调用的循环无法证明全局不变，
+        # 这里显式快照一次（语义不变：tick_limit 初始化后无写点）。
+        self.emit('  const long long qot_tk_lim = qotrt_tick_limit;')
         if not is_main:
             # 形参绑定：nbind = min(argc, n_bind_slots)，顺序展开（与字节码解释器一致；
             # 未绑定的形参槽保持 VT_NONE，与 StackFrame 默认值一致）
@@ -315,7 +325,7 @@ class Cg(object):
 
     def _slots_of(self, i):
         out = []
-        if i.op == GUARD_NUM:
+        if i.op == GUARD_NUM or i.op == GUARD_TYPE:
             out += list(i.args)
         if i.op in (LOAD_F64, STORE_F64, MOV_V, MOV_F, BR_IF_NOT, BR_IF, BR_F,
                     RET_V, RET_F, UNARY_GEN, NEG_F, INDEX_GET, CALL_DYNAMIC,
@@ -370,9 +380,12 @@ class Cg(object):
             if pc == 0 or self._is_jump_target(f, pc):
                 out.append('L%d:;' % pc)
             # 融合优先：先试探「裸比较 + 分支」（去装箱快循环的形态），
+            # 再试探「未组化比较 + 分支」（PROMAX-B2：慢循环条件直发），
             # 再试探「带 guard 的比较组 + 分支」，再试「下标+算术融合」，
             # 再试「独占追加」，最后才是通用组。
             consumed = self._try_fused_cmp_branch(f, pc, out)
+            if not consumed:
+                consumed = self._try_fused_arith_branch(f, pc, out)
             if not consumed:
                 consumed = self._try_f64_group(f, pc, out)
             if not consumed:
@@ -800,25 +813,53 @@ class Cg(object):
             fast = '      %s = qotrt_bool(%s %s %s);' % (
                 rd, lhs_txt, CMP_PRED_TEXT[ai.pred], rhs_txt)
         bound = '1' if self.unsafe_index else '(_i >= 0 && _i < _a->len)'
+        # 【PROMAX-G4】fuse 的 spec 感知：容器槽类型已被 GUARD_TYPE 证实时，
+        # 容器 t 检查由 guard 承担（免一次槽读+比较），无关分支裁剪（ARR-only /
+        # DICT-only）；下标/键与元素类型检查保留（不受容器 guard 保护）。
+        spec = getattr(gi, '_spec_type', -1)
         out.append('  { int _fz%d = 0;' % tag)
-        out.append('    if (%s.t == VT_ARR && %s.t == VT_NUM) {' % (rc, rx))
-        out.append('      QArr* _a = (QArr*)%s.u.p; int _i = (int)%s.u.d;' % (rc, rx))
-        out.append('      if (%s) {' % bound)
-        out.append('        V16* _ev = &_a->a[_i];')
-        out.append('        if (_ev->t == VT_NUM && %s.t == VT_NUM) {' % ro)
-        out.append(fast)
-        out.append('        _fz%d = 1;' % tag)
-        out.append('        }')
-        out.append('      }')
-        out.append('            } else if (%s.t == VT_DICT && %s.t == VT_STR) {' % (rc, rx))
-        out.append('      QStr* _k = (QStr*)%s.u.p;' % rx)
-        out.append('      V16* _ev = qotrt_dict_find((QDict*)%s.u.p, _k->s, _k->len,'
-                   ' qotrt_vhash(%s));' % (rc, self._va(gi.b)))
-        out.append('      if (_ev != 0 && _ev->t == VT_NUM && %s.t == VT_NUM) {' % ro)
-        out.append(fast)
-        out.append('        _fz%d = 1;' % tag)
-        out.append('      }')
-        out.append('    }')
+        if spec == 5:   # VT_ARR（guard 已证）
+            out.append('    if (%s.t == VT_NUM) {' % rx)
+            out.append('      QArr* _a = (QArr*)%s.u.p; int _i = (int)%s.u.d;' % (rc, rx))
+            out.append('      if (%s) {' % bound)
+            out.append('        V16* _ev = &_a->a[_i];')
+            out.append('        if (_ev->t == VT_NUM && %s.t == VT_NUM) {' % ro)
+            out.append(fast)
+            out.append('        _fz%d = 1;' % tag)
+            out.append('        }')
+            out.append('      }')
+            out.append('    }')
+        elif spec == 6:   # VT_DICT（guard 已证）
+            out.append('    if (%s.t == VT_STR) {' % rx)
+            out.append('      QStr* _k = (QStr*)%s.u.p;' % rx)
+            out.append('      V16* _ev = qotrt_dict_find1((QDict*)%s.u.p, _k->s, _k->len,'
+                       ' %s);' % (rc, self._keyhash_expr(gi.b, rx)))
+            out.append('      if (_ev == 0) _ev = qotrt_dict_find((QDict*)%s.u.p, _k->s,'
+                       ' _k->len, %s);' % (rc, self._keyhash_expr(gi.b, rx)))
+            out.append('      if (_ev != 0 && _ev->t == VT_NUM && %s.t == VT_NUM) {' % ro)
+            out.append(fast)
+            out.append('        _fz%d = 1;' % tag)
+            out.append('      }')
+            out.append('    }')
+        else:
+            out.append('    if (%s.t == VT_ARR && %s.t == VT_NUM) {' % (rc, rx))
+            out.append('      QArr* _a = (QArr*)%s.u.p; int _i = (int)%s.u.d;' % (rc, rx))
+            out.append('      if (%s) {' % bound)
+            out.append('        V16* _ev = &_a->a[_i];')
+            out.append('        if (_ev->t == VT_NUM && %s.t == VT_NUM) {' % ro)
+            out.append(fast)
+            out.append('        _fz%d = 1;' % tag)
+            out.append('        }')
+            out.append('      }')
+            out.append('            } else if (%s.t == VT_DICT && %s.t == VT_STR) {' % (rc, rx))
+            out.append('      QStr* _k = (QStr*)%s.u.p;' % rx)
+            out.append('      V16* _ev = qotrt_dict_find((QDict*)%s.u.p, _k->s, _k->len,'
+                       ' qotrt_vhash(%s));' % (rc, self._va(gi.b)))
+            out.append('      if (_ev != 0 && _ev->t == VT_NUM && %s.t == VT_NUM) {' % ro)
+            out.append(fast)
+            out.append('        _fz%d = 1;' % tag)
+            out.append('      }')
+            out.append('    }')
         out.append('    if (!_fz%d) {' % tag)
         out.extend(self._emit_index_get(gi, self._vref))
         out.append('    }')
@@ -849,6 +890,97 @@ class Cg(object):
             if prev.op != CMP_F or prev.dst != slot:
                 return False
         return True
+
+    def _cmp_fusable(self, f, cmp_pc, vd):
+        """【PROMAX-B1】本条 CMP_F（结果槽 vd、定义点 cmp_pc）只被紧邻分支消费。
+
+        与 _cmp_branch_only 的差别（empty_loop 实证）：循环版本化后，比较结果
+        槽往往在慢循环里被 ARITH_GEN **作为操作数**读（`s17.u.d < s6.u.d` 的
+        右操作数 s6）—— 但那次读取的到达定义是循环外的 iter_len 写入，
+        根本看不到快循环 CMP 的结果。朴素结构判据把这种无害读取也一票否决，
+        快循环条件就永远吃着「bool 装箱 + truthy_str 调用」的每迭代税。
+        这里按**到达定义**精确判定：vd 的任一读取点，若该点可达的定义包含
+        cmp_pc（即真的可能读到本 CMP 的结果），该读取必须是紧邻本 CMP 的
+        那条分支；读不到本 CMP 结果的读取（别的定义链）一律不阻止融合。
+        结果按 (id(f), cmp_pc) 缓存 —— 融合判定是发射热点。
+        """
+        key = (id(f), cmp_pc)
+        cached = getattr(self, '_fusable_cache', None)
+        if cached is None:
+            cached = self._fusable_cache = {}
+        if key in cached:
+            return cached[key]
+        ok = self._cmp_fusable_uncached(f, cmp_pc, vd)
+        cached[key] = ok
+        return ok
+
+    def _cmp_fusable_uncached(self, f, cmp_pc, vd):
+        from lir2 import slot_ops
+        if vd < 0 or (vd & GLOBAL_BIT) or _is_upval(vd):
+            return False
+        ins = f.instrs
+        n = len(ins)
+        if not (0 <= cmp_pc < n) or ins[cmp_pc].dst != vd:
+            return False
+        for upc, i in enumerate(ins):
+            if vd not in slot_ops(i)[1]:
+                continue
+            if upc == cmp_pc + 1 and i.op in (BR_IF_NOT, BR_IF):
+                continue  # 紧邻分支 = 合法消费者
+            defs = self._reaching_defs_before(f, vd, upc)
+            if cmp_pc in defs:
+                return False  # 别的读取点看得到本 CMP 的结果
+        return True
+
+    def _try_fused_arith_branch(self, f, pc, out):
+        """【PROMAX-B2】ARITH_GEN(比较子码 7..12) + 紧邻 BR 融合。
+
+        未组化的循环条件（b6b/b1d/order_engine 形态：`i < len` 的操作数
+        因槽复用/类型混用未被 infer_f64 组化成 CMP_F）每迭代都在走
+        「qotrt_bool 装箱 → qotrt_truthy_str 调用」。这里把它融合成
+        「类型检查 + 裸 double 比较 + 直接跳转」：
+          快臂（双侧 NUM）：if (!(a.u.d < b.u.d)) goto L;
+          慢臂（类型混合）：qotrt_arith 原语义 → truthy → goto。
+        逐位一致：快臂的真值 = truthy_str(bool(a<b)) = (a<b)!=0.0（bool 槽
+        truthy 即 d!=0，qotrt_bool 产出恰为 1.0/0.0）。cmp dst 的唯一消费者
+        是紧邻 BR（到达定义判据，_cmp_fusable 的 ARITH 版），慢臂写回 dst
+        保持语义完备。
+        """
+        ins = f.instrs
+        n = len(ins)
+        if pc + 1 >= n or ins[pc].op != ARITH_GEN:
+            return 0
+        ai = ins[pc]
+        if not (7 <= ai.pred <= 12):
+            return 0
+        br = ins[pc + 1]
+        if br.op not in (BR_IF_NOT, BR_IF) or br.a != ai.dst:
+            return 0
+        if not self._cmp_fusable(f, pc, ai.dst):
+            return 0
+        ra, rb, rd = self._vref(ai.a), self._vref(ai.b), self._vref(ai.dst)
+        pred = CMP_PRED_TEXT[ai.pred]
+        self._emit_backedge_tick(br, pc + 1, out)
+        U = []
+        self._emit_try_unwind(br, pc + 1, U)
+        neg = '!' if br.op == BR_IF_NOT else ''
+        out.append('  if (%s.t == VT_NUM && %s.t == VT_NUM) {' % (ra, rb))
+        if U:
+            out.append('    if (%s(%s.u.d %s %s.u.d)) {'
+                       % (neg, ra, pred, rb))
+            out.extend(U)
+            out.append('      goto L%d;' % br.target)
+            out.append('    }')
+        else:
+            out.append('    if (%s(%s.u.d %s %s.u.d)) goto L%d;'
+                       % (neg, ra, pred, rb, br.target))
+        out.append('  } else {')
+        out.append('    qotrt_arith(%d, %s, %s, %s);'
+                   % (ai.pred, self._va(ai.a), self._va(ai.b), self._va(ai.dst)))
+        out.append('    if (%sqotrt_truthy_str(%s)) goto L%d;'
+                   % (neg, self._va(ai.dst), br.target))
+        out.append('  }')
+        return 2
 
     # ---------------------------------------------------------- 使用计数
     def _use_count(self, f):
@@ -960,7 +1092,7 @@ class Cg(object):
         cmp_i = ins[pc]
         if br.a != cmp_i.dst or br.a < 0 or (br.a & GLOBAL_BIT) or _is_upval(br.a):
             return 0
-        if not self._cmp_branch_only(f, cmp_i.dst):
+        if not self._cmp_fusable(f, pc, cmp_i.dst):
             return 0
         pred = CMP_PRED_TEXT.get(cmp_i.pred)
         if pred is None:
@@ -969,7 +1101,15 @@ class Cg(object):
         cond = 'f%d %s f%d' % (cmp_i.a, pred, cmp_i.b)
         if br.op == BR_IF_NOT:
             cond = '!(%s)' % cond
-        out.append('  if (%s) goto L%d;' % (cond, br.target))
+        U = []
+        self._emit_try_unwind(br, pc + 1, U)
+        if U:
+            out.append('  if (%s) {' % cond)
+            out.extend(U)
+            out.append('    goto L%d;' % br.target)
+            out.append('  }')
+        else:
+            out.append('  if (%s) goto L%d;' % (cond, br.target))
         return 2
 
     def _try_f64_group(self, f, pc, out):
@@ -1067,13 +1207,21 @@ class Cg(object):
             # 融合：CMP 结果只被紧随的这条分支读 → 快路径不落地 V16
             br = ins[pc + 3] if pc + 3 < n else None
             if (br is not None and br.op in (BR_IF_NOT, BR_IF) and br.a == vd
-                    and self._cmp_branch_only(f, vd)):
+                    and self._cmp_fusable(f, pc + 2, vd)):
                 self._emit_backedge_tick(br, pc + 3, out)
                 fast = '%s %s %s' % (ea, pred, eb)
                 if br.op == BR_IF_NOT:
                     fast = '!(%s)' % fast
+                U = []
+                self._emit_try_unwind(br, pc + 3, U)
                 if g is None:
-                    out.append('  if (%s) goto L%d;' % (fast, br.target))
+                    if U:
+                        out.append('  if (%s) {' % fast)
+                        out.extend(U)
+                        out.append('    goto L%d;' % br.target)
+                        out.append('  }')
+                    else:
+                        out.append('  if (%s) goto L%d;' % (fast, br.target))
                 else:
                     pre, ra, rb = self._fallback_args(ins, pc, pc + 1, src, pc)
                     out.append('  if (%s) {' % g)
@@ -1135,7 +1283,8 @@ class Cg(object):
         if cached is None:
             cached = set()
             for i in f.instrs:
-                if i.op in (JMP, BR_IF_NOT, BR_IF, BR_F, GUARD_NUM, TRY_PUSH):
+                if i.op in (JMP, BR_IF_NOT, BR_IF, BR_F, GUARD_NUM,
+                            GUARD_TYPE, TRY_PUSH):
                     if 0 <= i.target < len(f.instrs):
                         cached.add(i.target)
             try:
@@ -1156,6 +1305,11 @@ class Cg(object):
             # 否则 goto 未特化的原循环。纯控制流，不写任何槽。
             conds = ' && '.join('%s.t == VT_NUM' % v(s) for s in i.args)
             E.append('  if (!(%s)) goto L%d;' % (conds, i.target))
+        elif i.op == GUARD_TYPE:
+            # PROMAX-G4：类型不变量守卫（与 GUARD_NUM 同构，判据换成槽的
+            # tag == pred）。失败 goto 原通用循环。纯控制流。
+            E.append('  if (!(%s.t == %d)) goto L%d;'
+                     % (v(i.args[0]), int(i.pred), i.target))
         elif i.op == CONST_F64:
             E.append('  f%d = %s;' % (i.dst, _cd(i.imm)))
         elif i.op == CONST_VAL:
@@ -1398,7 +1552,9 @@ class Cg(object):
             E.append('  { QotrtLanding %s; %s.prev = qotrt_landings; '
                      'qotrt_landings = &%s;' % (tag, tag, tag))
             E.append('    volatile int qhit_%d;' % pc)
-            E.append('    qhit_%d = setjmp(%s.jb);' % (pc, tag))
+            # PROMAX-E1：跳转原语宏（GCC x64 = 自制汇编 returns_twice 原语 ~15ns，
+            # 本机实测 MinGW longjmp ~1500ns/次是 throw 单价的 94%；MSVC 回落 setjmp）。
+            E.append('    qhit_%d = QOT_SJ_SET(&%s);' % (pc, tag))
             E.append('    if (qhit_%d) { qotrt_landings = %s.prev; goto L%d; }'
                      % (pc, tag, i.target))
         elif i.op == TRY_POP:
@@ -1486,14 +1642,22 @@ class Cg(object):
         """CONST_VAL：数值/bool 常量直接落地成立字面量，省一次常量池堆读。
 
         常量池由 qotrt_init_consts 一次性填好，数值与 bool 是纯值语义，
-        在调用点重建与取池项逐位相同；字符串/其它仍走 qotrt_const（避免
+        在调用点重建与取池项逐位相同；字符串/其它仍走常量池取项（避免
         每次执行都新建堆对象）。
+
+        【PROMAX-C1】字符串类池项从 `qotrt_const(k)` 函数调用改为直接
+        `qotrt_consts[k]` 数组读：省一次 call/ret 与边界检查（k 是编译期
+        已知合法下标），并且数组读对 gcc 是可 LICM 的纯 load——循环里
+        重复取同一常量（b1d 的 s18 = qotrt_const(5)）由编译器自动外提，
+        这是函数调用形态拿不到的。
         """
         cv = self.consts[i.a] if 0 <= i.a < len(self.consts) else None
         if isinstance(cv, bool):
             return ['  %s = qotrt_bool(%s);' % (v(i.dst), 'true' if cv else 'false')]
         if isinstance(cv, (int, float)):
             return ['  %s = qotrt_num(%s);' % (v(i.dst), _cd(cv))]
+        if 0 <= i.a < len(self.consts):
+            return ['  %s = qotrt_consts[%d];' % (v(i.dst), i.a)]
         return ['  %s = qotrt_const(%d);' % (v(i.dst), i.a)]
 
     def _emit_omethod(self, i, nt, pc, v, is_main, depth_param):
@@ -1566,6 +1730,34 @@ class Cg(object):
             expr = ('%s.u.d %s %s.u.d' % (ra, ARITH_OPS[i.pred], rb)) if i.pred in ARITH_OPS \
                 else ('%s(%s.u.d, %s.u.d)' % (ARITH_FNS[i.pred], ra, rb))
             fast = '    %s = qotrt_num(%s);' % (rd, expr)
+        elif i.pred in (11, 12):
+            # 【PROMAX-S1】STR ==/!= STR 的调用点内联快路径。逐位一致性：
+            #   指针相等 → 内容必相等（intern 单字符与常量池字符串指针唯一），
+            #     与 qotrt_arith 的 len+memcmp 结果一致；
+            #   指针不等 → len + memcmp（qotrt_arith op11 的哈希快筛只是负向
+            #     加速（hash 不同 → 必不等），筛不掉任何 memcmp 会判等的对，
+            #     结果恒一致；op12 本来就是裸 memcmp 取反）。
+            # b1d 的 `c == "h"` 从「qotrt_arith 调用 + switch 分派 + 哈希筛」
+            # 缩为两条指针比较（驻留表命中即 1 条）。
+            if i.pred == 11:
+                fast = ('    %s = qotrt_bool((_sa == _sb) || '
+                        '(_sa->len == _sb->len && memcmp(_sa->s, _sb->s, '
+                        '(size_t)_sa->len) == 0));' % rd)
+            else:
+                fast = ('    %s = qotrt_bool((_sa != _sb) && '
+                        '(_sa->len == _sb->len && memcmp(_sa->s, _sb->s, '
+                        '(size_t)_sa->len) == 0));' % rd)
+            return ['  if (%s.t == VT_NUM && %s.t == VT_NUM) {' % (ra, rb),
+                    '    %s = qotrt_bool(%s.u.d %s %s.u.d);' % (
+                        rd, ra, CMP_PRED_TEXT[i.pred], rb),
+                    '  } else if (%s.t == VT_STR && %s.t == VT_STR) {' % (ra, rb),
+                    '    QStr *_sa = (QStr *)%s.u.p; QStr *_sb = (QStr *)%s.u.p;'
+                    % (ra, rb),
+                    fast,
+                    '  } else {',
+                    '    qotrt_arith(%d, %s, %s, %s);'
+                    % (i.pred, self._va(i.a), self._va(i.b), self._va(i.dst)),
+                    '  }']
         elif 7 <= i.pred <= 12:
             fast = '    %s = qotrt_bool(%s.u.d %s %s.u.d);' % (
                 rd, ra, CMP_PRED_TEXT[i.pred], rb)
@@ -1670,6 +1862,61 @@ class Cg(object):
     def _emit_index_get(self, i, v):
         rc, rx, rd = v(i.a), v(i.b), v(i.dst)
         kh = self._keyhash_expr(i.b, rx)
+        # 【PROMAX-G4】_spec_type（GUARD_TYPE 已证容器槽类型，循环体内
+        # 恒定）：发射单容器分支（容器 t 检查由 guard 承担，下标/键类型
+        # 检查保留 —— 它们不受容器 guard 保护）。慢路径无属性 → 通用三重
+        # 分支，行为恒等。
+        # 【PROMAX-S2/D2】通用形态的发射级快路径（逐位一致，见内联契约）：
+        #   STR 分支：单字符取值直接读全局驻留表；
+        #   DICT 分支：find1（首槽特化，内联）先试，miss 回落完整 find；
+        #     哈希实参在分支内先落局部（vhash 只调一次）。
+        spec = getattr(i, '_spec_type', -1)
+        if spec == 5:   # VT_ARR
+            if self.unsafe_index:
+                return ['  if (%s.t == VT_NUM) {' % rx,
+                        '    QArr* _a = (QArr*)%s.u.p; int _i = (int)%s.u.d;' % (rc, rx),
+                        '    %s = _a->a[_i]; /* unsafe-index */' % rd,
+                        '  } else {',
+                        '    qotrt_index_get(%s, %s, %s);'
+                        % (self._va(i.a), self._va(i.b), self._va(i.dst)),
+                        '  }']
+            return ['  if (%s.t == VT_NUM) {' % rx,
+                    '    QArr* _a = (QArr*)%s.u.p; int _i = (int)%s.u.d;' % (rc, rx),
+                    '    %s = (_i >= 0 && _i < _a->len) ? _a->a[_i] : qotrt_null_v();' % rd,
+                    '  } else {',
+                    '    qotrt_index_get(%s, %s, %s);'
+                    % (self._va(i.a), self._va(i.b), self._va(i.dst)),
+                    '  }']
+        if spec == 6:   # VT_DICT
+            return ['  if (%s.t == VT_STR) {' % rx,
+                    '    QStr* _k = (QStr*)%s.u.p; uint64_t _kh = %s;' % (rx, kh),
+                    '    V16* _h = qotrt_dict_find1((QDict*)%s.u.p, _k->s, _k->len, _kh);' % rc,
+                    '    if (!_h) _h = qotrt_dict_find((QDict*)%s.u.p, _k->s, _k->len, _kh);' % rc,
+                    '    %s = _h ? *_h : qotrt_null_v();' % rd,
+                    '  } else {',
+                    '    qotrt_index_get(%s, %s, %s);'
+                    % (self._va(i.a), self._va(i.b), self._va(i.dst)),
+                    '  }']
+        if spec == 4:   # VT_STR
+            if self.unsafe_index:
+                return ['  if (%s.t == VT_NUM) {' % rx,
+                        '    QStr* _q = (QStr*)%s.u.p; int _j = (int)%s.u.d;' % (rc, rx),
+                        '    { QStr* _ci = &qotrt_char_intern[(unsigned char)_q->s[_j]].q;'
+                        ' %s.t = VT_STR; %s.u.p = _ci; } /* unsafe-index */' % (rd, rd),
+                        '  } else {',
+                        '    qotrt_index_get(%s, %s, %s);'
+                        % (self._va(i.a), self._va(i.b), self._va(i.dst)),
+                        '  }']
+            return ['  if (%s.t == VT_NUM) {' % rx,
+                    '    QStr* _q = (QStr*)%s.u.p; int _j = (int)%s.u.d;' % (rc, rx),
+                    '    if (_j >= 0 && _j < _q->len) { QStr* _ci = &qotrt_char_intern'
+                    '[(unsigned char)_q->s[_j]].q; %s.t = VT_STR; %s.u.p = _ci; }'
+                    % (rd, rd),
+                    '    else %s = qotrt_null_v();' % rd,
+                    '  } else {',
+                    '    qotrt_index_get(%s, %s, %s);'
+                    % (self._va(i.a), self._va(i.b), self._va(i.dst)),
+                    '  }']
         # QOT_UNSAFE_INDEX=1（上帝法则配置）：移除边界检查，越界 = 未定义行为。
         # 默认关闭 —— 语言默认保留「越界得 null」定价。
         if self.unsafe_index:
@@ -1677,13 +1924,14 @@ class Cg(object):
                     '    QArr* _a = (QArr*)%s.u.p; int _i = (int)%s.u.d;' % (rc, rx),
                     '    %s = _a->a[_i]; /* unsafe-index: 越界=UB（配置自担） */' % rd,
                     '  } else if (%s.t == VT_DICT && %s.t == VT_STR) {' % (rc, rx),
-                    '    QStr* _k = (QStr*)%s.u.p;' % rx,
-                    '    V16* _h = qotrt_dict_find((QDict*)%s.u.p, _k->s, _k->len,'
-                    ' %s);' % (rc, kh),
+                    '    QStr* _k = (QStr*)%s.u.p; uint64_t _kh = %s;' % (rx, kh),
+                    '    V16* _h = qotrt_dict_find1((QDict*)%s.u.p, _k->s, _k->len, _kh);' % rc,
+                    '    if (!_h) _h = qotrt_dict_find((QDict*)%s.u.p, _k->s, _k->len, _kh);' % rc,
                     '    %s = _h ? *_h : qotrt_null_v();' % rd,
                     '  } else if (%s.t == VT_STR && %s.t == VT_NUM) {' % (rc, rx),
                     '    QStr* _q = (QStr*)%s.u.p; int _j = (int)%s.u.d;' % (rc, rx),
-                    '    %s = qotrt_str(_q->s + _j, 1); /* unsafe-index */' % rd,
+                    '    { QStr* _ci = &qotrt_char_intern[(unsigned char)_q->s[_j]].q;'
+                    ' %s.t = VT_STR; %s.u.p = _ci; } /* unsafe-index */' % (rd, rd),
                     '  } else {',
                     '    qotrt_index_get(%s, %s, %s);'
                     % (self._va(i.a), self._va(i.b), self._va(i.dst)),
@@ -1692,14 +1940,16 @@ class Cg(object):
                 '    QArr* _a = (QArr*)%s.u.p; int _i = (int)%s.u.d;' % (rc, rx),
                 '    %s = (_i >= 0 && _i < _a->len) ? _a->a[_i] : qotrt_null_v();' % rd,
                 '  } else if (%s.t == VT_DICT && %s.t == VT_STR) {' % (rc, rx),
-                '    QStr* _k = (QStr*)%s.u.p;' % rx,
-                '    V16* _h = qotrt_dict_find((QDict*)%s.u.p, _k->s, _k->len,'
-                ' %s);' % (rc, kh),
+                '    QStr* _k = (QStr*)%s.u.p; uint64_t _kh = %s;' % (rx, kh),
+                '    V16* _h = qotrt_dict_find1((QDict*)%s.u.p, _k->s, _k->len, _kh);' % rc,
+                '    if (!_h) _h = qotrt_dict_find((QDict*)%s.u.p, _k->s, _k->len, _kh);' % rc,
                 '    %s = _h ? *_h : qotrt_null_v();' % rd,
                 '  } else if (%s.t == VT_STR && %s.t == VT_NUM) {' % (rc, rx),
                 '    QStr* _q = (QStr*)%s.u.p; int _j = (int)%s.u.d;' % (rc, rx),
-                '    %s = (_j >= 0 && _j < _q->len) ? qotrt_str(_q->s + _j, 1)'
-                ' : qotrt_null_v();' % rd,
+                '    if (_j >= 0 && _j < _q->len) { QStr* _ci = &qotrt_char_intern'
+                '[(unsigned char)_q->s[_j]].q; %s.t = VT_STR; %s.u.p = _ci; }'
+                % (rd, rd),
+                '    else %s = qotrt_null_v();' % rd,
                 '  } else {',
                 '    qotrt_index_get(%s, %s, %s);'
                 % (self._va(i.a), self._va(i.b), self._va(i.dst)),
@@ -1708,6 +1958,33 @@ class Cg(object):
     def _emit_index_set(self, i, v):
         rc, rx, rv = v(i.a), v(i.b), v(i.c)
         kh = self._keyhash_expr(i.b, rx)
+        # 【PROMAX-G4】_spec_type 特化（同 _emit_index_get；键类型检查保留）
+        spec = getattr(i, '_spec_type', -1)
+        if spec == 5:   # VT_ARR
+            if self.unsafe_index:
+                return ['  if (%s.t == VT_NUM) {' % rx,
+                        '    QArr* _a = (QArr*)%s.u.p; int _i = (int)%s.u.d;' % (rc, rx),
+                        '    _a->a[_i] = %s; /* unsafe-index */' % rv,
+                        '  } else {',
+                        '    qotrt_index_set(%s, %s, %s);'
+                        % (self._va(i.a), self._va(i.b), self._va(i.c)),
+                        '  }']
+            return ['  if (%s.t == VT_NUM) {' % rx,
+                    '    QArr* _a = (QArr*)%s.u.p; int _i = (int)%s.u.d;' % (rc, rx),
+                    '    if (_i >= 0 && _i < _a->len) { _a->a[_i] = %s; }' % rv,
+                    '  } else {',
+                    '    qotrt_index_set(%s, %s, %s);'
+                    % (self._va(i.a), self._va(i.b), self._va(i.c)),
+                    '  }']
+        if spec == 6:   # VT_DICT
+            return ['  if (%s.t == VT_STR) {' % rx,
+                    '    QStr* _k = (QStr*)%s.u.p;' % rx,
+                    '    *qotrt_dict_at((QDict*)%s.u.p, _k->s, _k->len, %s) = %s;'
+                    % (rc, kh, rv),
+                    '  } else {',
+                    '    qotrt_index_set(%s, %s, %s);'
+                    % (self._va(i.a), self._va(i.b), self._va(i.c)),
+                    '  }']
         if self.unsafe_index:
             return ['  if (%s.t == VT_ARR && %s.t == VT_NUM) {' % (rc, rx),
                     '    QArr* _a = (QArr*)%s.u.p; int _i = (int)%s.u.d;' % (rc, rx),

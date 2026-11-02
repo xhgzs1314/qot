@@ -25,6 +25,8 @@ public:
     
     void Draw(Renderer* renderer) override;
     void Update(float deltaTime) override;
+
+    // v4：无交互态，直接用基类（disabled 位）
     
 private:
     float m_value;
@@ -101,27 +103,42 @@ inline void ProgressBar::SetHeight(float height) {
 
 inline void ProgressBar::Draw(Renderer* renderer) {
     if (!m_visible || !renderer) return;
-    
-    
+    // v4：owner-draw 接管（进度视觉全交回调，值可从外部状态取）
+    if (m_paintFn) {
+        m_paintFn(renderer, m_bounds.Width(), m_bounds.Height(), StyleFlags());
+        return;
+    }
+
+    float radius = m_style.radiusSet ? m_style.radius : m_borderRadius;
+
     RoundedRect bgRect;
     bgRect.rect = Rect(m_bounds.left, m_bounds.top, m_bounds.right, m_bounds.top + m_height);
-    bgRect.radiusX = m_borderRadius;
-    bgRect.radiusY = m_borderRadius;
-    renderer->FillRoundedRect(bgRect, m_backgroundColor);
-    
-    
+    bgRect.radiusX = radius;
+    bgRect.radiusY = radius;
+    Color trackBg;
+    if (!ResolvedStateBg(StyleFlags(), trackBg)) trackBg = m_backgroundColor;
+    renderer->FillRoundedRect(bgRect, trackBg);
+
+
     float progressWidth = m_bounds.Width() * m_value;
     if (progressWidth > 0) {
         RoundedRect progressRect;
         progressRect.rect = Rect(m_bounds.left, m_bounds.top, m_bounds.left + progressWidth, m_bounds.top + m_height);
-        progressRect.radiusX = m_borderRadius;
-        progressRect.radiusY = m_borderRadius;
-        
-        if (m_useGradient) {
+        progressRect.radiusX = radius;
+        progressRect.radiusY = radius;
+
+        if (m_style.bgGradSet) {
+            renderer->FillRoundedRectGradient(progressRect, m_style.bgGrad1, m_style.bgGrad2,
+                                              m_style.bgGradVertical != 0);
+        } else if (m_useGradient) {
             renderer->FillRoundedRectGradient(progressRect, m_progressColorStart, m_progressColorEnd, true);
         } else {
             renderer->FillRoundedRect(progressRect, m_progressColorStart);
         }
+    }
+
+    if (m_style.borderSet) {
+        renderer->DrawRoundedRect(bgRect, m_style.borderColor, m_style.borderWidth);
     }
     
     

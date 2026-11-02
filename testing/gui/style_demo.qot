@@ -1,0 +1,155 @@
+// ===========================================================================
+// style_demo.qot —— vgui v4 验收：样式原语 + 绘制接管 + 自绘菜单样式
+//
+// 覆盖：
+//   1. 样式叠加层：按钮 = 渐变背景 + 状态色（悬停/按下/禁用）+ 圆角 + 边框
+//      + 文字样式；Label/进度条/滚动条/Toast 各自的样式原语；
+//   2. 绘制接管（owner-draw）：按钮接管画「环形进度」，回调里 vg_draw_*
+//      自由作画；状态位驱动（按下时环变亮）；
+//   3. 状态位：vg_style_flags 的 disabled 位联动 vg_set_enabled；
+//   4. 自绘菜单：样式四件套（背景/悬停/文字/描边）设置（popup 交互见探针）；
+//   5. 样式复位 vg_style_reset。
+// 120 帧后自动关窗（无人值守可跑）。
+// ===========================================================================
+
+var w = vg_create_window("style demo", 560, 420);
+vg_set_window_bg_gradient(w, [0.07, 0.07, 0.13, 1], [0.10, 0.09, 0.17, 1]);
+
+var cnt = [0, 0, 0];   // [帧数, 失败数, 总断言]
+
+any_t func check(cond, tag) {
+    cnt[2] = cnt[2] + 1;
+    if (!cond) {
+        cnt[1] = cnt[1] + 1;
+        output("FAIL " + tag);
+    }
+}
+
+// ---- 1. 样式叠加：完全定制的主按钮 ----
+var btn = vg_create_button(w, "主操作", 30, 30, 150, 44);
+check(vg_style_radius(btn, 14) == true, "radius");
+check(vg_style_bg_gradient(btn, [0.22, 0.55, 1.0, 1], [0.55, 0.30, 0.95, 1], true) == true, "bg gradient");
+check(vg_style_border(btn, [1, 1, 1, 0.35], 1.5) == true, "border");
+check(vg_style_text(btn, [1, 1, 1, 1], 16, true) == true, "text style");
+check(vg_style_state_bg(btn, 1, [0.32, 0.65, 1.0, 1]) == true, "hover bg");
+check(vg_style_state_bg(btn, 2, [0.16, 0.42, 0.80, 1]) == true, "pressed bg");
+check(vg_style_state_bg(btn, 3, [0.30, 0.30, 0.36, 1]) == true, "disabled bg");
+check(vg_style_state_text(btn, 3, [0.65, 0.65, 0.70, 1]) == true, "disabled text");
+
+// ---- 2. owner-draw：环形进度按钮 ----
+var ringBtn = vg_create_button(w, "", 220, 30, 120, 120);
+var progress = [0.0];
+var ringPaintOk = [false];
+any_t func paint_ring(cw, ch, state) {
+    ringPaintOk[0] = true;   // 回调确实被调用（帧内自证）
+    var cx = cw / 2;
+    var cy = ch / 2;
+    var rr = 42;
+    // 轨道
+    vg_draw_stroke_ellipse(cx, cy, rr, rr, [0.20, 0.22, 0.32, 0.9]);
+    // 进度弧
+    // state: 1 悬停 2 按下 —— 取整用 x - x%1（QOT 的 % 即 fmod，双端等价 floor）
+    var half = state / 2;
+    var pressed = (half - half % 1) % 2;
+    var hovered = state % 2;
+    var steps = 40;
+    var psteps = progress[0] * steps;
+    var filled = psteps - psteps % 1;
+    for (i in 0..filled) {
+        var a0 = -1.5707963 + (i * 6.2831853) / steps;
+        var a1 = -1.5707963 + ((i + 1) * 6.2831853) / steps;
+        var bright = pressed ? 1.0 : (hovered ? 0.85 : 0.65);
+        vg_draw_line(cx + rr * cos(a0), cy + rr * sin(a0),
+                     cx + rr * cos(a1), cy + rr * sin(a1),
+                     [0.30 * bright, 0.80 * bright, 1.0 * bright, 1], 5);
+    }
+    // 中心百分比
+    var p100 = progress[0] * 100;
+    var pct = str(p100 - p100 % 1) + "%";
+    vg_draw_text(pct, cx - 22, cy - 9, 15, [0.92, 0.95, 1, 1]);
+}
+check(vg_on_paint(ringBtn, func(cw, ch, state) -> paint_ring(cw, ch, state)) == true, "on_paint");
+check(vg_on_paint(0, func(cw, ch, state) -> paint_ring(cw, ch, state)) == false, "on_paint bad id");
+
+// ---- 3. 样式化 Label + 进度条 + 滚动区 + Toast ----
+var lb = vg_create_label(w, "样式化标签", 30, 100, 150, 26);
+check(vg_style_text(lb, [0.65, 0.85, 1, 1], 18, true) == true, "label text style");
+check(vg_style_bg(lb, [0.15, 0.20, 0.35, 0.5]) == true, "label bg");
+check(vg_style_radius(lb, 8) == true, "label radius");
+
+var pb = vg_create_progressbar(w, 30, 150, 180, 10);
+check(vg_style_bg(pb, [0.35, 0.65, 1.0, 1]) == true, "progress color");
+check(vg_style_radius(pb, 5) == true, "progress radius");
+check(vg_style_border(pb, [1, 1, 1, 0.2], 1) == true, "progress border");
+
+var sp = vg_create_scrollpane(w, 380, 30, 150, 200);
+vg_scroll_content(sp, 600);
+for (i in 0..10) {
+    var r = vg_create_label(w, "行 " + str(i), 10, 8 + i * 44, 120, 24);
+    vg_scroll_attach(sp, r, 10, 8 + i * 44, 120, 24);
+}
+check(vg_style_bg(sp, [0.10, 0.12, 0.22, 1]) == true, "scroll bg");
+check(vg_scroll_style(sp, [0.18, 0.20, 0.30, 0.7], [0.35, 0.75, 1.0, 0.9], 10) == true, "scrollbar style");
+
+check(vg_toast_style(w, [0.10, 0.16, 0.30, 0.95], [0.75, 0.95, 1, 1], [0.35, 0.75, 1, 0.5], 12) == true, "toast style");
+
+// ---- 4. 自绘菜单：样式四件套（popup 交互由探针自动验证）----
+var mid = vg_create_menu();
+var miOpen = vg_menu_add_item(mid, "打开");
+var miSave = vg_menu_add_item(mid, "保存");
+vg_menu_separator(mid);
+var miQuit = vg_menu_add_item(mid, "退出");
+check(miOpen > 0 && miSave > 0 && miQuit > 0, "menu items");
+check(vg_menu_bg(mid, [0.08, 0.08, 0.14, 0.97]) == true, "menu bg");
+check(vg_menu_hover_bg(mid, [0.30, 0.60, 1.0, 0.40]) == true, "menu hover");
+check(vg_menu_text_color(mid, [0.85, 0.92, 1.0, 1]) == true, "menu text");
+check(vg_menu_border(mid, [0.35, 0.60, 1.0, 0.5], 1.2) == true, "menu border");
+check(vg_menu_destroy(mid) == true, "menu destroy");
+
+// ---- 5. 状态位联动 ----
+any_t func check_flags() {
+    vg_set_enabled(btn, false);
+    var f = vg_style_flags(btn);
+    var q = f / 4;
+    cnt[2] = cnt[2] + 1;
+    if ((q - q % 1) % 2 == 0) {
+        cnt[1] = cnt[1] + 1;
+        output("FAIL flags disabled bit");
+    }
+    vg_set_enabled(btn, true);
+    f = vg_style_flags(btn);
+    q = f / 4;
+    cnt[2] = cnt[2] + 1;
+    if ((q - q % 1) % 2 != 0) {
+        cnt[1] = cnt[1] + 1;
+        output("FAIL flags re-enabled");
+    }
+}
+
+any_t func on_frame(dt) {
+    cnt[0] = cnt[0] + 1;
+    progress[0] = (cnt[0] % 120) / 120.0;   // 环形进度循环推进
+    if (cnt[0] == 3) {
+        check(ringPaintOk[0] == true, "paint callback ran");
+        check_flags();
+        check(vg_style_reset(lb) == true, "style reset");
+    }
+    if (cnt[0] == 60) {
+        vg_toast(w, "样式化 Toast", 1200);
+    }
+    if (cnt[0] >= 120) {
+        vg_close_window(w);
+    } else {
+        vg_request_frame();
+    }
+}
+
+vg_on_frame(func(dt) -> on_frame(dt));
+vg_show_window(w);
+vg_run();
+
+if (cnt[1] == 0) {
+    output("style-demo-ok checks=" + str(cnt[2]) + " fails=0");
+} else {
+    output("style-demo-FAILED checks=" + str(cnt[2]) + " fails=" + str(cnt[1]));
+}

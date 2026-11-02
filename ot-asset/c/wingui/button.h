@@ -26,6 +26,14 @@ public:
     bool HandleMouseMove(const Point& mousePos) override;
     bool HandleMouseDown(const Point& mousePos, int button) override;
     bool HandleMouseUp(const Point& mousePos, int button) override;
+
+    // v4：状态位（hover/pressed 补充基类 disabled）
+    unsigned StyleFlags() const override {
+        unsigned f = UIComponent::StyleFlags();
+        if (m_state == State::Hovered || (m_state == State::Normal && m_currentHoverProgress > 0.5f)) f |= 0x1;
+        if (m_state == State::Pressed) f |= 0x2;
+        return f;
+    }
     
 private:
     enum class State {
@@ -33,6 +41,11 @@ private:
         Hovered,
         Pressed
     };
+
+    // v4：样式叠加解析（isSet 优先，否则组件默认）
+    float Radius() const { return m_style.radiusSet ? m_style.radius : m_borderRadius; }
+    float FontSize() const { return m_style.textSet ? m_style.textSize : m_fontSize; }
+    bool FontBold() const { return m_style.textSet ? m_style.textBold : false; }
     
     std::wstring m_text;
     Color m_textColor;
@@ -102,27 +115,45 @@ inline void Button::OnClick(ClickCallback callback) {
 
 inline void Button::Draw(Renderer* renderer) {
     if (!m_visible || !renderer) return;
-    Color bgColor;
-    switch (m_state) {
-        case State::Pressed:
-            bgColor = m_pressColor;
-            break;
-        case State::Hovered:
-            bgColor = Color::Lerp(m_normalColor, m_hoverColor, m_currentHoverProgress);
-            break;
-        default:
-            bgColor = m_normalColor;
-            break;
+    // v4：owner-draw 接管 —— 默认绘制整体让位，回调里自由作画
+    if (m_paintFn) {
+        m_paintFn(renderer, m_bounds.Width(), m_bounds.Height(), StyleFlags());
+        return;
     }
-    
+    unsigned flags = StyleFlags();
+    Color bgColor;
+    if (!ResolvedStateBg(flags, bgColor)) {
+        switch (m_state) {
+            case State::Pressed:
+                bgColor = m_pressColor;
+                break;
+            case State::Hovered:
+                bgColor = Color::Lerp(m_normalColor, m_hoverColor, m_currentHoverProgress);
+                break;
+            default:
+                bgColor = m_normalColor;
+                break;
+        }
+    }
+    if (m_style.bgGradSet && !(flags & 0x6)) {   // 渐变背景（hover/pressed 时不叠加）
+        renderer->FillRoundedRectGradient(RoundedRect(m_bounds, Radius(), Radius()),
+                                          m_style.bgGrad1, m_style.bgGrad2,
+                                          m_style.bgGradVertical != 0);
+    }
+
     RoundedRect rect;
     rect.rect = m_bounds;
-    rect.radiusX = m_borderRadius;
-    rect.radiusY = m_borderRadius;
-    
-    renderer->FillRoundedRect(rect, bgColor);
-    renderer->DrawRoundedRect(rect, Color(1, 1, 1, 0.3f), 1.0f);
-    renderer->DrawText(m_text, m_bounds, m_textColor, m_fontSize, false, true);
+    rect.radiusX = Radius();
+    rect.radiusY = Radius();
+
+    if (!m_style.bgGradSet || (flags & 0x6)) renderer->FillRoundedRect(rect, bgColor);
+    Color bc;
+    if (m_style.borderSet) { bc = m_style.borderColor; }
+    else bc = Color(1, 1, 1, 0.3f);
+    renderer->DrawRoundedRect(rect, bc, m_style.borderSet ? m_style.borderWidth : 1.0f);
+    Color tc;
+    if (!ResolvedStateText(flags, tc)) tc = m_textColor;
+    renderer->DrawText(m_text, m_bounds, tc, FontSize(), FontBold(), true);
 }
 
 inline void Button::Update(float deltaTime) {

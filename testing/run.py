@@ -51,7 +51,6 @@ DLL = os.path.join(ROOT, 'qotrun.dll')
 ANSI_RE = re.compile(r'\x1b\[[0-9;]*[A-Za-z]')
 
 # 套件 -> cases/ 下的子目录。
-# 【 转向 · CP-N1/P3】用例目录已由 cases/vm/ 重组为 cases/native/
 # ——native 是唯一产品形态，用例集归它所有。--suite vm 因此指向**同一目录**，
 # 但语义已降级为「冻结回归」（ §8.7）：只许跑、不许新增用例，
 # 也不再作 native 的差分期望源（期望源 = golden，见 run_native）。
@@ -67,12 +66,6 @@ CASE_SUITES = {
 ALL_SUITES = ['unit', 'cli', 'syntax', 'sema', 'interp', 'module',
               'cpp', 'fuzz', 'native', 'perf', 'ci']
 
-# 【 · VM 线弃管】用户裁决：VM 彻底不管 —— 不碰、不测、它的报错
-# 也不管。语义递变的第三格（"冻结回归" → "弃管"）：
-#   * --suite all 不再发现 vm 套件；cases/native 下 runs_on='vm' 的 15 个用例
-#     不再执行（它们只在 vm 套件里跑，native 套件本就跳过它们）。
-#   * M2-EC 错误契约四钉（断言 VM 侧行为）同步作废（见 test_err_contract）。
-#   * 逃生开关 QOT_VM_SUITE=1 仅供考古比对，日常/交付一律不带。
 VM_ABANDONED = os.environ.get('QOT_VM_SUITE', '0') != '1'
 if not VM_ABANDONED:
     ALL_SUITES.insert(4, 'vm')
@@ -544,9 +537,6 @@ def _golden_check(case: Case, actual_lines: list, update_golden: bool,
 
 
 def run_native_case(c: Case, aot_dir: str, update_golden: bool) -> Result:
-    """单个用例走一次 AOT：编译 → 跑 → 与 native 口径 golden 对账。
-    【P1030-4】json 顶层 "setup"（网络用例的本地服务器等）在此起/收；
-    【M7】"prerun"（同步构建钩子，如 C 插件编译）在编译前执行。"""
     pre_err = _prerun(c)
     if pre_err:
         return Result(c.name, 'FAIL', detail='[native] %s' % pre_err)
@@ -582,25 +572,6 @@ def run_native_case(c: Case, aot_dir: str, update_golden: bool) -> Result:
 
 
 def run_native(update_golden: bool, only=None):
-    """后端 A 套件（T-42 验收）——【 转向 · CP-N1】期望源 = native 口径 golden。
-
-    历史形态（已废止）：同一 .qot 分别跑 VM 与原生 exe，两者 stdout 归一化后
-    逐行比对（VM 输出即期望）。废止的两条理由：
-      ① VM 已转「冻结待定」（ §8.7 / SPEC R14）——裁判本人停摆，
-         冻结期内不许为 native 的结构性改动去改 VM；
-      ② native 侧的结构性优化（字典槽布局 / 键比较 / 常量键哈希）会制造
-         「预期的漂移」，VM 侧不变 → 差分会把预期内的漂移报成失败（任务书 T0）。
-
-    现状：期望源 = testing/golden/<case>.out。现有 golden 本就与 native 同口径
-    （历史上一路是 native==VM==golden），因此脱钩不需要重录；若确需重录，
-    必须 --update-golden --reason（SPEC R3），且用例里写死的 expect.stdout 硬断言
-    仍然校验（重录不豁免）。VM 不再参与 native 的任何判据。
-
-    【 补】runs_on == 'vm' 的用例（VM 冻结定价钉）不进 native 套件：
-    它们的 expect.stdout 是 VM 口径硬断言，native 侧行为已按裁判口径独立定价
-    （如空串字面量），跑进来只会制造假失败（empty_string 裁决反转实证）。
-    VM 钉只跑 --suite vm。
-    """
     results = []
     cdir = os.path.join(CASES, 'native')
     if not _has_cxx():

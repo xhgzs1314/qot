@@ -1,9 +1,0 @@
-tul_md5|str,size_t|str
-tul_b64enc|str,size_t|str
-tul_b64dec|str|str
-tul_sha256|str,size_t|str
-tul_hmac_md5|str,size_t,str,size_t|str
-tul_hmac_sha256|str,size_t,str,size_t|str
-tul_urlencode|str|str
-tul_urldecode|str|str
-tul_crc32|str,size_t|uint

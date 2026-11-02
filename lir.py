@@ -98,6 +98,12 @@ CALL_OMETHOD = 44  # dst=值槽, name_idx=方法名表下标(退路发射), pred
                    # args=[receiver, 实参...], argc=len(args)：对象方法分派；
                    # receiver 为 VT_OBJ → qotrt_types[tid].mfns[mid] 指针直调，
                    # 否则退回「receiver 前置」的内置/用户函数调用定价。
+# 【PROMAX-G4】类型不变量守卫（仅后端 A 内部，永不进 VM opcode 面——与
+# ARENA_PUSH 同律）。args=[槽]，pred=VT_* 类型 tag，target=慢循环头：
+# 运行期该槽 t == tag 则顺序落下（进入容器特化快循环），否则走原通用循环。
+# 与 GUARD_NUM 同构：纯控制流、不改槽值；guard 成立期间槽在体内无定义 →
+# 不变量成立，快体的 INDEX_GET/INDEX_SET/融合发射按已知类型裁剪分支。
+GUARD_TYPE = 45
 
 INSTR_NAMES = {
     CONST_F64: 'CONST_F64', CONST_VAL: 'CONST_VAL', LOAD_F64: 'LOAD_F64',
@@ -114,6 +120,7 @@ INSTR_NAMES = {
     THROW: 'THROW', TRY_PUSH: 'TRY_PUSH', TRY_POP: 'TRY_POP',
     ENV_NEW: 'ENV_NEW', MAKE_CLOSURE: 'MAKE_CLOSURE', THROWVAL: 'THROWVAL',
     FIELD_GET: 'FIELD_GET', FIELD_SET: 'FIELD_SET', CALL_OMETHOD: 'CALL_OMETHOD',
+    GUARD_TYPE: 'GUARD_TYPE',
 }
 
 # 语义 op 常量：与字节码 BINARY_OP/UNARY_OP 的子码完全一致（bytecode.Compiler._binop_map）
@@ -137,7 +144,7 @@ class LirInstr(object):
     """
     __slots__ = ('op', 'dst', 'a', 'b', 'c', 'imm', 'pred', 'target',
                  'func_idx', 'argc', 'args', 'name_idx', 'str_idx', '_src_op',
-                 '_no_inline')
+                 '_no_inline', '_spec_type')
 
     def __init__(self, op, **kw):
         self.op = op
@@ -155,6 +162,8 @@ class LirInstr(object):
         self.args = kw.get('args') or []       # 实参槽号列表（调用/容器构造）
         self._src_op = None                    # F64 改写组回指原通用指令（cgen 兜底用）
         self._no_inline = False                # 内联展开期标记：环/递归调用点，禁止再展开
+        self._spec_type = -1                   # PROMAX-G4：类型不变量守卫成立的容器槽下标
+                                               # 的特化 tag（VT_*；-1 = 无特化）
 
     def __repr__(self):
         return 'LirInstr(%s)' % _fmt_instr(self)

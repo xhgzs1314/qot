@@ -124,3 +124,138 @@ boolean_t func download(url, path) {
     }
     return file_write(path, dict_get(r, "body")) > 0;
 }
+
+// ============================================================================
+// HTTP 服务端（select 多路复用，单进程多连接并发）
+// ============================================================================
+any_t func http_server(host, port, handler, duration_ms) {
+    var srv = socket_new();
+    if (srv == null) {
+        return null;
+    }
+    if (socket_bind(srv, host, port) == false) {
+        socket_close(srv);
+        return null;
+    }
+    if (socket_listen(srv, 64) == false) {
+        socket_close(srv);
+        return null;
+    }
+    // 活句柄数组（[0] = listen 恒在）+ 每连接已收文本（[0] 占位）。
+    var hs = arr_new();
+    push(hs, srv);
+    var bufs = arr_new();
+    push(bufs, "");
+    var served = 0;
+    var bytes_out = 0;
+    var peak_conns = 0;
+    var accept_reject = 0;
+    var deadline = time_now_ms() + duration_ms;
+    var running = true;
+    loop (running) {
+        var left = deadline - time_now_ms();
+        if (left <= 0) {
+            running = false;
+        } else {
+            // 等待窗口：上限 500ms（tick 检查点；select 被信号打断也不失 deadlines）
+            if (left > 500) {
+                left = 500;
+            }
+            var ready = socket_select(hs, left);
+            var rc = arr_len(ready);
+            var k = 0;
+            loop (k < rc) {
+                var h = arr_get(ready, k);
+                if (h == srv) {
+                    // accept 面（上限 62：hs 里 listen+61 连接；满载时
+                    // 暂不 accept，内核 backlog 排队，下个就绪周期再收）
+                    if (arr_len(hs) < 62) {
+                        var c = socket_accept(srv);
+                        if (c == null) {
+                            accept_reject = accept_reject + 1;
+                        } else {
+                            push(hs, c);
+                            push(bufs, "");
+                            var nc = arr_len(hs) - 1;
+                            if (nc > peak_conns) {
+                                peak_conns = nc;
+                            }
+                        }
+                    }
+                } else {
+                    // 连接面：收请求
+                    var idx = arr_index_of(hs, h);
+                    if (idx < 1) {
+                        // 并行数组不同步（理论不可达）：关句柄防御
+                        socket_close(h);
+                    } else {
+                        var chunk = socket_recv(h, 4096);
+                        if (str_empty(chunk)) {
+                            // EOF / 错误 / 超时（连接无 timeout → 阻塞 recv 不空
+                            // 不返 —— select 就绪下的 "" 即对端关闭或错误）
+                            socket_close(h);
+                            arr_remove_at(hs, idx);
+                            arr_remove_at(bufs, idx);
+                        } else {
+                            var b = arr_get(bufs, idx) + chunk;
+                            arr_set(bufs, idx, b);
+                            if (str_len(b) > 65536) {
+                                // 请求头超限：直接关闭
+                                socket_close(h);
+                                arr_remove_at(hs, idx);
+                                arr_remove_at(bufs, idx);
+                            } else {
+                                if (str_find(b, "\r\n\r\n", 0) >= 0) {
+                                    // 请求头齐了：解析请求行取 path
+                                    var line_end = str_find(b, "\r\n", 0);
+                                    var req_line = str_slice(b, 0, line_end);
+                                    var parts = str_split(req_line, " ");
+                                    var path = "/";
+                                    if (arr_len(parts) >= 2) {
+                                        path = arr_get(parts, 1);
+                                    }
+                                    // 应答
+                                    var body = handler(path);
+                                    var head = "";
+                                    if (body == null) {
+                                        head = "HTTP/1.0 404 Not Found\r\n"
+                                            + "Content-Type: text/plain\r\n"
+                                            + "Content-Length: 0\r\n"
+                                            + "Connection: close\r\n\r\n";
+                                        body = "";
+                                    } else {
+                                        head = "HTTP/1.0 200 OK\r\n"
+                                            + "Content-Type: text/plain\r\n"
+                                            + "Content-Length: "
+                                            + num_to_str_int(str_len(body))
+                                            + "\r\n"
+                                            + "Connection: close\r\n\r\n";
+                                    }
+                                    socket_send_all(h, head + body);
+                                    served = served + 1;
+                                    bytes_out = bytes_out + str_len(body);
+                                    socket_close(h);
+                                    arr_remove_at(hs, idx);
+                                    arr_remove_at(bufs, idx);
+                                }
+                            }
+                        }
+                    }
+                }
+                k = k + 1;
+            }
+        }
+    }
+    // 收尾：关全部活句柄
+    var j = arr_len(hs);
+    loop (j > 0) {
+        socket_close(arr_get(hs, j - 1));
+        j = j - 1;
+    }
+    var out = dict_new();
+    dict_set(out, "served", served);
+    dict_set(out, "bytes_out", bytes_out);
+    dict_set(out, "peak_conns", peak_conns);
+    dict_set(out, "accept_reject", accept_reject);
+    return out;
+}

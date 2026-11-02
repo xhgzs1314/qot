@@ -1,0 +1,140 @@
+// ===========================================================================
+// layout_demo.qot —— vgui v3  1 验收：布局系统（解释器 + AOT 双跑）
+//
+// 覆盖：
+//   1. vbox 排 4 控件：padding/spacing 叠放正确；
+//   2. vg_layout_props：fill=1 交叉轴拉伸（宽撑满）、weight=1 主轴伸展；
+//   3. 程序化 resize（vg_set_window_size）→ 控件按布局自动重排；
+//   4. hbox / grid 模式；
+//   5. absolute 关闭布局（绝对坐标共存）。
+// 断言基于窗口客户区实测值；结束自动关窗（无人值守可跑）。
+//
+// 注意（QOT 语义）：跨函数计数用数组下标；函数值传参用 lambda 单表达式委托。
+// ===========================================================================
+
+var w = vg_create_window("layout demo", 480, 400);
+var b1 = vg_create_button(w, "One", 0, 0, 100, 40);
+var b2 = vg_create_button(w, "Two", 0, 0, 100, 40);
+var b3 = vg_create_button(w, "Three", 0, 0, 100, 40);
+var b4 = vg_create_button(w, "Four", 0, 0, 100, 40);
+
+var fails = [0];
+var checks = [0];
+
+any_t func expect(cond, tag) {
+    checks[0] = checks[0] + 1;
+    if (!cond) {
+        fails[0] = fails[0] + 1;
+        output("FAIL " + tag);
+    }
+}
+
+// ---- 1. vbox：padding 20 / spacing 10，四个 40 高按钮叠放 ----
+vg_layout_begin(w, "vbox");
+vg_layout_padding(w, 20, 20, 20, 20);
+vg_layout_spacing(w, 10);
+vg_layout_add(w, b1);
+vg_layout_add(w, b2);
+vg_layout_add(w, b3);
+vg_layout_add(w, b4);
+vg_layout_end(w);
+
+var p1 = vg_get_pos(b1);
+var p2 = vg_get_pos(b2);
+var p4 = vg_get_pos(b4);
+expect(p1[0] == 20 && p1[1] == 20, "vbox: first at (20,20)");
+expect(p2[1] == 70, "vbox: second y = 20+40+10");
+expect(p4[1] == 170, "vbox: fourth y = 20+3*50");
+
+// ---- 2. fill=1：b4 交叉轴拉伸（vbox 中 = 宽度撑满内容区） ----
+vg_layout_props(b4, 0, 1);
+vg_layout_end(w);
+var s4 = vg_get_size(b4);
+var cw = vg_window_client_size(w);
+expect(s4[0] == cw[0] - 40, "vbox: fill=1 stretches to client width - padding");
+expect(s4[1] == 40, "vbox: fill=1 keeps natural height");
+
+// ---- 3. weight=1 + fill=1：b1 全伸展 + 程序化 resize 重排 ----
+vg_layout_begin(w, "vbox");
+vg_layout_padding(w, 20, 20, 20, 20);
+vg_layout_spacing(w, 10);
+vg_layout_add(w, b1);
+vg_layout_add(w, b2);
+vg_layout_add(w, b3);
+vg_layout_add(w, b4);
+vg_layout_props(b1, 0, 1, 0, 1.0);
+vg_layout_end(w);
+
+vg_set_window_size(w, 720, 560);
+var cw2 = vg_window_client_size(w);
+var p1b = vg_get_pos(b1);
+var s1 = vg_get_size(b1);
+var s1w = cw2[0] - 40;
+var s1h = cw2[1] - 40 - 3 * 40 - 3 * 10;
+expect(p1b[0] == 20 && p1b[1] == 20, "resize: vbox top-left unchanged");
+expect(s1[0] == s1w, "resize: width tracks client");
+expect(s1[1] == s1h, "resize: weight=1 takes remaining height");
+var p4b = vg_get_pos(b4);
+expect(p4b[1] == 20 + s1h + 110, "resize: siblings pushed below grown b1");
+
+// ---- 4. hbox ----
+vg_layout_begin(w, "hbox");
+vg_layout_padding(w, 20, 20, 20, 20);
+vg_layout_spacing(w, 10);
+vg_layout_add(w, b1);
+vg_layout_add(w, b2);
+vg_layout_add(w, b3);
+vg_layout_end(w);
+var hp2 = vg_get_pos(b2);
+expect(hp2[0] == 130 && hp2[1] == 20, "hbox: second at (130,20)");
+var hs1 = vg_get_size(b1);
+expect(hs1[1] == 40, "hbox: fill=0 keeps natural height");
+vg_layout_props(b1, 0, 1);
+vg_layout_end(w);
+var hs1b = vg_get_size(b1);
+expect(hs1b[1] == cw2[1] - 40, "hbox: fill=1 stretches height");
+vg_layout_props(b1, 0, 0, 1);
+vg_layout_props(b2, 0, 0, 1);
+vg_layout_props(b3, 0, 0, 1);
+vg_layout_end(w);
+var hp2b = vg_get_pos(b2);
+// 期望 y = 20 + (clientH - 80) / 2（浮点除，读回 int 截断 → ±2 容差）
+expect(hp2b[1] >= 20 + (cw2[1] - 84) / 2 && hp2b[1] <= 20 + (cw2[1] - 76) / 2,
+       "hbox: align=1 centers vertically");
+
+// ---- 5. grid（2 列）----
+vg_layout_begin(w, "grid");
+vg_layout_cols(w, 2);
+vg_layout_padding(w, 20, 20, 20, 20);
+vg_layout_spacing(w, 10);
+vg_layout_add(w, b1);
+vg_layout_add(w, b2);
+vg_layout_add(w, b3);
+vg_layout_add(w, b4);
+vg_layout_props(b1, 0, 1);
+vg_layout_props(b2, 0, 1);
+vg_layout_props(b3, 0, 1);
+vg_layout_props(b4, 0, 1);
+vg_layout_end(w);
+var gcw = (cw2[0] - 40 - 10) / 2;
+var gp2 = vg_get_pos(b2);
+var gp3 = vg_get_pos(b3);
+var gs2 = vg_get_size(b2);
+// gcw 可能带 0.5（奇数客户区）→ x/宽 ±1 容差
+expect(gp2[0] >= 20 + gcw + 9 && gp2[0] <= 20 + gcw + 11, "grid: col 2 x");
+expect(gs2[0] >= gcw - 1 && gs2[0] <= gcw, "grid: fill=1 cell width");
+expect(gp3[1] == 70, "grid: row 2 y = 20+40+10");
+
+// ---- 6. absolute 关闭布局 ----
+vg_layout_begin(w, "absolute");
+vg_layout_end(w);
+vg_set_position(b1, 7, 9);
+var ap = vg_get_pos(b1);
+expect(ap[0] == 7 && ap[1] == 9, "absolute: vg_set_pos works after layout off");
+
+vg_close_window(w);
+if (fails[0] == 0) {
+    output("layout-demo-ok checks=" + str(checks[0]) + " fails=0");
+} else {
+    output("layout-demo-FAILED checks=" + str(checks[0]) + " fails=" + str(fails[0]));
+}

@@ -28,7 +28,7 @@ from lir import (
     INDEX_GET, INDEX_SET, MAKE_ARRAY, MAKE_DICT, REQUIRE, STOP, NOP,
     GUARD_NUM, GLOBAL_BIT, ARENA_PUSH, ARENA_RESET,
     THROW, TRY_PUSH, TRY_POP, ENV_NEW, MAKE_CLOSURE, THROWVAL, UPVAL_BIT,
-    FIELD_GET, FIELD_SET, CALL_OMETHOD,
+    FIELD_GET, FIELD_SET, CALL_OMETHOD, GUARD_TYPE,
 )
 
 # F1/F2 闭包与异常的 LIR 特征。含这些特征的函数（闭包函数/含 try 的函数）
@@ -1321,6 +1321,77 @@ def _match_group(ins, k):
     return None
 
 
+def _slot_static_type(instrs, slot, pool):
+    """【PROMAX-G4】槽的写入形态不动点类型证明 → VT tag 或 None。
+
+    形态：
+      MAKE_ARRAY → VT_ARR(5)；MAKE_DICT → VT_DICT(6)；
+      CONST_VAL(字符串常量) → VT_STR(4)；
+      ARITH_GEN(pred=1)（拼接）→ 左操作数的已证类型（涵盖 `s=s+x` 自拼接）；
+      MOV_V ← 源槽 → 源的已证类型；
+      其它写形态 → 槽证伪（POISON 终态）。
+    多轮传播到不动点（≤ 8 轮，链深防御）。
+
+    正确性边界：证明结果只用于 GUARD_TYPE 的**预测**；预测错（如
+    `1 + "a"` 实为 STR 而左类型是 NUM）→ 运行期 guard 失败 → 走原通用
+    循环，行为恒等 —— 错误预测的代价是性能而非语义。
+    """
+    UNK, POISON = 0, -1
+    from lir import MAKE_ARRAY, MAKE_DICT, CONST_VAL, MOV_V as _MV
+    from lir import ARITH_GEN as _AG
+    tags = {}
+
+    def get(s):
+        return tags.get(s, UNK)
+
+    changed = True
+    rounds = 0
+    while changed and rounds < 8:
+        changed = False
+        rounds += 1
+        for i in instrs:
+            d = slot_ops(i)[0]
+            for ds in d:
+                if ds is None or ds < 0 or _is_special_slot(ds):
+                    continue
+                cur = get(ds)
+                if cur == POISON:
+                    continue
+                t = None
+                if i.op == MAKE_ARRAY:
+                    t = 5   # VT_ARR
+                elif i.op == MAKE_DICT:
+                    t = 6   # VT_DICT
+                elif i.op == CONST_VAL and pool is not None \
+                        and 0 <= i.a < len(pool) and isinstance(pool[i.a], str):
+                    t = 4   # VT_STR
+                elif i.op == _AG and i.pred == 1 and i.a is not None and i.a >= 0:
+                    t = get(i.a)   # 拼接：结果类型 = 左类型（预测用途）
+                    if t == UNK:
+                        continue   # 左未定 → 下轮再看
+                elif i.op == _MV and i.a is not None and i.a >= 0:
+                    t = get(i.a)
+                    if t == UNK:
+                        continue
+                else:
+                    if cur != POISON:
+                        tags[ds] = POISON
+                        changed = True
+                    continue
+                if t is None or t in (UNK, POISON):
+                    tags[ds] = POISON
+                    changed = True
+                    continue
+                if cur == UNK:
+                    tags[ds] = t
+                    changed = True
+                elif cur != t:
+                    tags[ds] = POISON
+                    changed = True
+    r = tags.get(slot, UNK)
+    return r if isinstance(r, int) and r > 0 else None
+
+
 def _try_unbox_loop(f2, lp, pool):
     """对单个自然循环做去装箱。成功返回 True（f2 已被改写）。
 
@@ -1341,12 +1412,12 @@ def _try_unbox_loop(f2, lp, pool):
     ninstr = sum(len(f2.blocks[b].instrs) + 1 for b in body)
     if ninstr > MAX_UNBOX_INSTRS:
         return False
-    # 已版本化的循环不再重复处理：前置头里那条指向本头的 GUARD_NUM 就是标记。
-    # 没有它，慢循环（逐字未改动的原指令流）在下一轮会被再克隆一次，
-    # 每轮加一份副本 → 代码爆炸（实测一轮变八份）。
+    # 已版本化的循环不再重复处理：前置头里那条指向本头的 GUARD_NUM /
+    # GUARD_TYPE 就是标记。没有它，慢循环（逐字未改动的原指令流）在下一轮
+    # 会被再克隆一次，每轮加一份副本 → 代码爆炸（实测一轮变八份）。
     for p in f2.blocks[lp.header].preds:
         for i in f2.blocks[p].instrs:
-            if i.op == GUARD_NUM and i.target == lp.header:
+            if i.op in (GUARD_NUM, GUARD_TYPE) and i.target == lp.header:
                 return False
 
     # ---- 循环体内的 F64 组 ----
@@ -1361,14 +1432,62 @@ def _try_unbox_loop(f2, lp, pool):
             else:
                 groups.append((bid, k, g))
                 k += g['len']
-    if not groups:
+
+    # ---- 【PROMAX-G4】类型不变量分析（先于组判定：无组的循环也能做纯
+    # 类型特化版本化 —— b6b/b1d 形态的容器扫描循环正是「无 F64 组但容器
+    # 槽类型恒定」的高频业务形态）。----
+    tguard = {}          # slot -> VT tag
+    if os.environ.get('QOT_NO_TGUARD') != '1':
+        body_defs = set()
+        body_calls = False
+        for bid in body:
+            blk = f2.blocks[bid]
+            for bi in blk.instrs:
+                for ds in slot_ops(bi)[0]:
+                    if ds >= 0:
+                        body_defs.add(ds)
+                if bi.op in (CALL_USER, CALL_BUILTIN, CALL_MODULE,
+                             CALL_DYNAMIC, REQUIRE):
+                    body_calls = True
+            t = blk.term
+            if t is not None and t.op in (CALL_USER, CALL_BUILTIN,
+                                          CALL_MODULE, CALL_DYNAMIC,
+                                          REQUIRE):
+                body_calls = True
+        all_instrs = [i for b in f2.blocks for i in b.instrs]
+        for bid in sorted(body):
+            for bi in f2.blocks[bid].instrs:
+                if bi.op not in (INDEX_GET, INDEX_SET):
+                    continue
+                cslot = bi.a
+                if cslot in tguard or cslot < 0 or _is_special_slot(cslot) \
+                        or cslot in body_defs:
+                    continue
+                # 全局槽：体内无任何调用（值语义下只有指令流能改写槽）时，
+                # 「体内无定义」同样保证类型不变 —— guard 安全（A1 的顾虑
+                # 是被调方改写，这里显式排除）。局部槽不受此限。
+                if is_global(cslot) and body_calls:
+                    continue
+                tag = _slot_static_type(all_instrs, cslot, pool)
+                if os.environ.get('QOT_DBG_UNBOX'):
+                    writers = [repr(x.op) + '/pred=%s' % getattr(x, 'pred', None)
+                               for x in all_instrs
+                               if cslot in slot_ops(x)[0]]
+                    print('[tguard] slot=%s tag=%s writers=%s'
+                          % (cslot, tag, writers[:6]))
+                if tag is not None:
+                    tguard[cslot] = tag
+    if not groups and not tguard:
         return False
 
-    # ---- 循环体内不允许运行期代码加载 / 动态分派 ----
-    for bid in body:
-        for i in f2.blocks[bid].instrs:
-            if i.op in (REQUIRE, CALL_MODULE, CALL_DYNAMIC):
-                return False
+    # ---- 循环体内不允许运行期代码加载 / 动态分派（纯类型特化路径豁免：
+    # 克隆体与原体逐字相同，CALL_DYNAMIC 的语义面不受 INDEX 特化影响；
+    # guard 槽是局部槽，值语义下不可能被被调方改写类型）----
+    if not tguard:
+        for bid in body:
+            for i in f2.blocks[bid].instrs:
+                if i.op in (REQUIRE, CALL_MODULE, CALL_DYNAMIC):
+                    return False
 
     # ---- def/use 收集（含终结器）----
     defs_in, uses_in = {}, {}
@@ -1459,17 +1578,30 @@ def _try_unbox_loop(f2, lp, pool):
         if not dropped:
             break
 
+    if os.environ.get('QOT_DBG_UNBOX'):
+        print('[unbox] groups=%s cand_after=%s dropped=%s'
+              % ([(bid, g['kind']) for (bid, k, g) in groups], sorted(cand),
+                 sorted(x for x in (set(group_defs) | set(group_reads)) - cand)))
+
     if not cand:
-        return False
+        # 无组可拆（纯类型特化路径）：tguard 非空即可继续
+        if not tguard:
+            return False
+        cand = set()
     if len(cand) > MAX_UNBOX_SLOTS:
-        return False
-    # 至少要有「变体槽」被拆箱才值得克隆（只拆不变槽的收益极小）
+        if not tguard:
+            return False
+    # 至少要有「变体槽」被拆箱才值得克隆（只拆不变槽的收益极小）；
+    # 纯类型路径无变体，靠 tguard 估值。
     variant = sorted(s for s in cand if s in defs_in)
-    if not variant:
+    if not variant and not tguard:
         return False
     # 至少要有一个组的全部输入都在 C 里（否则快循环与慢循环逐字相同）
-    if not any(all(x in cand for x in g_vinputs(bid, g)) for (bid, k, g) in groups):
-        return False
+    if groups and not tguard:
+        if not any(all(x in cand for x in g_vinputs(bid, g)) for (bid, k, g) in groups):
+            if os.environ.get('QOT_DBG_UNBOX'):
+                print('[unbox] reject: no fully-unboxed group; cand=%s' % sorted(cand))
+            return False
 
     # ---- 分配镜像 f 槽 ----
     mirrors = {}
@@ -1570,6 +1702,22 @@ def _try_unbox_loop(f2, lp, pool):
         ph.instrs.append(LirInstr(GUARD_NUM, args=guarded, target=lp.header))
     for s in guarded:
         ph.instrs.append(LirInstr(LOAD_F64, dst=mirrors[s], a=s))
+
+    # ---- 【PROMAX-G4】类型守卫发射（分析已前置；此段只生成 guard + 挂属性）----
+    # guard：ph 追加 GUARD_TYPE（slot, tag, target=原头）——失败走原通用循环。
+    # 特化：克隆体里 a 槽 == 候选槽的 INDEX 指令挂 _spec_type=tag →
+    #   cgen 发射单分支形态（免三重类型分派 + 三次槽读）。
+    # 正确性：guard 成立 ⇒ 循环内槽 t 恒为 tag（体内无写 + 值语义不变）；
+    # 失败路径是逐字未动的原指令流，行为恒等。
+    for s in sorted(tguard):
+        ph.instrs.append(
+            LirInstr(GUARD_TYPE, args=[s], pred=int(tguard[s]),
+                     target=lp.header))
+        for bid in sorted(body):
+            for ci in f2.blocks[idmap[bid]].instrs:
+                if ci.op in (INDEX_GET, INDEX_SET) and ci.a == s:
+                    ci._spec_type = int(tguard[s])
+
     ph.term = LirInstr(JMP, target=idmap[lp.header])
 
     entries = f2.loop_entries(lp)

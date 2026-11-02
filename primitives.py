@@ -1,23 +1,5 @@
 # -*- coding: utf-8 -*-
-"""P0.1 原语 —— 解释器 oracle 侧实现（CP-2 · 0）。
-
-定位（R15 三层架构 + M1 单一清单纪律）：
-  * 本模块是 builtins.toml 里 P0.1 批（A 文件路径 / B 字符串 / D 数字 /
-    E 数组 / F 字典）的解释器实现，**薄壳原则**：语义口径逐条对齐
-    qot_aot_runtime.h 的 qotrt_* 原语（native 是发布面，这里是唯一对照面）；
-  * 谁也不许在这里另立一份名单：名字集 = 清单 interp 字段集，
-    `__name__` 必须与清单逐字一致（_apply_builtin_manifest 机械校验）；
-  * 失败哨兵不抛异常（数值 -1 / 字符串 "" / 数组字典 null / 布尔 false），
-    与 native 逐位一致；只有参数个数错误走 TypeError（→ [2010]，与
-    dict_get 等既有内置同范式）。
-
-与 native 的对齐机制（为什么这些 _ 辅助函数长得像 C）：
-  * QOT 的字符串是 **UTF-8 字节序列**。Python str 是码点序列 —— 所有
-    字节级原语先 encode('utf-8', 'surrogateescape') 落到 bytes 上操作，
-    结果 decode 回 str（surrogateescape 保证任意字节往返无损）；
-  * QOT 的 number 是 F64，输出口径必须与 qotrt_num_to_buf 一致
-    （整数值 → "N.000000"，否则 %f 6 位）；
-  * tostring 口径：null/bool/数字/字符串/容器逐项复刻 qotrt_tostring。
+"""解释器 oracle 侧实现
 """
 import math
 import os
@@ -3962,6 +3944,36 @@ def socket_udp_recv_handler(*args):
     return data.decode('utf-8', 'surrogateescape')
 
 
+def socket_select_handler(*args):
+    """select 多路复用：句柄数组 + 超时 ms → 就绪句柄数组（新数组）。
+
+    与 native 侧 qotrt_socket_select 同契约：读就绪面；非法句柄跳过；
+    超时/错误 → 空数组；入参非数组 → None。
+    """
+    import select as _sel
+    if len(args) < 2 or not isinstance(args[0], list):
+        return None
+    ms = int(args[1]) if not isinstance(args[1], bool) \
+        and isinstance(args[1], (int, float)) else 0
+    if ms < 0:
+        ms = 0
+    pairs = []
+    for h in args[0]:
+        p = _sock_of(h)
+        if p is None:
+            continue
+        pairs.append((int(h), p))
+    if not pairs:
+        return []
+    try:
+        ready, _, _ = _sel.select([p for (_, p) in pairs], [], [],
+                                  ms / 1000.0)
+    except (OSError, ValueError):
+        return []
+    ready_set = {id(r) for r in ready}
+    return [float(h) for (h, p) in pairs if id(p) in ready_set]
+
+
 # ---------------------------------------------------------------- 登记表
 
 # 解释器回调宿主（Evaluator 在 index.py 侧经 set_evaluator 注册；
@@ -4073,14 +4085,7 @@ def json_validate_handler(*args):
         return False
 
 
-# ===========================================================================
-# GUI 组（vg_*）：解释器侧经 ctypes 驱动 qotgui.dll —— 与原生程序共用
-# 同一份 C++ 实现（ot-asset/c/wingui），行为由代码保证一致，不靠对齐。
-#
-# 事件模型：**轮询**（vg_poll_event）而非回调。C 侧无法反向调用各引擎的
-# 函数值，轮询让两侧语义天然一致，也不挑宿主线程模型。
-# kind: 1 点击 / 2 改变 / 3 选中
-# ===========================================================================
+
 _QG_DLL = None
 _QG_ERR = ['']
 
@@ -4090,7 +4095,7 @@ def _qg_err_set(msg):
 
 
 def _qg_dll():
-    """装载 qotgui.dll（找不到就明确报错，不静默降级）。"""
+    """装载 qotgui.dll"""
     global _QG_DLL
     if _QG_DLL is not None:
         return _QG_DLL
@@ -4113,14 +4118,22 @@ def _qg_dll():
             dll.qg_create_window.restype = ctypes.c_int
             dll.qg_create_window.argtypes = [ctypes.c_char_p, ctypes.c_int, ctypes.c_int]
             for nm in ('qg_create_label', 'qg_create_button', 'qg_create_checkbox',
-                       'qg_create_toggle', 'qg_create_textbox', 'qg_create_slider',
-                       'qg_create_progressbar', 'qg_create_card', 'qg_create_combobox',
-                       'qg_create_listbox', 'qg_create_tabcontrol', 'qg_create_spinner'):
+                       'qg_create_toggle', 'qg_create_textbox',
+                       'qg_create_card'):
                 f = getattr(dll, nm, None)
                 if f is not None:
                     f.restype = ctypes.c_int
                     f.argtypes = [ctypes.c_int, ctypes.c_char_p,
                                   ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
+            # 无 text 参数的控件族（C ABI 5 参）——v2 曾误挂 6 参声明，
+            # 首次在 QOT 里调用即 ctypes TypeError（性能探针实测踩出）
+            for nm in ('qg_create_slider', 'qg_create_progressbar',
+                       'qg_create_combobox', 'qg_create_listbox',
+                       'qg_create_tabcontrol', 'qg_create_spinner'):
+                f = getattr(dll, nm, None)
+                if f is not None:
+                    f.restype = ctypes.c_int
+                    f.argtypes = [ctypes.c_int] + [ctypes.c_int] * 4
             for nm in ('qg_show_window', 'qg_close_window', 'qg_destroy'):
                 f = getattr(dll, nm, None)
                 if f is not None:
@@ -4160,6 +4173,227 @@ def _qg_dll():
             dll.qg_poll_event.argtypes = [ctypes.POINTER(ctypes.c_int),
                                           ctypes.POINTER(ctypes.c_int),
                                           ctypes.POINTER(ctypes.c_double)]
+            # ---- v2：回调 / 帧原语 / 窗口能力 / Canvas 绘制 ----
+            dll.qg_bind.restype = ctypes.c_int
+            dll.qg_bind.argtypes = [ctypes.c_int, ctypes.c_uint,
+                                    ctypes.c_void_p, ctypes.c_void_p]
+            dll.qg_unbind.restype = ctypes.c_int
+            dll.qg_unbind.argtypes = [ctypes.c_int]
+            dll.qg_on_frame.restype = ctypes.c_int
+            dll.qg_on_frame.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+            dll.qg_off_frame.restype = ctypes.c_int
+            dll.qg_off_frame.argtypes = [ctypes.c_int]
+            dll.qg_request_frame.restype = None
+            dll.qg_easing.restype = ctypes.c_float
+            dll.qg_easing.argtypes = [ctypes.c_int, ctypes.c_float]
+            for nm in ('qg_set_window_transparent', 'qg_set_window_backdrop',
+                       'qg_set_window_round', 'qg_set_window_borderless',
+                       'qg_set_window_topmost', 'qg_prevent_close',
+                       'qg_window_drag', 'qg_window_minimize',
+                       'qg_window_maximize', 'qg_window_restore'):
+                f = getattr(dll, nm, None)
+                if f is not None:
+                    f.restype = ctypes.c_int
+                    f.argtypes = [ctypes.c_int, ctypes.c_int]
+            dll.qg_set_window_backdrop.argtypes = [ctypes.c_int, ctypes.c_int,
+                                                   ctypes.c_float]
+            dll.qg_set_window_bg_rgba.restype = ctypes.c_int
+            dll.qg_set_window_bg_rgba.argtypes = [ctypes.c_int] + [ctypes.c_float] * 8
+            dll.qg_set_theme.restype = ctypes.c_int
+            dll.qg_set_theme.argtypes = [ctypes.c_int, ctypes.c_int]
+            dll.qg_set_opacity.restype = ctypes.c_int
+            dll.qg_set_opacity.argtypes = [ctypes.c_int, ctypes.c_float]
+            dll.qg_animate.restype = ctypes.c_int
+            dll.qg_animate.argtypes = [ctypes.c_int, ctypes.c_int,
+                                       ctypes.c_float, ctypes.c_float,
+                                       ctypes.c_float, ctypes.c_int]
+            dll.qg_animate_stop.restype = ctypes.c_int
+            dll.qg_animate_stop.argtypes = [ctypes.c_int]
+            dll.qg_create_canvas.restype = ctypes.c_int
+            dll.qg_create_canvas.argtypes = [ctypes.c_int] + [ctypes.c_int] * 4
+            dll.qg_canvas_on_draw.restype = ctypes.c_int
+            dll.qg_canvas_on_draw.argtypes = [ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p]
+            dll.qg_create_image.restype = ctypes.c_int
+            dll.qg_create_image.argtypes = [ctypes.c_int, ctypes.c_char_p] + [ctypes.c_int] * 4
+            dll.qg_image_load.restype = ctypes.c_int
+            dll.qg_image_load.argtypes = [ctypes.c_char_p]
+            dll.qg_image_free.restype = None
+            dll.qg_image_free.argtypes = [ctypes.c_int]
+            dll.qg_image_size.restype = ctypes.c_int
+            dll.qg_image_size.argtypes = [ctypes.c_int,
+                                          ctypes.POINTER(ctypes.c_int),
+                                          ctypes.POINTER(ctypes.c_int)]
+            for nm in ('qg_wait_event',):
+                f = getattr(dll, nm, None)
+                if f is not None:
+                    f.restype = ctypes.c_int
+            # 绘制原语一族（float 参数必须显式声明，ctypes 默认按 double 传）
+            dll.qg_draw_measure_text.restype = None
+            dll.qg_draw_measure_text.argtypes = [ctypes.c_char_p, ctypes.c_float,
+                                                 ctypes.POINTER(ctypes.c_float),
+                                                 ctypes.POINTER(ctypes.c_float)]
+            _draw_fns = {
+                'qg_draw_fill_rect': [ctypes.c_float] * 8,
+                'qg_draw_stroke_rect': [ctypes.c_float] * 9,
+                'qg_draw_fill_round_rect': [ctypes.c_float] * 9,
+                'qg_draw_stroke_round_rect': [ctypes.c_float] * 10,
+                'qg_draw_fill_ellipse': [ctypes.c_float] * 8,
+                'qg_draw_stroke_ellipse': [ctypes.c_float] * 9,
+                'qg_draw_line': [ctypes.c_float] * 9,
+                'qg_draw_gradient_rect': [ctypes.c_float] * 12 + [ctypes.c_int],
+            }
+            for nm, spec in _draw_fns.items():
+                f = getattr(dll, nm, None)
+                if f is not None:
+                    f.restype = None
+                    f.argtypes = spec
+            dll.qg_draw_text.restype = None
+            dll.qg_draw_text.argtypes = [ctypes.c_char_p] + [ctypes.c_float] * 7
+            dll.qg_draw_push_clip.restype = None
+            dll.qg_draw_push_clip.argtypes = [ctypes.c_float] * 4
+            dll.qg_draw_pop_clip.restype = None
+            dll.qg_draw_pop_clip.argtypes = []
+            dll.qg_draw_push_translate.restype = None
+            dll.qg_draw_push_translate.argtypes = [ctypes.c_float] * 2
+            dll.qg_draw_push_rotate.restype = None
+            dll.qg_draw_push_rotate.argtypes = [ctypes.c_float] * 3
+            dll.qg_draw_push_scale.restype = None
+            dll.qg_draw_push_scale.argtypes = [ctypes.c_float] * 4
+            dll.qg_draw_pop_transform.restype = None
+            dll.qg_draw_pop_transform.argtypes = []
+            dll.qg_draw_image.restype = None
+            dll.qg_draw_image.argtypes = [ctypes.c_int] + [ctypes.c_float] * 5
+            dll.qg_draw_push_blur.restype = None
+            dll.qg_draw_push_blur.argtypes = [ctypes.c_float] * 5
+            dll.qg_draw_pop_blur.restype = None
+            dll.qg_draw_pop_blur.argtypes = []
+            # ---- v3：布局系统 ----
+            dll.qg_layout_begin.restype = ctypes.c_int
+            dll.qg_layout_begin.argtypes = [ctypes.c_int, ctypes.c_char_p]
+            dll.qg_layout_add.restype = ctypes.c_int
+            dll.qg_layout_add.argtypes = [ctypes.c_int, ctypes.c_int]
+            dll.qg_layout_spacing.restype = ctypes.c_int
+            dll.qg_layout_spacing.argtypes = [ctypes.c_int, ctypes.c_float]
+            dll.qg_layout_padding.restype = ctypes.c_int
+            dll.qg_layout_padding.argtypes = [ctypes.c_int] + [ctypes.c_float] * 4
+            dll.qg_layout_cols.restype = ctypes.c_int
+            dll.qg_layout_cols.argtypes = [ctypes.c_int, ctypes.c_int]
+            dll.qg_layout_props.restype = ctypes.c_int
+            dll.qg_layout_props.argtypes = [ctypes.c_int] + [ctypes.c_float] * 4 + \
+                                           [ctypes.c_int, ctypes.c_int, ctypes.c_float]
+            dll.qg_layout_end.restype = ctypes.c_int
+            dll.qg_layout_end.argtypes = [ctypes.c_int]
+            # v3：位置/尺寸读回（布局重排断言用）
+            dll.qg_get_pos.restype = ctypes.c_int
+            dll.qg_get_pos.argtypes = [ctypes.c_int,
+                                       ctypes.POINTER(ctypes.c_int),
+                                       ctypes.POINTER(ctypes.c_int)]
+            dll.qg_get_size.restype = ctypes.c_int
+            dll.qg_get_size.argtypes = [ctypes.c_int,
+                                        ctypes.POINTER(ctypes.c_int),
+                                        ctypes.POINTER(ctypes.c_int)]
+            dll.qg_window_client_size.restype = ctypes.c_int
+            dll.qg_window_client_size.argtypes = [ctypes.c_int,
+                                                  ctypes.POINTER(ctypes.c_int),
+                                                  ctypes.POINTER(ctypes.c_int)]
+            # ---- v3：滚动容器与虚拟化列表 ----
+            for nm in ('qg_create_scrollpane', 'qg_create_vlist'):
+                f = getattr(dll, nm, None)
+                if f is not None:
+                    f.restype = ctypes.c_int
+                    f.argtypes = [ctypes.c_int] + [ctypes.c_int] * 4
+            dll.qg_scroll_content.restype = ctypes.c_int
+            dll.qg_scroll_content.argtypes = [ctypes.c_int, ctypes.c_float]
+            dll.qg_scroll_attach.restype = ctypes.c_int
+            dll.qg_scroll_attach.argtypes = [ctypes.c_int] + [ctypes.c_int] * 5
+            dll.qg_scroll_offset.restype = ctypes.c_double
+            dll.qg_scroll_offset.argtypes = [ctypes.c_int]
+            dll.qg_scroll_to.restype = ctypes.c_int
+            dll.qg_scroll_to.argtypes = [ctypes.c_int, ctypes.c_float]
+            dll.qg_list_set_count.restype = ctypes.c_int
+            dll.qg_list_set_count.argtypes = [ctypes.c_int, ctypes.c_int]
+            dll.qg_list_add_item.restype = ctypes.c_int
+            dll.qg_list_add_item.argtypes = [ctypes.c_int, ctypes.c_char_p]
+            dll.qg_list_draw_count.restype = ctypes.c_int
+            dll.qg_list_draw_count.argtypes = [ctypes.c_int]
+            dll.qg_list_on_data.restype = ctypes.c_int
+            dll.qg_list_on_data.argtypes = [ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p]
+            # ---- v3：模态对话框 / 菜单 / toast ----
+            dll.qg_show_dialog.restype = ctypes.c_int
+            dll.qg_show_dialog.argtypes = [ctypes.c_int, ctypes.c_int]
+            dll.qg_set_dialog_result.restype = ctypes.c_int
+            dll.qg_set_dialog_result.argtypes = [ctypes.c_int, ctypes.c_int]
+            dll.qg_create_menu.restype = ctypes.c_int
+            dll.qg_create_menu.argtypes = []
+            dll.qg_menu_add_item.restype = ctypes.c_int
+            dll.qg_menu_add_item.argtypes = [ctypes.c_int, ctypes.c_char_p]
+            dll.qg_menu_separator.restype = ctypes.c_int
+            dll.qg_menu_separator.argtypes = [ctypes.c_int]
+            dll.qg_menu_popup.restype = ctypes.c_int
+            dll.qg_menu_popup.argtypes = [ctypes.c_int, ctypes.c_int,
+                                          ctypes.c_int, ctypes.c_int]
+            dll.qg_menu_destroy.restype = ctypes.c_int
+            dll.qg_menu_destroy.argtypes = [ctypes.c_int]
+            dll.qg_toast.restype = ctypes.c_int
+            dll.qg_toast.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int]
+            # ---- v3：文本富能力 ----
+            dll.qg_draw_text_ex.restype = None
+            dll.qg_draw_text_ex.argtypes = [ctypes.c_char_p] + [ctypes.c_float] * 9 + \
+                                           [ctypes.c_int, ctypes.c_int, ctypes.c_int,
+                                            ctypes.c_int, ctypes.c_int]
+            dll.qg_draw_measure_text_ex.restype = None
+            dll.qg_draw_measure_text_ex.argtypes = [ctypes.c_char_p, ctypes.c_float,
+                                                    ctypes.c_int, ctypes.c_int,
+                                                    ctypes.c_float,
+                                                    ctypes.POINTER(ctypes.c_float),
+                                                    ctypes.POINTER(ctypes.c_float)]
+            # ---- v3：系统集成 ----
+            dll.qg_clipboard_set.restype = ctypes.c_int
+            dll.qg_clipboard_set.argtypes = [ctypes.c_char_p]
+            dll.qg_clipboard_get.restype = ctypes.c_int
+            dll.qg_clipboard_get.argtypes = [ctypes.c_char_p, ctypes.c_int]
+            dll.qg_window_accept_files.restype = ctypes.c_int
+            dll.qg_window_accept_files.argtypes = [ctypes.c_int, ctypes.c_int]
+            dll.qg_take_drop_file.restype = ctypes.c_int
+            dll.qg_take_drop_file.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int]
+            dll.qg_taskbar_progress.restype = ctypes.c_int
+            dll.qg_taskbar_progress.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int]
+            dll.qg_taskbar_state.restype = ctypes.c_int
+            dll.qg_taskbar_state.argtypes = [ctypes.c_int, ctypes.c_int]
+            # ---- v4：样式原语 ----
+            for nm in ('qg_style_bg', 'qg_menu_bg', 'qg_menu_hover_bg',
+                       'qg_menu_text_color'):
+                f = getattr(dll, nm, None)
+                if f is not None:
+                    f.restype = ctypes.c_int
+                    f.argtypes = [ctypes.c_int] + [ctypes.c_float] * 4
+            dll.qg_style_radius.restype = ctypes.c_int
+            dll.qg_style_radius.argtypes = [ctypes.c_int, ctypes.c_float]
+            dll.qg_style_reset.restype = ctypes.c_int
+            dll.qg_style_reset.argtypes = [ctypes.c_int]
+            dll.qg_style_bg_gradient.restype = ctypes.c_int
+            dll.qg_style_bg_gradient.argtypes = [ctypes.c_int] + [ctypes.c_float] * 8 + [ctypes.c_int]
+            dll.qg_style_border.restype = ctypes.c_int
+            dll.qg_style_border.argtypes = [ctypes.c_int] + [ctypes.c_float] * 5
+            dll.qg_style_padding.restype = ctypes.c_int
+            dll.qg_style_padding.argtypes = [ctypes.c_int] + [ctypes.c_float] * 4
+            dll.qg_style_text.restype = ctypes.c_int
+            dll.qg_style_text.argtypes = [ctypes.c_int] + [ctypes.c_float] * 5 + [ctypes.c_int]
+            for nm in ('qg_style_state_bg', 'qg_style_state_text'):
+                f = getattr(dll, nm, None)
+                if f is not None:
+                    f.restype = ctypes.c_int
+                    f.argtypes = [ctypes.c_int, ctypes.c_int] + [ctypes.c_float] * 4
+            dll.qg_style_flags.restype = ctypes.c_uint
+            dll.qg_style_flags.argtypes = [ctypes.c_int]
+            dll.qg_on_paint.restype = ctypes.c_int
+            dll.qg_on_paint.argtypes = [ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p]
+            dll.qg_toast_style.restype = ctypes.c_int
+            dll.qg_toast_style.argtypes = [ctypes.c_int] + [ctypes.c_float] * 13
+            dll.qg_scroll_style.restype = ctypes.c_int
+            dll.qg_scroll_style.argtypes = [ctypes.c_int] + [ctypes.c_float] * 9
+            dll.qg_menu_border.restype = ctypes.c_int
+            dll.qg_menu_border.argtypes = [ctypes.c_int] + [ctypes.c_float] * 5
             _QG_DLL = dll
             return dll
     _qg_err_set('找不到 qotgui.dll —— 请先运行 '
@@ -4378,6 +4612,1420 @@ def vg_wait_event_handler(*args):
 
 def vg_last_error_handler(*args):
     return _QG_ERR[0]
+
+
+# ===========================================================================
+# v2 · 事件回调 / 帧原语 / Canvas 绘制（原语化）
+#
+# ctypes CFUNCTYPE 生成 Python 函数的 C 指针；cookie（整数）映射回 QOT 闭包，
+# 事件触发时经 evaluator 调用。回调线程 = 消息循环线程（vg_run 阻塞处 =
+# 本线程），QOT 闭包内可直接调用任何 vg_* 接口。
+# ===========================================================================
+_QG_BINDS = {}          # cookie(int) -> QotClosure
+_QG_CB_REF = ['']       # CFUNCTYPE 实例保活槽（防 GC 回收回调函数）
+_QG_DRAW_CB_REF = ['']
+
+_QG_EVT_CB_TYPE = None
+
+
+def _qg_evt_cb_type():
+    """事件回调的 C 签名：fn(id, kind, value, x, y, userdata)"""
+    global _QG_EVT_CB_TYPE
+    if _QG_EVT_CB_TYPE is None:
+        import ctypes as _c
+        _QG_EVT_CB_TYPE = _c.CFUNCTYPE(
+            None, _c.c_int, _c.c_int, _c.c_double, _c.c_int, _c.c_int, _c.c_void_p)
+    return _QG_EVT_CB_TYPE
+
+
+def _qg_evt_trampoline():
+    """模块级单例回调（保活）：cookie → QOT 闭包 → evaluator 调用。
+    统一 QOT 侧签名：fn(id, value, x, y)。"""
+    if _QG_CB_REF[0]:
+        return _QG_CB_REF[0]
+    import ctypes as _c
+    ty = _qg_evt_cb_type()
+
+    def _cb(cid, kind, value, x, y, ud):
+        clo = _QG_BINDS.get(ud or 0)
+        if clo is None:
+            return
+        ev = _current_evaluator()
+        if ev is None:
+            return
+        try:
+            ev._call_closure(clo, [cid, value, x, y])
+        except Exception:
+            pass   # 回调异常不炸 C 消息循环（与 AOT 侧口径一致）
+
+    _QG_CB_REF[0] = ty(_cb)
+    return _QG_CB_REF[0]
+
+
+def _qg_frame_trampoline():
+    """帧回调单例：fn(dt)。"""
+    if _QG_DRAW_CB_REF[0]:
+        return _QG_DRAW_CB_REF[0]
+    import ctypes as _c
+    ty = _c.CFUNCTYPE(None, _c.c_double, _c.c_void_p)
+
+    def _cb(dt, ud):
+        clo = _QG_BINDS.get(ud or 0)
+        if clo is None:
+            return
+        ev = _current_evaluator()
+        if ev is None:
+            return
+        try:
+            ev._call_closure(clo, [dt])
+        except Exception:
+            pass
+
+    _QG_DRAW_CB_REF[0] = ty(_cb)
+    return _QG_DRAW_CB_REF[0]
+
+
+def _qg_canvas_cb():
+    """Canvas 绘制回调单例：fn(w, h)（与帧回调分开保活）。"""
+    global _QG_EVT_CB_TYPE
+    slot = _QG_CANVAS_CB_REF
+    if slot[0]:
+        return slot[0]
+    import ctypes as _c
+    ty = _c.CFUNCTYPE(None, _c.c_float, _c.c_float, _c.c_void_p)
+
+    def _cb(w, h, ud):
+        clo = _QG_BINDS.get(ud or 0)
+        if clo is None:
+            return
+        ev = _current_evaluator()
+        if ev is None:
+            return
+        try:
+            ev._call_closure(clo, [w, h])
+        except Exception:
+            pass
+
+    slot[0] = ty(_cb)
+    return slot[0]
+
+
+def _qg_paint_cb():
+    """owner-draw 回调单例（v4）：fn(w, h, state)（与 canvas 回调分开保活）。"""
+    slot = _QG_PAINT_CB_REF
+    if slot[0]:
+        return slot[0]
+    import ctypes as _c
+    ty = _c.CFUNCTYPE(None, _c.c_float, _c.c_float, _c.c_uint, _c.c_void_p)
+
+    def _cb(w, h, state, ud):
+        clo = _QG_BINDS.get(ud or 0)
+        if clo is None:
+            return
+        ev = _current_evaluator()
+        if ev is None:
+            return
+        try:
+            ev._call_closure(clo, [w, h, float(state)])
+        except Exception:
+            pass
+
+    slot[0] = ty(_cb)
+    return slot[0]
+
+
+_QG_CANVAS_CB_REF = ['']
+_QG_PAINT_CB_REF = ['']
+_QG_FRAME_MARK = object()
+_QG_NEXT_COOKIE = [1]
+
+
+def _qg_cookie(clo):
+    """闭包登记：cookie → QOT 闭包（回调触发时反查）。"""
+    cookie = _QG_NEXT_COOKIE[0]
+    _QG_NEXT_COOKIE[0] += 1
+    _QG_BINDS[cookie] = clo
+    return cookie
+
+
+def vg_bind_handler(*args):
+    """通用绑定：vg_bind(id, kinds_mask, fn) → token | null"""
+    dll = _qg_dll()
+    if not dll or len(args) < 3:
+        return None
+    clo = args[2]
+    if not _is_closure(clo):
+        return None
+    cookie = _qg_cookie(clo)
+    import ctypes as _c
+    token = dll.qg_bind(int(_qg_num(args[0], 0)), int(_qg_num(args[1], 0)),
+                        _c.cast(_qg_evt_trampoline(), _c.c_void_p),
+                        _c.c_void_p(cookie))
+    return token if token else None
+
+
+def vg_unbind_handler(*args):
+    dll = _qg_dll()
+    if not dll or not args:
+        return False
+    ok = dll.qg_unbind(int(_qg_num(args[0], 0))) == 1
+    if ok:
+        # 注册表项生命周期与 token 解耦（cookie 槽留待进程末清理，量级可忽略）
+        pass
+    return ok
+
+
+def _vg_on_kind(mask):
+    def h(*args):
+        dll = _qg_dll()
+        if not dll or len(args) < 2:
+            return None
+        clo = args[-1]
+        if not _is_closure(clo):
+            return None
+        cookie = _qg_cookie(clo)
+        import ctypes as _c
+        token = dll.qg_bind(int(_qg_num(args[0], 0)), mask,
+                            _c.cast(_qg_evt_trampoline(), _c.c_void_p),
+                            _c.c_void_p(cookie))
+        return token if token else None
+    return h
+
+
+def vg_on_click_handler(*args):
+    return _vg_on_kind(0x00001)(*args)
+
+
+def vg_on_change_handler(*args):
+    return _vg_on_kind(0x00002)(*args)
+
+
+def vg_on_select_handler(*args):
+    return _vg_on_kind(0x00004)(*args)
+
+
+def vg_on_mouse_handler(*args):
+    """vg_on_mouse(id, kind, fn)：kind = 10 按下 11 抬起 12 移动 13 进入 14 离开 15 双击"""
+    dll = _qg_dll()
+    if not dll or len(args) < 3:
+        return None
+    clo = args[2]
+    if not _is_closure(clo):
+        return None
+    cookie = _qg_cookie(clo)
+    import ctypes as _c
+    token = dll.qg_bind(int(_qg_num(args[0], 0)), int(_qg_num(args[1], 0)),
+                        _c.cast(_qg_evt_trampoline(), _c.c_void_p),
+                        _c.c_void_p(cookie))
+    return token if token else None
+
+
+def vg_on_key_handler(*args):
+    return _vg_on_kind(0x00800)(*args)
+
+
+def vg_on_text_handler(*args):
+    return _vg_on_kind(0x02000)(*args)
+
+
+def vg_on_close_handler(*args):
+    return _vg_on_kind(0x04000)(*args)
+
+
+def vg_on_resize_handler(*args):
+    return _vg_on_kind(0x08000)(*args)
+
+
+def vg_on_load_handler(*args):
+    return _vg_on_kind(0x40000)(*args)
+
+
+def vg_on_scroll_handler(*args):
+    """滚动事件绑定（kind=16，value=偏移）：vg_on_scroll(id, fn) → token"""
+    return _vg_on_kind(0x80000)(*args)
+
+
+def vg_on_menu_handler(*args):
+    """菜单命令绑定（kind=50，value=选中项 id）：vg_on_menu(win, fn) → token"""
+    return _vg_on_kind(0x100000)(*args)
+
+
+def vg_on_drop_handler(*args):
+    """拖放文件绑定（kind=51，value=文件数，x/y=落点）：vg_on_drop(win, fn) → token"""
+    return _vg_on_kind(0x200000)(*args)
+
+
+def vg_on_frame_handler(*args):
+    """帧原语：vg_on_frame(fn) → token；回调 fn(dt)，需要下一帧再 vg_request_frame()"""
+    dll = _qg_dll()
+    if not dll or not args:
+        return None
+    clo = args[0]
+    if not _is_closure(clo):
+        return None
+    cookie = _qg_cookie(clo)
+    import ctypes as _c
+    token = dll.qg_on_frame(_c.cast(_qg_frame_trampoline(), _c.c_void_p),
+                            _c.c_void_p(cookie))
+    return token if token else None
+
+
+def vg_off_frame_handler(*args):
+    dll = _qg_dll()
+    return bool(dll) and args and dll.qg_off_frame(int(_qg_num(args[0], 0))) == 1
+
+
+def vg_request_frame_handler(*args):
+    dll = _qg_dll()
+    if not dll:
+        return False
+    dll.qg_request_frame()
+    return True
+
+
+def vg_easing_handler(*args):
+    """缓动纯函数：vg_easing(t, kind) → 0..1（kind 0..11）"""
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return 0.0
+    return float(dll.qg_easing(int(_qg_num(args[1], 0)), float(_qg_num(args[0], 0.0))))
+
+
+def vg_window_transparent_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    return dll.qg_set_window_transparent(int(_qg_num(args[0], 0)),
+                                         1 if _qg_num(args[1], 0) else 0) == 1
+
+
+def vg_window_backdrop_handler(*args):
+    """系统合成器背景模糊原语：vg_window_backdrop(win, on[, tint_alpha])"""
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    return dll.qg_set_window_backdrop(int(_qg_num(args[0], 0)),
+                                      1 if _qg_num(args[1], 0) else 0,
+                                      _c.c_float(float(_qg_num(args[2], 0.5)))) == 1
+
+
+def vg_set_window_round_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    return dll.qg_set_window_round(int(_qg_num(args[0], 0)),
+                                   1 if _qg_num(args[1], 0) else 0) == 1
+
+
+def vg_set_window_borderless_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    return dll.qg_set_window_borderless(int(_qg_num(args[0], 0)),
+                                        1 if _qg_num(args[1], 0) else 0) == 1
+
+
+def vg_set_window_topmost_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    return dll.qg_set_window_topmost(int(_qg_num(args[0], 0)),
+                                     1 if _qg_num(args[1], 0) else 0) == 1
+
+
+def vg_prevent_close_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    return dll.qg_prevent_close(int(_qg_num(args[0], 0)),
+                                1 if _qg_num(args[1], 0) else 0) == 1
+
+
+def vg_window_drag_handler(*args):
+    dll = _qg_dll()
+    return bool(dll) and args and dll.qg_window_drag(int(_qg_num(args[0], 0))) == 1
+
+
+def vg_window_minimize_handler(*args):
+    dll = _qg_dll()
+    return bool(dll) and args and dll.qg_window_minimize(int(_qg_num(args[0], 0))) == 1
+
+
+def vg_window_maximize_handler(*args):
+    dll = _qg_dll()
+    return bool(dll) and args and dll.qg_window_maximize(int(_qg_num(args[0], 0))) == 1
+
+
+def vg_window_restore_handler(*args):
+    dll = _qg_dll()
+    return bool(dll) and args and dll.qg_window_restore(int(_qg_num(args[0], 0))) == 1
+
+
+def vg_set_window_bg_rgba_handler(*args):
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    c0 = _qg_color(args, 1) or [0.05, 0.05, 0.12, 1.0]
+    c1 = _qg_color(args, 2) or c0
+    return dll.qg_set_window_bg_rgba(
+        int(_qg_num(args[0], 0)),
+        _c.c_float(c0[0]), _c.c_float(c0[1]), _c.c_float(c0[2]), _c.c_float(c0[3]),
+        _c.c_float(c1[0]), _c.c_float(c1[1]), _c.c_float(c1[2]), _c.c_float(c1[3])) == 1
+
+
+def vg_set_theme_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    return dll.qg_set_theme(int(_qg_num(args[0], 0)), int(_qg_num(args[1], 0))) == 1
+
+
+def vg_set_font_handler(*args):
+    dll = _qg_dll()
+    if not dll or not args:
+        return False
+    return dll.qg_set_font(_qg_bytes(args[0])) == 1
+
+
+def vg_set_opacity_handler(*args):
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    return dll.qg_set_opacity(int(_qg_num(args[0], 0)),
+                              _c.c_float(float(_qg_num(args[1], 1.0)))) == 1
+
+
+def vg_animate_handler(*args):
+    """动画糖：vg_animate(id, prop, from, to, ms, easing) → 动画 id | null
+    prop: 0 x 1 y 2 w 3 h 4 opacity；完成发 kind=8 事件。"""
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 6:
+        return None
+    anim = dll.qg_animate(int(_qg_num(args[0], 0)), int(_qg_num(args[1], 0)),
+                          _c.c_float(float(_qg_num(args[2], 0.0))),
+                          _c.c_float(float(_qg_num(args[3], 0.0))),
+                          _c.c_float(float(_qg_num(args[4], 200.0))),
+                          _c.c_int(int(_qg_num(args[5], 2))))
+    return anim if anim else None
+
+
+def vg_animate_stop_handler(*args):
+    dll = _qg_dll()
+    return bool(dll) and args and dll.qg_animate_stop(int(_qg_num(args[0], 0))) == 1
+
+
+def vg_create_canvas_handler(*args):
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll:
+        return None
+    win = int(_qg_num(args[0], 0)) if args else 0
+    x = int(_qg_num(args[1], 20)) if len(args) > 1 else 20
+    y = int(_qg_num(args[2], 20)) if len(args) > 2 else 20
+    w = int(_qg_num(args[3], 200)) if len(args) > 3 else 200
+    hh = int(_qg_num(args[4], 200)) if len(args) > 4 else 200
+    r = dll.qg_create_canvas(win, x, y, w, hh)
+    return r if r else None
+
+
+def vg_canvas_on_draw_handler(*args):
+    """vg_canvas_on_draw(id, fn)：每帧绘制本画布时调 fn(w, h)，
+    回调内用 vg_draw_* 原语自由作画（坐标相对画布原点）。"""
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    clo = args[1]
+    if not _is_closure(clo):
+        return False
+    cookie = _qg_cookie(clo)
+    import ctypes as _c
+    cb = _qg_canvas_cb()
+    return dll.qg_canvas_on_draw(int(_qg_num(args[0], 0)),
+                                 _c.cast(cb, _c.c_void_p),
+                                 _c.c_void_p(cookie)) == 1
+
+
+def vg_create_image_handler(*args):
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return None
+    win = int(_qg_num(args[0], 0))
+    path = _qg_bytes(args[1])
+    x = int(_qg_num(args[2], 20)) if len(args) > 2 else 20
+    y = int(_qg_num(args[3], 20)) if len(args) > 3 else 20
+    w = int(_qg_num(args[4], 120)) if len(args) > 4 else 120
+    hh = int(_qg_num(args[5], 120)) if len(args) > 5 else 120
+    r = dll.qg_create_image(win, path, x, y, w, hh)
+    return r if r else None
+
+
+def vg_image_load_handler(*args):
+    dll = _qg_dll()
+    if not dll or not args:
+        return None
+    r = dll.qg_image_load(_qg_bytes(args[0]))
+    return r if r else None
+
+
+def vg_image_free_handler(*args):
+    dll = _qg_dll()
+    if not dll or not args:
+        return False
+    dll.qg_image_free(int(_qg_num(args[0], 0)))
+    return True
+
+
+def vg_image_size_handler(*args):
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or not args:
+        return None
+    w = _c.c_int(0)
+    h = _c.c_int(0)
+    if dll.qg_image_size(int(_qg_num(args[0], 0)), _c.byref(w), _c.byref(h)) != 1:
+        return None
+    return [w.value, h.value]
+
+
+# ---- 绘制原语（vg_draw_*：Canvas 绘制回调期间可用） ----
+
+def _vg_color_at(args, idx):
+    c = _qg_color(args, idx)
+    return c if c else [0.0, 0.0, 0.0, 1.0]
+
+
+def vg_draw_fill_rect_handler(*args):
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 5:
+        return False
+    c = _vg_color_at(args, 4)
+    dll.qg_draw_fill_rect(float(_qg_num(args[0], 0)), float(_qg_num(args[1], 0)),
+                          float(_qg_num(args[2], 0)), float(_qg_num(args[3], 0)),
+                          _c.c_float(c[0]), _c.c_float(c[1]),
+                          _c.c_float(c[2]), _c.c_float(c[3]))
+    return True
+
+
+def vg_draw_stroke_rect_handler(*args):
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 6:
+        return False
+    c = _vg_color_at(args, 4)
+    dll.qg_draw_stroke_rect(float(_qg_num(args[0], 0)), float(_qg_num(args[1], 0)),
+                            float(_qg_num(args[2], 0)), float(_qg_num(args[3], 0)),
+                            _c.c_float(c[0]), _c.c_float(c[1]),
+                            _c.c_float(c[2]), _c.c_float(c[3]),
+                            _c.c_float(float(_qg_num(args[5], 1.0))))
+    return True
+
+
+def vg_draw_fill_round_rect_handler(*args):
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 6:
+        return False
+    c = _vg_color_at(args, 5)
+    dll.qg_draw_fill_round_rect(float(_qg_num(args[0], 0)), float(_qg_num(args[1], 0)),
+                                float(_qg_num(args[2], 0)), float(_qg_num(args[3], 0)),
+                                _c.c_float(float(_qg_num(args[4], 4.0))),
+                                _c.c_float(c[0]), _c.c_float(c[1]),
+                                _c.c_float(c[2]), _c.c_float(c[3]))
+    return True
+
+
+def vg_draw_stroke_round_rect_handler(*args):
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 7:
+        return False
+    c = _vg_color_at(args, 5)
+    dll.qg_draw_stroke_round_rect(float(_qg_num(args[0], 0)), float(_qg_num(args[1], 0)),
+                                  float(_qg_num(args[2], 0)), float(_qg_num(args[3], 0)),
+                                  _c.c_float(float(_qg_num(args[4], 4.0))),
+                                  _c.c_float(c[0]), _c.c_float(c[1]),
+                                  _c.c_float(c[2]), _c.c_float(c[3]),
+                                  _c.c_float(float(_qg_num(args[6], 1.0))))
+    return True
+
+
+def vg_draw_fill_ellipse_handler(*args):
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 5:
+        return False
+    c = _vg_color_at(args, 4)
+    dll.qg_draw_fill_ellipse(float(_qg_num(args[0], 0)), float(_qg_num(args[1], 0)),
+                             float(_qg_num(args[2], 10.0)), float(_qg_num(args[3], 10.0)),
+                             _c.c_float(c[0]), _c.c_float(c[1]),
+                             _c.c_float(c[2]), _c.c_float(c[3]))
+    return True
+
+
+def vg_draw_stroke_ellipse_handler(*args):
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 6:
+        return False
+    c = _vg_color_at(args, 4)
+    dll.qg_draw_stroke_ellipse(float(_qg_num(args[0], 0)), float(_qg_num(args[1], 0)),
+                               float(_qg_num(args[2], 10.0)), float(_qg_num(args[3], 10.0)),
+                               _c.c_float(c[0]), _c.c_float(c[1]),
+                               _c.c_float(c[2]), _c.c_float(c[3]),
+                               _c.c_float(float(_qg_num(args[5], 1.0))))
+    return True
+
+
+def vg_draw_line_handler(*args):
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 6:
+        return False
+    c = _vg_color_at(args, 4)
+    dll.qg_draw_line(float(_qg_num(args[0], 0)), float(_qg_num(args[1], 0)),
+                     float(_qg_num(args[2], 0)), float(_qg_num(args[3], 0)),
+                     _c.c_float(c[0]), _c.c_float(c[1]),
+                     _c.c_float(c[2]), _c.c_float(c[3]),
+                     _c.c_float(float(_qg_num(args[5], 1.0))))
+    return True
+
+
+def vg_draw_text_handler(*args):
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 5:
+        return False
+    c = _vg_color_at(args, 4)
+    dll.qg_draw_text(_qg_bytes(args[0]),
+                     float(_qg_num(args[1], 0)), float(_qg_num(args[2], 0)),
+                     _c.c_float(float(_qg_num(args[3], 14.0))),
+                     _c.c_float(c[0]), _c.c_float(c[1]),
+                     _c.c_float(c[2]), _c.c_float(c[3]))
+    return True
+
+
+def vg_draw_measure_text_handler(*args):
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return None
+    w = _c.c_float(0)
+    h = _c.c_float(0)
+    dll.qg_draw_measure_text(_qg_bytes(args[0]),
+                             _c.c_float(float(_qg_num(args[1], 14.0))),
+                             _c.byref(w), _c.byref(h))
+    return [w.value, h.value]
+
+
+def vg_draw_gradient_rect_handler(*args):
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 7:
+        return False
+    c0 = _vg_color_at(args, 4)
+    c1 = _vg_color_at(args, 5)
+    dll.qg_draw_gradient_rect(float(_qg_num(args[0], 0)), float(_qg_num(args[1], 0)),
+                              float(_qg_num(args[2], 0)), float(_qg_num(args[3], 0)),
+                              _c.c_float(c0[0]), _c.c_float(c0[1]),
+                              _c.c_float(c0[2]), _c.c_float(c0[3]),
+                              _c.c_float(c1[0]), _c.c_float(c1[1]),
+                              _c.c_float(c1[2]), _c.c_float(c1[3]),
+                              _c.c_int(int(_qg_num(args[6], 1))))
+    return True
+
+
+def vg_draw_push_clip_handler(*args):
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 4:
+        return False
+    dll.qg_draw_push_clip(float(_qg_num(args[0], 0)), float(_qg_num(args[1], 0)),
+                          float(_qg_num(args[2], 0)), float(_qg_num(args[3], 0)))
+    return True
+
+
+def vg_draw_pop_clip_handler(*args):
+    dll = _qg_dll()
+    if not dll:
+        return False
+    dll.qg_draw_pop_clip()
+    return True
+
+
+def vg_draw_push_translate_handler(*args):
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    dll.qg_draw_push_translate(float(_qg_num(args[0], 0)), float(_qg_num(args[1], 0)))
+    return True
+
+
+def vg_draw_push_rotate_handler(*args):
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 3:
+        return False
+    dll.qg_draw_push_rotate(float(_qg_num(args[0], 0)), float(_qg_num(args[1], 0)),
+                            float(_qg_num(args[2], 0)))
+    return True
+
+
+def vg_draw_push_scale_handler(*args):
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 4:
+        return False
+    dll.qg_draw_push_scale(float(_qg_num(args[0], 0)), float(_qg_num(args[1], 0)),
+                           float(_qg_num(args[2], 1.0)), float(_qg_num(args[3], 1.0)))
+    return True
+
+
+def vg_draw_pop_transform_handler(*args):
+    dll = _qg_dll()
+    if not dll:
+        return False
+    dll.qg_draw_pop_transform()
+    return True
+
+
+def vg_draw_image_handler(*args):
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 5:
+        return False
+    dll.qg_draw_image(int(_qg_num(args[0], 0)),
+                      float(_qg_num(args[1], 0)), float(_qg_num(args[2], 0)),
+                      float(_qg_num(args[3], 0)), float(_qg_num(args[4], 0)),
+                      _c.c_float(float(_qg_num(args[5], 1.0))))
+    return True
+
+
+def vg_draw_push_blur_handler(*args):
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 5:
+        return False
+    dll.qg_draw_push_blur(float(_qg_num(args[0], 5.0)),
+                          float(_qg_num(args[1], 0)), float(_qg_num(args[2], 0)),
+                          float(_qg_num(args[3], 0)), float(_qg_num(args[4], 0)))
+    return True
+
+
+def vg_draw_pop_blur_handler(*args):
+    dll = _qg_dll()
+    if not dll:
+        return False
+    dll.qg_draw_pop_blur()
+    return True
+
+
+# ---- v3 · 布局系统 ----
+
+def vg_layout_begin_handler(*args):
+    """声明窗口布局：vg_layout_begin(win, "vbox"|"hbox"|"grid"|"absolute")。
+    absolute = 关闭布局恢复绝对坐标；随后 vg_layout_add 登记条目。"""
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    return dll.qg_layout_begin(int(_qg_num(args[0], 0)), _qg_bytes(args[1])) == 1
+
+
+def vg_layout_add_handler(*args):
+    """按布局顺序登记控件：vg_layout_add(win, id)"""
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    return dll.qg_layout_add(int(_qg_num(args[0], 0)), int(_qg_num(args[1], 0))) == 1
+
+
+def vg_layout_spacing_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    import ctypes as _c
+    return dll.qg_layout_spacing(int(_qg_num(args[0], 0)),
+                                 _c.c_float(float(_qg_num(args[1], 8.0)))) == 1
+
+
+def vg_layout_padding_handler(*args):
+    """内容区内边距：vg_layout_padding(win, all) / (win, lr, tb) / (win, l, t, r, b)"""
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or not args:
+        return False
+    a = float(_qg_num(args[1], 0.0)) if len(args) > 1 else 0.0
+    b = float(_qg_num(args[2], a)) if len(args) > 2 else a
+    c = float(_qg_num(args[3], a)) if len(args) > 3 else a
+    d = float(_qg_num(args[4], b)) if len(args) > 4 else b
+    return dll.qg_layout_padding(int(_qg_num(args[0], 0)),
+                                 _c.c_float(a), _c.c_float(b),
+                                 _c.c_float(c), _c.c_float(d)) == 1
+
+
+def vg_layout_cols_handler(*args):
+    """网格列数（grid 模式）：vg_layout_cols(win, n)"""
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    return dll.qg_layout_cols(int(_qg_num(args[0], 0)), int(_qg_num(args[1], 2))) == 1
+
+
+def vg_layout_props_handler(*args):
+    """控件布局属性：vg_layout_props(id, margin, [fill], [align], [weight])
+    margin = [l,t,r,b] 或标量全边；fill 0 自然 1 交叉轴拉伸 2 全拉伸；
+    align 0 起 1 中 2 末；weight 主轴伸展权重（vbox 高度 / hbox 宽度均分）。"""
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    m = args[1]
+    if isinstance(m, (list, tuple)):
+        vals = [_qg_num(x, 0.0) for x in m[:4]]
+        while len(vals) < 4:
+            vals.append(0.0)
+        ml, mt, mr, mb = vals
+    else:
+        ml = mt = mr = mb = float(_qg_num(m, 0.0))
+    fill = int(_qg_num(args[2], 0)) if len(args) > 2 else 0
+    align = int(_qg_num(args[3], 0)) if len(args) > 3 else 0
+    weight = float(_qg_num(args[4], 0.0)) if len(args) > 4 else 0.0
+    return dll.qg_layout_props(
+        int(_qg_num(args[0], 0)),
+        _c.c_float(ml), _c.c_float(mt), _c.c_float(mr), _c.c_float(mb),
+        fill, align, _c.c_float(weight)) == 1
+
+
+def vg_layout_end_handler(*args):
+    """收口并立即重排：vg_layout_end(win)；此后窗口 resize 自动重排。"""
+    dll = _qg_dll()
+    if not dll or not args:
+        return False
+    return dll.qg_layout_end(int(_qg_num(args[0], 0))) == 1
+
+
+def vg_get_pos_handler(*args):
+    """读回控件左上角：vg_get_pos(id) → [x, y] | null"""
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or not args:
+        return None
+    x = _c.c_int(0)
+    y = _c.c_int(0)
+    if dll.qg_get_pos(int(_qg_num(args[0], 0)), _c.byref(x), _c.byref(y)) != 1:
+        return None
+    return [x.value, y.value]
+
+
+def vg_get_size_handler(*args):
+    """读回控件尺寸：vg_get_size(id) → [w, h] | null"""
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or not args:
+        return None
+    w = _c.c_int(0)
+    h = _c.c_int(0)
+    if dll.qg_get_size(int(_qg_num(args[0], 0)), _c.byref(w), _c.byref(h)) != 1:
+        return None
+    return [w.value, h.value]
+
+
+def vg_window_client_size_handler(*args):
+    """读回窗口客户区：vg_window_client_size(win) → [w, h] | null"""
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or not args:
+        return None
+    w = _c.c_int(0)
+    h = _c.c_int(0)
+    if dll.qg_window_client_size(int(_qg_num(args[0], 0)),
+                                 _c.byref(w), _c.byref(h)) != 1:
+        return None
+    return [w.value, h.value]
+
+
+# ---- v3 · 滚动容器与虚拟化列表 ----
+
+_QG_LISTDATA_CB_REF = ['']
+
+
+def _qg_listdata_trampoline():
+    """虚拟列表行数据回调单例：fn(row) → 文本（经 evaluator 调 QOT 闭包）。"""
+    if _QG_LISTDATA_CB_REF[0]:
+        return _QG_LISTDATA_CB_REF[0]
+    import ctypes as _c
+    ty = _c.CFUNCTYPE(_c.c_char_p, _c.c_int, _c.c_void_p)
+
+    def _cb(row, ud):
+        clo = _QG_BINDS.get(ud or 0)
+        if clo is None:
+            return b''
+        ev = _current_evaluator()
+        if ev is None:
+            return b''
+        try:
+            r = ev._call_closure(clo, [row])
+            if r is None:
+                return b''
+            return str(r).encode('utf-8')
+        except Exception:
+            return b''
+
+    _QG_LISTDATA_CB_REF[0] = ty(_cb)
+    return _QG_LISTDATA_CB_REF[0]
+
+
+def vg_create_scrollpane_handler(*args):
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll:
+        return None
+    win = int(_qg_num(args[0], 0)) if args else 0
+    x = int(_qg_num(args[1], 20)) if len(args) > 1 else 20
+    y = int(_qg_num(args[2], 20)) if len(args) > 2 else 20
+    w = int(_qg_num(args[3], 200)) if len(args) > 3 else 200
+    hh = int(_qg_num(args[4], 160)) if len(args) > 4 else 160
+    r = dll.qg_create_scrollpane(win, x, y, w, hh)
+    return r if r else None
+
+
+def vg_scroll_content_handler(*args):
+    """内容虚高：vg_scroll_content(id, content_h)"""
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    return dll.qg_scroll_content(int(_qg_num(args[0], 0)),
+                                 _c.c_float(float(_qg_num(args[1], 0)))) == 1
+
+
+def vg_scroll_attach_handler(*args):
+    """把已有控件装进滚动区：vg_scroll_attach(sp, id, x, y, w, h)；
+    x/y = 内容坐标（相对内容左上）。attach 后控件由滚动区托管。"""
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 6:
+        return False
+    return dll.qg_scroll_attach(
+        int(_qg_num(args[0], 0)), int(_qg_num(args[1], 0)),
+        int(_qg_num(args[2], 0)), int(_qg_num(args[3], 0)),
+        int(_qg_num(args[4], 0)), int(_qg_num(args[5], 0))) == 1
+
+
+def vg_scroll_offset_handler(*args):
+    """当前滚动偏移：vg_scroll_offset(id) → 数值"""
+    dll = _qg_dll()
+    if not dll or not args:
+        return 0.0
+    return float(dll.qg_scroll_offset(int(_qg_num(args[0], 0))))
+
+
+def vg_scroll_to_handler(*args):
+    """滚动到指定偏移：vg_scroll_to(id, offset)"""
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    return dll.qg_scroll_to(int(_qg_num(args[0], 0)),
+                            _c.c_float(float(_qg_num(args[1], 0)))) == 1
+
+
+def vg_create_vlist_handler(*args):
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll:
+        return None
+    win = int(_qg_num(args[0], 0)) if args else 0
+    x = int(_qg_num(args[1], 20)) if len(args) > 1 else 20
+    y = int(_qg_num(args[2], 20)) if len(args) > 2 else 20
+    w = int(_qg_num(args[3], 200)) if len(args) > 3 else 200
+    hh = int(_qg_num(args[4], 160)) if len(args) > 4 else 160
+    r = dll.qg_create_vlist(win, x, y, w, hh)
+    return r if r else None
+
+
+def vg_list_set_count_handler(*args):
+    """虚拟列表数据条数：vg_list_set_count(id, n)——万行级无压力。"""
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    return dll.qg_list_set_count(int(_qg_num(args[0], 0)),
+                                 int(_qg_num(args[1], 0))) == 1
+
+
+def vg_list_add_item_handler(*args):
+    """数组模式加行：vg_list_add_item(id, text)"""
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    return dll.qg_list_add_item(int(_qg_num(args[0], 0)), _qg_bytes(args[1])) == 1
+
+
+def vg_list_draw_count_handler(*args):
+    """累计已绘制行数（虚拟化自证：只随可视区滚动量增长）"""
+    dll = _qg_dll()
+    if not dll or not args:
+        return 0
+    return dll.qg_list_draw_count(int(_qg_num(args[0], 0)))
+
+
+def vg_list_on_data_handler(*args):
+    """行数据回调：vg_list_on_data(id, fn)；fn(row) → 行文本（回调模式，
+    大数据零拷贝——绘制时逐行取）。"""
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    clo = args[1]
+    if not _is_closure(clo):
+        return False
+    cookie = _qg_cookie(clo)
+    import ctypes as _c
+    cb = _qg_listdata_trampoline()
+    return dll.qg_list_on_data(int(_qg_num(args[0], 0)),
+                               _c.cast(cb, _c.c_void_p),
+                               _c.c_void_p(cookie)) == 1
+
+
+# ---- v3 · 模态对话框 / 菜单 / toast ----
+
+def vg_show_dialog_handler(*args):
+    """模态对话框：vg_show_dialog(win, parent) → 结果码（阻塞至关闭，
+    父窗冻结；回调内 vg_set_dialog_result 设置返回值）。"""
+    dll = _qg_dll()
+    if not dll or not args:
+        return -1
+    parent = int(_qg_num(args[1], 0)) if len(args) > 1 else 0
+    return dll.qg_show_dialog(int(_qg_num(args[0], 0)), parent)
+
+
+def vg_set_dialog_result_handler(*args):
+    """回调内设置对话框返回值：vg_set_dialog_result(win, code)"""
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    return dll.qg_set_dialog_result(int(_qg_num(args[0], 0)),
+                                    int(_qg_num(args[1], 0))) == 1
+
+
+def vg_create_menu_handler(*args):
+    """右键菜单：vg_create_menu() → 菜单 id | null"""
+    dll = _qg_dll()
+    if not dll:
+        return None
+    r = dll.qg_create_menu()
+    return r if r else None
+
+
+def vg_menu_add_item_handler(*args):
+    """加菜单项：vg_menu_add_item(mid, text) → 项 id | null"""
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return None
+    r = dll.qg_menu_add_item(int(_qg_num(args[0], 0)), _qg_bytes(args[1]))
+    return r if r else None
+
+
+def vg_menu_separator_handler(*args):
+    """加分隔线：vg_menu_separator(mid)"""
+    dll = _qg_dll()
+    if not dll or not args:
+        return False
+    return dll.qg_menu_separator(int(_qg_num(args[0], 0))) == 1
+
+
+def vg_menu_popup_handler(*args):
+    """弹出菜单（同步阻塞）：vg_menu_popup(mid, win, x, y) → 选中项 id
+    （0 = 取消）；同时发 kind=50 事件（value = 项 id）。"""
+    dll = _qg_dll()
+    if not dll or len(args) < 4:
+        return 0
+    return dll.qg_menu_popup(int(_qg_num(args[0], 0)), int(_qg_num(args[1], 0)),
+                             int(_qg_num(args[2], 0)), int(_qg_num(args[3], 0)))
+
+
+def vg_menu_destroy_handler(*args):
+    """销毁菜单：vg_menu_destroy(mid)"""
+    dll = _qg_dll()
+    if not dll or not args:
+        return False
+    return dll.qg_menu_destroy(int(_qg_num(args[0], 0))) == 1
+
+
+def vg_toast_handler(*args):
+    """轻提示：vg_toast(win, text[, ms=2200])——底部居中卡片自动淡出。"""
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    return dll.qg_toast(int(_qg_num(args[0], 0)), _qg_bytes(args[1]),
+                        int(_qg_num(args[2], 2200)) if len(args) > 2 else 2200) == 1
+
+
+# ---- v3 · 文本富能力 ----
+
+def vg_draw_text_ex_handler(*args):
+    """富文本：vg_draw_text_ex(text, x, y, w, h, size, color, bold, halign,
+    valign[, wrap[, ellipsis]])——halign/valign 0 起 1 中 2 末；
+    wrap=自动换行；ellipsis=超宽省略号。Canvas 回调期间可用。"""
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 10:
+        return False
+    c = _vg_color_at(args, 6)
+    dll.qg_draw_text_ex(
+        _qg_bytes(args[0]),
+        _c.c_float(float(_qg_num(args[1], 0))), _c.c_float(float(_qg_num(args[2], 0))),
+        _c.c_float(float(_qg_num(args[3], 0))), _c.c_float(float(_qg_num(args[4], 0))),
+        _c.c_float(float(_qg_num(args[5], 14.0))),
+        _c.c_float(c[0]), _c.c_float(c[1]), _c.c_float(c[2]), _c.c_float(c[3]),
+        int(_qg_num(args[7], 0)), int(_qg_num(args[8], 0)), int(_qg_num(args[9], 0)),
+        int(_qg_num(args[10], 0)) if len(args) > 10 else 0,
+        int(_qg_num(args[11], 0)) if len(args) > 11 else 0)
+    return True
+
+
+def vg_draw_measure_text_ex_handler(*args):
+    """富测量：vg_draw_measure_text_ex(text, size[, bold[, wrap[, maxw]]])
+    → [w, h]；wrap=true 返回换行后的实际宽高。"""
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return None
+    w = _c.c_float(0)
+    h = _c.c_float(0)
+    dll.qg_draw_measure_text_ex(
+        _qg_bytes(args[0]),
+        _c.c_float(float(_qg_num(args[1], 14.0))),
+        int(_qg_num(args[2], 0)) if len(args) > 2 else 0,
+        int(_qg_num(args[3], 0)) if len(args) > 3 else 0,
+        _c.c_float(float(_qg_num(args[4], 0))) if len(args) > 4 else _c.c_float(0),
+        _c.byref(w), _c.byref(h))
+    return [w.value, h.value]
+
+
+# ---- v3 · 系统集成 ----
+
+def vg_clipboard_set_handler(*args):
+    """写剪贴板文本：vg_clipboard_set(text) → bool"""
+    dll = _qg_dll()
+    if not dll or not args:
+        return False
+    return dll.qg_clipboard_set(_qg_bytes(args[0])) == 1
+
+
+def vg_clipboard_get_handler(*args):
+    """读剪贴板文本：vg_clipboard_get() → str（无文本返回空串）"""
+    dll = _qg_dll()
+    if not dll:
+        return ''
+    import ctypes as _c
+    buf = _c.create_string_buffer(8192)
+    n = dll.qg_clipboard_get(buf, 8192)
+    if n <= 0:
+        return ''
+    return buf.raw[:n].decode('utf-8', errors='replace')
+
+
+def vg_window_accept_files_handler(*args):
+    """拖放开关联动：vg_window_accept_files(win, on) → bool"""
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    return dll.qg_window_accept_files(int(_qg_num(args[0], 0)),
+                                      1 if args[1] else 0) == 1
+
+
+def vg_take_drop_file_handler(*args):
+    """取拖放文件路径：vg_take_drop_file(i) → str（kind=51 回调里立刻取）"""
+    dll = _qg_dll()
+    if not dll or not args:
+        return ''
+    import ctypes as _c
+    buf = _c.create_string_buffer(4096)
+    n = dll.qg_take_drop_file(int(_qg_num(args[0], 0)), buf, 4096)
+    if n <= 0:
+        return ''
+    return buf.raw[:n].decode('utf-8', errors='replace')
+
+
+def vg_taskbar_progress_handler(*args):
+    """任务栏进度：vg_taskbar_progress(win, done, total) → bool"""
+    dll = _qg_dll()
+    if not dll or len(args) < 3:
+        return False
+    return dll.qg_taskbar_progress(int(_qg_num(args[0], 0)),
+                                   int(_qg_num(args[1], 0)),
+                                   int(_qg_num(args[2], 0))) == 1
+
+
+def vg_taskbar_state_handler(*args):
+    """任务栏状态：vg_taskbar_state(win, state)；0 无 1 不确定 2 正常 3 错误 4 暂停"""
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    return dll.qg_taskbar_state(int(_qg_num(args[0], 0)),
+                                int(_qg_num(args[1], 0))) == 1
+
+
+# ---- v4 · 样式原语 ----
+
+def _qg_color4(args, i):
+    import ctypes as _c
+    dll = _qg_dll()
+    if dll is None or i >= len(args):
+        return None
+    col = args[i]
+    if isinstance(col, (list, tuple)) and len(col) >= 3:
+        r = float(_qg_num(col[0], 0))
+        g = float(_qg_num(col[1], 0))
+        b = float(_qg_num(col[2], 0))
+        a = float(_qg_num(col[3], 1)) if len(col) > 3 else 1.0
+        return (r, g, b, a)
+    return None
+
+
+def vg_style_bg_handler(*args):
+    """背景色叠加：vg_style_bg(id, [r,g,b,a])；未设置走组件默认"""
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    c = _qg_color4(args, 1)
+    if c is None:
+        return False
+    return dll.qg_style_bg(int(_qg_num(args[0], 0)),
+                           _c.c_float(c[0]), _c.c_float(c[1]),
+                           _c.c_float(c[2]), _c.c_float(c[3])) == 1
+
+
+def vg_style_bg_gradient_handler(*args):
+    """渐变背景叠加：vg_style_bg_gradient(id, c1, c2[, vertical=true])"""
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 3:
+        return False
+    c1 = _qg_color4(args, 1)
+    c2 = _qg_color4(args, 2)
+    if c1 is None or c2 is None:
+        return False
+    vert = 1 if (len(args) < 4 or args[3]) else 0
+    return dll.qg_style_bg_gradient(
+        int(_qg_num(args[0], 0)),
+        _c.c_float(c1[0]), _c.c_float(c1[1]), _c.c_float(c1[2]), _c.c_float(c1[3]),
+        _c.c_float(c2[0]), _c.c_float(c2[1]), _c.c_float(c2[2]), _c.c_float(c2[3]),
+        vert) == 1
+
+
+def vg_style_border_handler(*args):
+    """边框叠加：vg_style_border(id, [r,g,b,a], width)"""
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 3:
+        return False
+    c = _qg_color4(args, 1)
+    if c is None:
+        return False
+    return dll.qg_style_border(int(_qg_num(args[0], 0)),
+                               _c.c_float(c[0]), _c.c_float(c[1]),
+                               _c.c_float(c[2]), _c.c_float(c[3]),
+                               _c.c_float(float(_qg_num(args[2], 1.0)))) == 1
+
+
+def vg_style_radius_handler(*args):
+    """圆角叠加：vg_style_radius(id, radius)"""
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    return dll.qg_style_radius(int(_qg_num(args[0], 0)),
+                               _c.c_float(float(_qg_num(args[1], 8.0)))) == 1
+
+
+def vg_style_padding_handler(*args):
+    """内边距叠加：vg_style_padding(id, l, t, r, b)"""
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 5:
+        return False
+    return dll.qg_style_padding(int(_qg_num(args[0], 0)),
+                                _c.c_float(float(_qg_num(args[1], 0))),
+                                _c.c_float(float(_qg_num(args[2], 0))),
+                                _c.c_float(float(_qg_num(args[3], 0))),
+                                _c.c_float(float(_qg_num(args[4], 0)))) == 1
+
+
+def vg_style_text_handler(*args):
+    """文字样式叠加：vg_style_text(id, [r,g,b,a], size[, bold])"""
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 3:
+        return False
+    c = _qg_color4(args, 1)
+    if c is None:
+        return False
+    size = _c.c_float(float(_qg_num(args[2], 14.0)))
+    bold = 1 if (len(args) > 3 and args[3]) else 0
+    return dll.qg_style_text(int(_qg_num(args[0], 0)),
+                             _c.c_float(c[0]), _c.c_float(c[1]),
+                             _c.c_float(c[2]), _c.c_float(c[3]), size, bold) == 1
+
+
+def vg_style_state_bg_handler(*args):
+    """状态背景叠加：vg_style_state_bg(id, which, [r,g,b,a])；which 1悬停 2按下 3禁用 4焦点"""
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 3:
+        return False
+    c = _qg_color4(args, 2)
+    if c is None:
+        return False
+    return dll.qg_style_state_bg(int(_qg_num(args[0], 0)), int(_qg_num(args[1], 1)),
+                                 _c.c_float(c[0]), _c.c_float(c[1]),
+                                 _c.c_float(c[2]), _c.c_float(c[3])) == 1
+
+
+def vg_style_state_text_handler(*args):
+    """状态文字色叠加：vg_style_state_text(id, which, [r,g,b,a])"""
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 3:
+        return False
+    c = _qg_color4(args, 2)
+    if c is None:
+        return False
+    return dll.qg_style_state_text(int(_qg_num(args[0], 0)), int(_qg_num(args[1], 1)),
+                                   _c.c_float(c[0]), _c.c_float(c[1]),
+                                   _c.c_float(c[2]), _c.c_float(c[3])) == 1
+
+
+def vg_style_reset_handler(*args):
+    """清空样式叠加：vg_style_reset(id) → 组件回到默认外观"""
+    dll = _qg_dll()
+    if not dll or not args:
+        return False
+    return dll.qg_style_reset(int(_qg_num(args[0], 0))) == 1
+
+
+def vg_style_flags_handler(*args):
+    """查状态位：vg_style_flags(id) → 0x1悬停 0x2按下 0x4禁用 0x8焦点"""
+    dll = _qg_dll()
+    if not dll or not args:
+        return 0
+    return dll.qg_style_flags(int(_qg_num(args[0], 0)))
+
+
+def vg_on_paint_handler(*args):
+    """绘制接管：vg_on_paint(id, fn)；每帧调 fn(w, h, state)，
+    回调内用 vg_draw_* 原语自由作画（坐标 = 组件本地原点）。
+    输入语义（点击/拖拽/滚轮）不变；容器类不支持（返回 false）。"""
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    clo = args[1]
+    if not _is_closure(clo):
+        return False
+    cookie = _qg_cookie(clo)
+    import ctypes as _c
+    cb = _qg_paint_cb()
+    return dll.qg_on_paint(int(_qg_num(args[0], 0)),
+                           _c.cast(cb, _c.c_void_p),
+                           _c.c_void_p(cookie)) == 1
+
+
+def vg_toast_style_handler(*args):
+    """Toast 样式：vg_toast_style(win, bg, text, border, radius)"""
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 5:
+        return False
+    bg = _qg_color4(args, 1)
+    tx = _qg_color4(args, 2)
+    bd = _qg_color4(args, 3)
+    if bg is None or tx is None or bd is None:
+        return False
+    flat = []
+    for c in (bg, tx, bd):
+        flat.extend((_c.c_float(c[0]), _c.c_float(c[1]), _c.c_float(c[2]), _c.c_float(c[3])))
+    return dll.qg_toast_style(int(_qg_num(args[0], 0)), *flat,
+                              _c.c_float(float(_qg_num(args[4], 8.0)))) == 1
+
+
+def vg_scroll_style_handler(*args):
+    """滚动条样式：vg_scroll_style(id, track, thumb, width)（作用于 ScrollPane）"""
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 4:
+        return False
+    tr = _qg_color4(args, 1)
+    th = _qg_color4(args, 2)
+    if tr is None or th is None:
+        return False
+    return dll.qg_scroll_style(int(_qg_num(args[0], 0)),
+                               _c.c_float(tr[0]), _c.c_float(tr[1]), _c.c_float(tr[2]), _c.c_float(tr[3]),
+                               _c.c_float(th[0]), _c.c_float(th[1]), _c.c_float(th[2]), _c.c_float(th[3]),
+                               _c.c_float(float(_qg_num(args[3], 8.0)))) == 1
+
+
+def vg_menu_bg_handler(*args):
+    """菜单背景色（自绘菜单）：vg_menu_bg(mid, [r,g,b,a])"""
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    c = _qg_color4(args, 1)
+    if c is None:
+        return False
+    return dll.qg_menu_bg(int(_qg_num(args[0], 0)),
+                          _c.c_float(c[0]), _c.c_float(c[1]),
+                          _c.c_float(c[2]), _c.c_float(c[3])) == 1
+
+
+def vg_menu_hover_bg_handler(*args):
+    """菜单悬停高亮色：vg_menu_hover_bg(mid, [r,g,b,a])"""
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    c = _qg_color4(args, 1)
+    if c is None:
+        return False
+    return dll.qg_menu_hover_bg(int(_qg_num(args[0], 0)),
+                                _c.c_float(c[0]), _c.c_float(c[1]),
+                                _c.c_float(c[2]), _c.c_float(c[3])) == 1
+
+
+def vg_menu_text_color_handler(*args):
+    """菜单文字色：vg_menu_text_color(mid, [r,g,b,a])"""
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    c = _qg_color4(args, 1)
+    if c is None:
+        return False
+    return dll.qg_menu_text_color(int(_qg_num(args[0], 0)),
+                                  _c.c_float(c[0]), _c.c_float(c[1]),
+                                  _c.c_float(c[2]), _c.c_float(c[3])) == 1
+
+
+def vg_menu_border_handler(*args):
+    """菜单描边：vg_menu_border(mid, [r,g,b,a], width)"""
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 3:
+        return False
+    c = _qg_color4(args, 1)
+    if c is None:
+        return False
+    return dll.qg_menu_border(int(_qg_num(args[0], 0)),
+                              _c.c_float(c[0]), _c.c_float(c[1]),
+                              _c.c_float(c[2]), _c.c_float(c[3]),
+                              _c.c_float(float(_qg_num(args[2], 1.0)))) == 1
 
 
 def vg_set_position_handler(*args):
@@ -4805,6 +6453,130 @@ PRIMITIVE_IMPLS = {
     'vg_listbox_clear': _named(_vg_clear, 'vg_listbox_clear_handler'),
     'vg_spinner_start': _named(_vg_noop_true, 'vg_spinner_start_handler'),
     'vg_spinner_stop': _named(_vg_noop_true, 'vg_spinner_stop_handler'),
+    # ---- v2：事件回调（推式绑定；与轮询并存） ----
+    'vg_bind': vg_bind_handler,
+    'vg_unbind': vg_unbind_handler,
+    'vg_on_click': vg_on_click_handler,
+    'vg_on_change': vg_on_change_handler,
+    'vg_on_select': vg_on_select_handler,
+    'vg_on_mouse': vg_on_mouse_handler,
+    'vg_on_key': vg_on_key_handler,
+    'vg_on_text': vg_on_text_handler,
+    'vg_on_close': vg_on_close_handler,
+    'vg_on_resize': vg_on_resize_handler,
+    'vg_on_load': vg_on_load_handler,
+    'vg_on_scroll': vg_on_scroll_handler,
+    'vg_on_menu': vg_on_menu_handler,
+    'vg_on_drop': vg_on_drop_handler,
+    # ---- v2：帧原语 / 缓动 ----
+    'vg_on_frame': vg_on_frame_handler,
+    'vg_off_frame': vg_off_frame_handler,
+    'vg_request_frame': vg_request_frame_handler,
+    'vg_easing': vg_easing_handler,
+    # ---- v2：窗口合成能力原语 ----
+    'vg_window_transparent': vg_window_transparent_handler,
+    'vg_window_backdrop': vg_window_backdrop_handler,
+    'vg_set_window_round': vg_set_window_round_handler,
+    'vg_set_window_borderless': vg_set_window_borderless_handler,
+    'vg_set_window_topmost': vg_set_window_topmost_handler,
+    'vg_prevent_close': vg_prevent_close_handler,
+    'vg_window_drag': vg_window_drag_handler,
+    'vg_window_minimize': vg_window_minimize_handler,
+    'vg_window_maximize': vg_window_maximize_handler,
+    'vg_window_restore': vg_window_restore_handler,
+    'vg_set_window_bg_rgba': vg_set_window_bg_rgba_handler,
+    'vg_set_theme': vg_set_theme_handler,
+    'vg_set_font': vg_set_font_handler,
+    # ---- v2：效果 / 动画糖 ----
+    'vg_set_opacity': vg_set_opacity_handler,
+    'vg_animate': vg_animate_handler,
+    'vg_animate_stop': vg_animate_stop_handler,
+    # ---- v2：Canvas / 图片组件 ----
+    'vg_create_canvas': vg_create_canvas_handler,
+    'vg_canvas_on_draw': vg_canvas_on_draw_handler,
+    'vg_create_image': vg_create_image_handler,
+    'vg_image_load': vg_image_load_handler,
+    'vg_image_free': vg_image_free_handler,
+    'vg_image_size': vg_image_size_handler,
+    # ---- v2：绘制原语（vg_draw_*，Canvas 回调期间用） ----
+    'vg_draw_fill_rect': vg_draw_fill_rect_handler,
+    'vg_draw_stroke_rect': vg_draw_stroke_rect_handler,
+    'vg_draw_fill_round_rect': vg_draw_fill_round_rect_handler,
+    'vg_draw_stroke_round_rect': vg_draw_stroke_round_rect_handler,
+    'vg_draw_fill_ellipse': vg_draw_fill_ellipse_handler,
+    'vg_draw_stroke_ellipse': vg_draw_stroke_ellipse_handler,
+    'vg_draw_line': vg_draw_line_handler,
+    'vg_draw_text': vg_draw_text_handler,
+    'vg_draw_measure_text': vg_draw_measure_text_handler,
+    'vg_draw_gradient_rect': vg_draw_gradient_rect_handler,
+    'vg_draw_push_clip': vg_draw_push_clip_handler,
+    'vg_draw_pop_clip': vg_draw_pop_clip_handler,
+    'vg_draw_push_translate': vg_draw_push_translate_handler,
+    'vg_draw_push_rotate': vg_draw_push_rotate_handler,
+    'vg_draw_push_scale': vg_draw_push_scale_handler,
+    'vg_draw_pop_transform': vg_draw_pop_transform_handler,
+    'vg_draw_image': vg_draw_image_handler,
+    'vg_draw_push_blur': vg_draw_push_blur_handler,
+    'vg_draw_pop_blur': vg_draw_pop_blur_handler,
+    # ---- v3：文本富能力 ----
+    'vg_draw_text_ex': vg_draw_text_ex_handler,
+    'vg_draw_measure_text_ex': vg_draw_measure_text_ex_handler,
+    # ---- v3：布局系统 ----
+    'vg_layout_begin': vg_layout_begin_handler,
+    'vg_layout_add': vg_layout_add_handler,
+    'vg_layout_spacing': vg_layout_spacing_handler,
+    'vg_layout_padding': vg_layout_padding_handler,
+    'vg_layout_cols': vg_layout_cols_handler,
+    'vg_layout_props': vg_layout_props_handler,
+    'vg_layout_end': vg_layout_end_handler,
+    'vg_get_pos': vg_get_pos_handler,
+    'vg_get_size': vg_get_size_handler,
+    'vg_window_client_size': vg_window_client_size_handler,
+    # ---- v3：滚动容器与虚拟化列表 ----
+    'vg_create_scrollpane': vg_create_scrollpane_handler,
+    'vg_scroll_content': vg_scroll_content_handler,
+    'vg_scroll_attach': vg_scroll_attach_handler,
+    'vg_scroll_offset': vg_scroll_offset_handler,
+    'vg_scroll_to': vg_scroll_to_handler,
+    'vg_create_vlist': vg_create_vlist_handler,
+    'vg_list_set_count': vg_list_set_count_handler,
+    'vg_list_add_item': vg_list_add_item_handler,
+    'vg_list_draw_count': vg_list_draw_count_handler,
+    'vg_list_on_data': vg_list_on_data_handler,
+    # ---- v3：模态对话框 / 菜单 / toast ----
+    'vg_show_dialog': vg_show_dialog_handler,
+    'vg_set_dialog_result': vg_set_dialog_result_handler,
+    'vg_create_menu': vg_create_menu_handler,
+    'vg_menu_add_item': vg_menu_add_item_handler,
+    'vg_menu_separator': vg_menu_separator_handler,
+    'vg_menu_popup': vg_menu_popup_handler,
+    'vg_menu_destroy': vg_menu_destroy_handler,
+    'vg_toast': vg_toast_handler,
+    # ---- v3：系统集成 ----
+    'vg_clipboard_set': vg_clipboard_set_handler,
+    'vg_clipboard_get': vg_clipboard_get_handler,
+    'vg_window_accept_files': vg_window_accept_files_handler,
+    'vg_take_drop_file': vg_take_drop_file_handler,
+    'vg_taskbar_progress': vg_taskbar_progress_handler,
+    'vg_taskbar_state': vg_taskbar_state_handler,
+    # ---- v4：样式原语 ----
+    'vg_style_bg': vg_style_bg_handler,
+    'vg_style_bg_gradient': vg_style_bg_gradient_handler,
+    'vg_style_border': vg_style_border_handler,
+    'vg_style_radius': vg_style_radius_handler,
+    'vg_style_padding': vg_style_padding_handler,
+    'vg_style_text': vg_style_text_handler,
+    'vg_style_state_bg': vg_style_state_bg_handler,
+    'vg_style_state_text': vg_style_state_text_handler,
+    'vg_style_reset': vg_style_reset_handler,
+    'vg_style_flags': vg_style_flags_handler,
+    'vg_on_paint': vg_on_paint_handler,
+    'vg_toast_style': vg_toast_style_handler,
+    'vg_scroll_style': vg_scroll_style_handler,
+    'vg_menu_bg': vg_menu_bg_handler,
+    'vg_menu_hover_bg': vg_menu_hover_bg_handler,
+    'vg_menu_text_color': vg_menu_text_color_handler,
+    'vg_menu_border': vg_menu_border_handler,
     # ---- O 组 网络（P0.3 · 0 §4.9）----
     'socket_new': socket_new_handler,
     'socket_connect': socket_connect_handler,
@@ -4824,5 +6596,6 @@ PRIMITIVE_IMPLS = {
     'socket_udp_new': socket_udp_new_handler,
     'socket_udp_send': socket_udp_send_handler,
     'socket_udp_recv': socket_udp_recv_handler,
+    'socket_select': socket_select_handler,
 }
 

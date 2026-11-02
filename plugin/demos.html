@@ -1,177 +1,976 @@
-<html>
+<!DOCTYPE html>
+<html lang="zh-CN">
 
 <head>
-    <title>更多例子</title>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>QOT 示例 · More Demos</title>
+    <style>
+        :root {
+            --bg: #f7f8fb;
+            --panel: #ffffff;
+            --ink: #0f172a;
+            --ink-2: #4a5568;
+            --ink-3: #8b95a6;
+            --line: #e6e9ef;
+            --line-soft: #eef1f6;
+            --accent: #4f46e5;
+            --accent-2: #0ea5e9;
+            --accent-soft: #eef0ff;
+            --code-bg: #0f172a;
+            --code-line: #1b2537;
+            --radius: 12px;
+            --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+            --mono: ui-monospace, SFMono-Regular, "JetBrains Mono", "Cascadia Code",
+                Consolas, "Liberation Mono", Menlo, monospace;
+        }
+
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+            -webkit-text-size-adjust: 100%;
+        }
+
+        body {
+            margin: 0;
+            background:
+                radial-gradient(1100px 420px at 18% -12%, #eceeff 0%, rgba(236, 238, 255, 0) 62%),
+                var(--bg);
+            color: var(--ink);
+            font-family: var(--sans);
+            font-size: 15.5px;
+            line-height: 1.72;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ---------- 顶部阅读进度 ---------- */
+        .progress {
+            position: fixed;
+            inset: 0 auto auto 0;
+            height: 2px;
+            width: 0;
+            background: linear-gradient(90deg, #6366f1, #22d3ee);
+            z-index: 90;
+            transition: width .08s linear;
+        }
+
+        .skip {
+            position: absolute;
+            left: -9999px;
+            top: 0;
+            background: var(--ink);
+            color: #fff;
+            padding: 10px 16px;
+            border-radius: 0 0 8px 0;
+            z-index: 200;
+        }
+
+        .skip:focus {
+            left: 0;
+        }
+
+        /* ---------- 骨架 ---------- */
+        .layout {
+            max-width: 1240px;
+            margin: 0 auto;
+            padding: 0 32px;
+            display: grid;
+            grid-template-columns: 252px minmax(0, 1fr);
+            gap: 56px;
+            align-items: start;
+        }
+
+        /* ---------- 侧栏 ---------- */
+        .sidebar {
+            position: sticky;
+            top: 0;
+            align-self: start;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 30px 24px 22px 0;
+            border-right: 1px solid var(--line);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 22px;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .brand-mark {
+            width: 32px;
+            height: 32px;
+            flex: none;
+            border-radius: 9px;
+            background: linear-gradient(135deg, #6366f1, #22d3ee);
+            color: #fff;
+            display: grid;
+            place-items: center;
+            font: 700 12px/1 var(--mono);
+            letter-spacing: .02em;
+            box-shadow: 0 6px 14px -8px rgba(79, 70, 229, .9);
+        }
+
+        .brand-name {
+            font-weight: 700;
+            font-size: 15px;
+            letter-spacing: -.01em;
+            line-height: 1.2;
+        }
+
+        .brand-sub {
+            display: block;
+            font: 500 10.5px/1.4 var(--mono);
+            letter-spacing: .1em;
+            color: var(--ink-3);
+            margin-top: 3px;
+            text-transform: uppercase;
+        }
+
+        .search {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .search input {
+            width: 100%;
+            padding: 9px 42px 9px 31px;
+            border: 1px solid var(--line);
+            border-radius: 9px;
+            background: #fff;
+            font: 400 13px/1.4 var(--sans);
+            color: var(--ink);
+            outline: none;
+            transition: border-color .16s, box-shadow .16s;
+        }
+
+        .search input::placeholder {
+            color: var(--ink-3);
+        }
+
+        .search input:focus {
+            border-color: #b7bbf4;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, .13);
+        }
+
+        .search svg {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--ink-3);
+            pointer-events: none;
+        }
+
+        .search kbd {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            font: 600 10px/1 var(--mono);
+            color: #8b95a6;
+            border: 1px solid var(--line);
+            border-radius: 4px;
+            padding: 3px 5px;
+            background: #f8fafc;
+        }
+
+        .nav-label {
+            font: 600 10px/1 var(--sans);
+            letter-spacing: .16em;
+            text-transform: uppercase;
+            color: var(--ink-3);
+            margin: 0 0 10px 4px;
+        }
+
+        .nav {
+            list-style: none;
+            margin: 0;
+            padding: 0 0 8px;
+            overflow-y: auto;
+            flex: 1 1 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+            scrollbar-width: thin;
+        }
+
+        .nav li.is-hidden {
+            display: none;
+        }
+
+        .nav a {
+            display: flex;
+            gap: 9px;
+            align-items: baseline;
+            padding: 7px 10px;
+            border-radius: 8px;
+            color: var(--ink-2);
+            text-decoration: none;
+            font-size: 13.5px;
+            line-height: 1.4;
+            transition: background .15s, color .15s;
+        }
+
+        .nav a:hover {
+            background: #eef1f7;
+            color: var(--ink);
+        }
+
+        .nav a.active {
+            background: var(--accent-soft);
+            color: #3730a3;
+            font-weight: 600;
+        }
+
+        .nav .n {
+            flex: none;
+            min-width: 17px;
+            font: 600 10.5px/1.6 var(--mono);
+            color: #a7b0c0;
+        }
+
+        .nav a.active .n {
+            color: var(--accent);
+        }
+
+        .side-foot {
+            border-top: 1px solid var(--line);
+            padding-top: 14px;
+            margin-top: 8px;
+            font-size: 12.5px;
+        }
+
+        .side-foot a {
+            color: var(--ink-2);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: color .15s;
+        }
+
+        .side-foot a:hover {
+            color: var(--accent);
+        }
+
+        /* ---------- 正文 ---------- */
+        .main {
+            min-width: 0;
+            padding-bottom: 90px;
+        }
+
+        .hero {
+            padding: 54px 0 4px;
+        }
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            font: 600 10.5px/1 var(--mono);
+            letter-spacing: .16em;
+            text-transform: uppercase;
+            color: #4338ca;
+            background: var(--accent-soft);
+            border: 1px solid #e0e3ff;
+            padding: 7px 11px;
+            border-radius: 999px;
+        }
+
+        .eyebrow .dot {
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: #6366f1;
+        }
+
+        .hero h1 {
+            font-size: clamp(2rem, 4.2vw, 2.7rem);
+            line-height: 1.14;
+            letter-spacing: -.032em;
+            margin: 18px 0 12px;
+            font-weight: 700;
+        }
+
+        .hero-lead {
+            margin: 0 0 22px;
+            font-size: 1.03rem;
+            color: var(--ink-2);
+            max-width: 62ch;
+        }
+
+        .hero-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 7px;
+            padding-bottom: 26px;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .hero-meta span {
+            font: 500 12px/1 var(--sans);
+            color: var(--ink-2);
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            padding: 6px 11px;
+        }
+
+        .hero-meta span b {
+            color: var(--ink);
+            font-weight: 600;
+        }
+
+        /* ---------- 示例区块 ---------- */
+        .demo {
+            padding: 34px 0 10px;
+            scroll-margin-top: 24px;
+        }
+
+        .demo + .demo {
+            border-top: 1px solid var(--line-soft);
+        }
+
+        .demo.is-hidden {
+            display: none;
+        }
+
+        .demo-head {
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+            margin-bottom: 14px;
+        }
+
+        .demo-idx {
+            flex: none;
+            margin-top: 3px;
+            font: 700 11.5px/1 var(--mono);
+            letter-spacing: .04em;
+            color: var(--accent);
+            background: var(--accent-soft);
+            border: 1px solid #e2e5ff;
+            border-radius: 8px;
+            padding: 7px 8px;
+        }
+
+        .demo-titles {
+            min-width: 0;
+            flex: 1 1 auto;
+        }
+
+        .demo h2 {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 0;
+            font-size: 1.32rem;
+            font-weight: 650;
+            letter-spacing: -.014em;
+            line-height: 1.35;
+            color: var(--ink);
+        }
+
+        .chip {
+            font: 600 10.5px/1 var(--mono);
+            letter-spacing: .04em;
+            color: var(--ink-3);
+            background: #fbfcfe;
+            border: 1px solid var(--line);
+            border-radius: 6px;
+            padding: 4px 7px;
+            white-space: nowrap;
+        }
+
+        .demo-desc {
+            margin: 6px 0 0;
+            font-size: .93rem;
+            color: var(--ink-2);
+        }
+
+        .sec-toggle {
+            flex: none;
+            margin-top: 2px;
+            width: 30px;
+            height: 30px;
+            display: grid;
+            place-items: center;
+            border: 1px solid var(--line);
+            background: #fff;
+            border-radius: 8px;
+            color: var(--ink-3);
+            cursor: pointer;
+            transition: .16s;
+        }
+
+        .sec-toggle:hover {
+            color: var(--ink);
+            border-color: #cfd6e2;
+            background: #f8fafc;
+        }
+
+        .sec-toggle svg {
+            transition: transform .22s ease;
+        }
+
+        .demo.collapsed .sec-toggle svg {
+            transform: rotate(-90deg);
+        }
+
+        .demo.collapsed .demo-body {
+            display: none;
+        }
+
+        .lede {
+            margin: 0 0 12px;
+            color: var(--ink-2);
+            font-size: .95rem;
+        }
+
+        .lede code,
+        p code {
+            font-family: var(--mono);
+            font-size: .88em;
+            background: #eef1f6;
+            border: 1px solid #e4e8f0;
+            border-radius: 5px;
+            padding: 1px 5px;
+            color: #3730a3;
+            white-space: nowrap;
+        }
+
+        /* ---------- 代码卡片 ---------- */
+        .code-card {
+            position: relative;
+            margin: 0 0 4px;
+            background: var(--code-bg);
+            border: 1px solid #16203a;
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: 0 16px 34px -24px rgba(15, 23, 42, .8), 0 1px 2px rgba(15, 23, 42, .12);
+        }
+
+        .code-head {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 10px 8px 14px;
+            background: #0b1220;
+            border-bottom: 1px solid var(--code-line);
+        }
+
+        .lang {
+            font: 700 10px/1 var(--mono);
+            letter-spacing: .18em;
+            text-transform: uppercase;
+            color: #7f93ad;
+        }
+
+        .code-meta {
+            font: 500 11px/1 var(--mono);
+            color: #4d6280;
+        }
+
+        .btn-copy {
+            margin-left: auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font: 600 11.5px/1 var(--sans);
+            color: #b9c7db;
+            background: #16202f;
+            border: 1px solid #253248;
+            border-radius: 7px;
+            padding: 6px 9px;
+            cursor: pointer;
+            transition: .16s;
+        }
+
+        .btn-copy:hover {
+            background: #1e2a3c;
+            border-color: #35455f;
+            color: #fff;
+        }
+
+        .btn-copy.done {
+            color: #86efac;
+            border-color: #2c5340;
+            background: #10251b;
+        }
+
+        .code-scroll {
+            display: flex;
+            align-items: stretch;
+            overflow: auto;
+            overscroll-behavior-x: contain;
+        }
+
+        .code-scroll pre {
+            margin: 0;
+            padding: 15px 20px 16px 16px;
+            font: 400 13px/20px var(--mono);
+            color: #d7e0ee;
+            tab-size: 4;
+        }
+
+        .code-scroll code {
+            font: inherit;
+            color: inherit;
+            background: none;
+            padding: 0;
+            border: 0;
+            white-space: pre;
+            display: block;
+        }
+
+        .gutter {
+            position: sticky;
+            left: 0;
+            z-index: 1;
+            flex: none;
+            padding: 15px 11px 16px 12px;
+            text-align: right;
+            font: 400 13px/20px var(--mono);
+            color: #3d5273;
+            background: var(--code-bg);
+            border-right: 1px solid var(--code-line);
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .gutter span {
+            display: block;
+        }
+
+        .tok-com {
+            color: #5d7597;
+            font-style: italic;
+        }
+
+        .tok-kw {
+            color: #c792ea;
+        }
+
+        .tok-type {
+            color: #7fdbca;
+        }
+
+        .tok-fn {
+            color: #82aaff;
+        }
+
+        .tok-str {
+            color: #c3e88d;
+        }
+
+        .tok-num {
+            color: #f78c6c;
+        }
+
+        .tok-macro {
+            color: #ff9e64;
+        }
+
+        .code-fade {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 96px;
+            background: linear-gradient(to bottom, rgba(15, 23, 42, 0), rgba(15, 23, 42, .96) 72%);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .2s;
+        }
+
+        .code-card.folding:not(.expanded) .code-scroll {
+            max-height: 330px;
+        }
+
+        .code-card.folding:not(.expanded) .code-fade {
+            opacity: 1;
+        }
+
+        .code-expand {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            width: 100%;
+            border: 0;
+            border-top: 1px solid var(--code-line);
+            background: #0b1220;
+            color: #8ba1bd;
+            font: 600 11.5px/1 var(--sans);
+            letter-spacing: .02em;
+            padding: 12px;
+            cursor: pointer;
+            transition: .16s;
+        }
+
+        .code-expand:hover {
+            background: #121c2e;
+            color: #dbe6f5;
+        }
+
+        .code-expand svg {
+            transition: transform .22s ease;
+        }
+
+        .code-card.expanded .code-expand svg {
+            transform: rotate(180deg);
+        }
+
+        .demo-body {
+            animation: fade .18s ease;
+        }
+
+        @keyframes fade {
+            from {
+                opacity: .4
+            }
+
+            to {
+                opacity: 1
+            }
+        }
+
+        /* ---------- 页脚 ---------- */
+        .doc-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-top: 46px;
+            padding-top: 20px;
+            border-top: 1px solid var(--line);
+            color: var(--ink-3);
+            font-size: 12.5px;
+        }
+
+        .doc-footer a {
+            color: var(--ink-2);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 500;
+        }
+
+        .doc-footer a:hover {
+            color: var(--accent);
+        }
+
+        .empty {
+            display: none;
+            padding: 26px 0;
+            color: var(--ink-3);
+            font-size: .95rem;
+        }
+
+        .empty.show {
+            display: block;
+        }
+
+        /* ---------- 移动端 ---------- */
+        .menu-btn,
+        .scrim {
+            display: none;
+        }
+
+        .to-top {
+            position: fixed;
+            right: 22px;
+            bottom: 22px;
+            width: 40px;
+            height: 40px;
+            display: grid;
+            place-items: center;
+            border-radius: 50%;
+            border: 1px solid var(--line);
+            background: #fff;
+            color: var(--ink-2);
+            cursor: pointer;
+            box-shadow: 0 8px 20px -10px rgba(15, 23, 42, .45);
+            opacity: 0;
+            transform: translateY(8px);
+            pointer-events: none;
+            transition: .2s;
+            z-index: 70;
+        }
+
+        .to-top.show {
+            opacity: 1;
+            transform: none;
+            pointer-events: auto;
+        }
+
+        .to-top:hover {
+            color: var(--accent);
+            border-color: #cdd3f2;
+        }
+
+        @media (max-width: 1020px) {
+            .layout {
+                grid-template-columns: minmax(0, 1fr);
+                padding: 0 20px;
+                gap: 0;
+            }
+
+            .sidebar {
+                position: fixed;
+                inset: 0 auto 0 0;
+                width: 282px;
+                height: 100%;
+                padding: 24px 20px;
+                background: #fff;
+                border-right: 1px solid var(--line);
+                box-shadow: 0 0 40px -12px rgba(15, 23, 42, .3);
+                transform: translateX(-102%);
+                transition: transform .26s cubic-bezier(.4, 0, .2, 1);
+                z-index: 80;
+            }
+
+            .sidebar.open {
+                transform: none;
+            }
+
+            .menu-btn {
+                position: fixed;
+                left: 16px;
+                top: 14px;
+                z-index: 75;
+                display: grid;
+                place-items: center;
+                width: 40px;
+                height: 40px;
+                border-radius: 10px;
+                border: 1px solid var(--line);
+                background: #fff;
+                color: var(--ink);
+                box-shadow: 0 8px 20px -12px rgba(15, 23, 42, .5);
+                cursor: pointer;
+            }
+
+            .scrim {
+                position: fixed;
+                inset: 0;
+                background: rgba(15, 23, 42, .34);
+                z-index: 79;
+                opacity: 0;
+                pointer-events: none;
+                transition: opacity .24s;
+            }
+
+            .scrim.show {
+                display: block;
+                opacity: 1;
+                pointer-events: auto;
+            }
+
+            .hero {
+                padding-top: 68px;
+            }
+        }
+
+        @media (max-width: 640px) {
+            body {
+                font-size: 15px;
+            }
+
+            .layout {
+                padding: 0 16px;
+            }
+
+            .hero h1 {
+                font-size: 1.9rem;
+            }
+
+            .demo {
+                padding-top: 28px;
+            }
+
+            .demo h2 {
+                font-size: 1.16rem;
+            }
+
+            .demo-head {
+                gap: 10px;
+            }
+
+            .demo-idx {
+                padding: 6px 7px;
+                font-size: 10.5px;
+            }
+
+            .code-scroll pre,
+            .gutter {
+                font-size: 12.5px;
+                line-height: 19px;
+            }
+
+            .code-scroll pre {
+                padding: 13px 16px 14px 13px;
+            }
+
+            .gutter {
+                padding: 13px 9px 14px 10px;
+            }
+
+            .chip {
+                display: none;
+            }
+        }
+
+        @media print {
+            .sidebar, .menu-btn, .to-top, .btn-copy, .code-expand, .sec-toggle, .progress {
+                display: none !important;
+            }
+
+            .layout {
+                grid-template-columns: 1fr;
+                padding: 0;
+            }
+
+            .code-card.folding:not(.expanded) .code-scroll {
+                max-height: none;
+            }
+
+            .code-fade {
+                display: none;
+            }
+        }
+
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cfd6e2;
+            border-radius: 10px;
+            border: 2px solid transparent;
+            background-clip: content-box;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #b4bdcd;
+            background-clip: content-box;
+        }
+
+        .code-scroll::-webkit-scrollbar-track {
+            background: #0b1220;
+        }
+
+        .code-scroll::-webkit-scrollbar-thumb {
+            background: #2c3c53;
+            border-radius: 8px;
+            border: 2px solid #0b1220;
+            background-clip: content-box;
+        }
+
+        .code-scroll::-webkit-scrollbar-thumb:hover {
+            background: #3d5170;
+            background-clip: content-box;
+        }
+    </style>
 </head>
-<style>
-    * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-    }
-
-    body {
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        line-height: 1.6;
-        color: #333;
-        background-color: #f8f9fa;
-        padding: 0;
-        margin: 0;
-    }
-
-
-    body {
-        max-width: 1200px;
-        margin: 0 auto;
-        padding: 0 20px;
-        background-color: #ffffff;
-        box-shadow: 0 0 20px rgba(0, 0, 0, 0.05);
-    }
-
-
-    h1,
-    h2,
-    h3,
-    h4 {
-        color: #2c3e50;
-        margin-bottom: 1rem;
-        font-weight: 600;
-    }
-
-    h1 {
-        font-size: 2.2rem;
-        padding: 2rem 0;
-        border-bottom: 3px solid #3498db;
-        margin-top: 1rem;
-    }
-
-    h2 {
-        font-size: 1.8rem;
-        margin-top: 2rem;
-        padding-bottom: 0.5rem;
-        border-bottom: 1px solid #e1e4e8;
-    }
-
-    h3 {
-        font-size: 1.4rem;
-        margin-top: 1.5rem;
-    }
-
-    h4 {
-        font-size: 1.2rem;
-        margin-top: 1rem;
-    }
-
-
-    p {
-        margin-bottom: 1rem;
-        color: #555;
-        font-size: 1rem;
-    }
-
-
-    ul {
-        margin-left: 1.5rem;
-        margin-bottom: 1rem;
-    }
-
-    li {
-        margin-bottom: 0.5rem;
-        color: #555;
-    }
-
-
-    pre {
-        background-color: #f8f9fa;
-        border: 1px solid #e1e4e8;
-        border-radius: 4px;
-        padding: 1rem;
-        margin: 1rem 0;
-        overflow-x: auto;
-        font-family: 'Consolas', 'Monaco', monospace;
-    }
-
-    code {
-        font-family: 'Consolas', 'Monaco', monospace;
-        background-color: #f1f1f1;
-        padding: 0.2rem 0.4rem;
-        border-radius: 3px;
-        font-size: 0.95rem;
-    }
-
-
-    .code-highlight {
-        color: #333;
-    }
-
-    .line-number {
-        color: #999;
-        padding-right: 0.8rem;
-        border-right: 1px solid #ccc;
-        margin-right: 0.8rem;
-
-    }
-
-
-    pre .comment {
-        color: #6a9955;
-    }
-
-
-    blockquote {
-        border-left: 4px solid #3498db;
-        padding: 0.5rem 1rem;
-        background-color: #f1f8ff;
-        margin: 1rem 0;
-        color: #555;
-    }
-
-
-    body>blockquote:last-of-type {
-        margin-top: 3rem;
-        margin-bottom: 2rem;
-        font-size: 0.9rem;
-    }
-
-
-    @media (max-width: 768px) {
-        h1 {
-            font-size: 1.8rem;
-        }
-
-        h2 {
-            font-size: 1.5rem;
-        }
-
-        h3 {
-            font-size: 1.2rem;
-        }
-
-        pre {
-            padding: 0.8rem;
-        }
-    }
-
-    ::-webkit-scrollbar {
-        width: 10px;
-        height: 10px;
-    }
-
-    ::-webkit-scrollbar-track {
-        background: #f1f1f1;
-    }
-
-    ::-webkit-scrollbar-thumb {
-        background: #888;
-        border-radius: 10px;
-    }
-</style>
 
 <body>
-    <h1>QOT-More Demos</h1>
-    <h2>Qot-A001 数据库操作</h2>
-    <pre><code class="code-highlight">// FFI 版：需将 libmysql.dll 置于同目录
+    <div class="progress" id="progress"></div>
+    <a class="skip" href="#main">跳到正文</a>
+
+    <button class="menu-btn" id="menuBtn" type="button" aria-label="打开目录">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round">
+            <path d="M3 6h18M3 12h18M3 18h18" />
+        </svg>
+    </button>
+    <div class="scrim" id="scrim"></div>
+
+    <div class="layout">
+        <aside class="sidebar" id="sidebar">
+            <a class="brand" href="index.html">
+                <span class="brand-mark">Q</span>
+                <span>
+                    <span class="brand-name">QOT 示例</span>
+                    <span class="brand-sub">More Demos</span>
+                </span>
+            </a>
+
+            <div class="search">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round">
+                    <circle cx="11" cy="11" r="7" />
+                    <path d="M20 20l-3.6-3.6" />
+                </svg>
+                <input id="search" type="search" placeholder="搜索示例 / API" autocomplete="off" spellcheck="false">
+                <kbd>/</kbd>
+            </div>
+
+            <p class="nav-label">目录 · 10 个示例</p>
+            <ul class="nav" id="nav"></ul>
+
+            <div class="side-foot">
+                <a href="index.html">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M19 12H5M11 18l-6-6 6-6" />
+                    </svg>
+                    返回首页
+                </a>
+            </div>
+        </aside>
+
+        <main class="main" id="main">
+            <header class="hero">
+                <span class="eyebrow"><span class="dot"></span>QOT Examples</span>
+                <h1>更多示例</h1>
+                <p class="hero-lead">十个可直接运行的 QOT 片段：FFI 调外部 DLL、HTTP 请求、标准库流水线与 GUI 事件循环。
+                    每段代码都可一键复制，长片段默认折叠。</p>
+                <div class="hero-meta">
+                    <span><b>10</b> 个示例</span>
+                    <span>FFI · 网络 · 标准库 · GUI</span>
+                    <span>代码支持高亮 / 行号 / 复制</span>
+                </div>
+            </header>
+
+            <section class="demo" id="a001" data-title="数据库操作">
+                <div class="demo-head">
+                    <span class="demo-idx">A001</span>
+                    <div class="demo-titles">
+                        <h2>数据库操作<span class="chip">Qot-A001</span></h2>
+                        <p class="demo-desc">用 FFI 加载 libmysql.dll，按 <code>mysql_real_connect</code> /
+                            <code>mysql_query</code> 的签名连接并执行 SQL。</p>
+                    </div>
+                    <button class="sec-toggle" type="button" aria-expanded="true" title="折叠 / 展开">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="demo-body">
+                    <pre><code class="code-highlight">// FFI 版：需将 libmysql.dll 置于同目录
 var mysql = ffi_load("libmysql.dll");
 var linkings = "555555:555555@tcp(localhost:3306)/555555?charset=utf8mb4";
 var conn = ffi_call_v(ffi_sym(mysql, "mysql_init"), ["ptr"], [0]);
@@ -183,8 +982,25 @@ ffi_call_v(ffi_sym(mysql, "mysql_real_connect"),
 // 原 MySQLExecute(conn, "DELETE ...")
 ffi_call_v(ffi_sym(mysql, "mysql_query"), ["i32", "ptr", "ptr"],
            [conn, ffi_ptr("DELETE FROM users WHERE username = 'admin';")]);</code></pre>
-    <h2>Qot-A002</h2>
-    <pre><code class="code-highlight">var students = [["张三", 90], ["李四", 85], ["王五", 78]];
+                </div>
+            </section>
+
+            <section class="demo" id="a002" data-title="数组与函数">
+                <div class="demo-head">
+                    <span class="demo-idx">A002</span>
+                    <div class="demo-titles">
+                        <h2>数组与函数<span class="chip">Qot-A002</span></h2>
+                        <p class="demo-desc">二维数组 + 自定义函数：遍历输出、追加元素、求平均分并按条件分支。</p>
+                    </div>
+                    <button class="sec-toggle" type="button" aria-expanded="true" title="折叠 / 展开">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="demo-body">
+                    <pre><code class="code-highlight">var students = [["张三", 90], ["李四", 85], ["王五", 78]];
 any_t func add_score(arr, name, score) {
     push(arr, [name, score]);
     return true;
@@ -214,8 +1030,25 @@ if (avg > 85) {
 } else {
     output("待提升");
 }</code></pre>
-    <h2>Qot-A003 绘图</h2>
-    <pre><code class="code-highlight">//QOT-Demo-PD库-绘图（FFI 版：需将 painting.dll 置于同目录——原 painting 模块
+                </div>
+            </section>
+
+            <section class="demo" id="a003" data-title="绘图（Turtle）">
+                <div class="demo-head">
+                    <span class="demo-idx">A003</span>
+                    <div class="demo-titles">
+                        <h2>绘图<span class="chip">Qot-A003</span></h2>
+                        <p class="demo-desc">把 painting.dll 的 Turtle 接口逐个包装成 QOT 函数，再画出方形、圆与螺旋。</p>
+                    </div>
+                    <button class="sec-toggle" type="button" aria-expanded="true" title="折叠 / 展开">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="demo-body">
+                    <pre><code class="code-highlight">//QOT-Demo-PD库-绘图（FFI 版：需将 painting.dll 置于同目录——原 painting 模块
 //已移除；以下包装把原 Turtle_* 调用原样接到 DLL 导出，参数码按实际签名调整）
 var painting = ffi_load("painting.dll");
 func Turtle_Create(w, h, t) {
@@ -335,53 +1168,122 @@ turtle->Turtle_Write(L"绘图演示", false, "center", 20);
 turtle->Turtle_MainLoop();
 turtle->Turtle_ExitOnClick();
 turtle->Turtle_Destroy();</code></pre>
-    <h2>Qot-A004 音乐播放</h2>
-    <pre><code class="code-highlight">// FFI 版：miaudio.dll 在 package\miaudio\，音乐在 ot-asset\audio\。
-// 注意：返回指针/句柄的函数必须用 ffi_call_v 显式定类（["ptr"]）——用 ffi_call
-// 推断会把指针按 f64 读成次正规值，传回时被拒。
+                </div>
+            </section>
+
+            <section class="demo" id="a004" data-title="音乐播放">
+                <div class="demo-head">
+                    <span class="demo-idx">A004</span>
+                    <div class="demo-titles">
+                        <h2>音乐播放<span class="chip">Qot-A004</span></h2>
+                        <p class="demo-desc">miaudio.dll 播放 MP3：类型码必须用 <code>i32</code>，且要等状态机真正进入播放中再跟踪结束。</p>
+                    </div>
+                    <button class="sec-toggle" type="button" aria-expanded="true" title="折叠 / 展开">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="demo-body">
+                    <pre><code class="code-highlight">// miaudio 播放示例
+// —— 类型码必须用 "i32"；用 "f64" 会按 XMM0 读 int 返回值（x64 上 int 在
+// EAX），拿到的是垃圾（实测恒 0）→ `position >= duration` 变 `0 >= 0`
+// 立即「播放结束」。返回指针的 Create 用 "ptr"（无类型码 ffi_call 按 f64
+// 读会把指针位模式当小数，后续当 ptr 传回被拒）
+// 【状态机】0=未知 1=播放中 2=已暂停 3=已停止（Open 后未 Play 时也是 3）
+// —— 循环必须先等 state 进入 1/2 再等 3
 var miaudio = ffi_load("package/miaudio/miaudio.dll");
-func MusicPlayer_Create() {
-    return ffi_call(ffi_sym(miaudio, "MusicPlayer_Create"), []);
+any_t func MusicPlayer_Create() {
+    return ffi_call_v(ffi_sym(miaudio, "MusicPlayer_Create"), ["ptr"], []);
 }
-func MusicPlayer_Open(p, f) {
+any_t func MusicPlayer_Open(p, f) {
     return ffi_call_v(ffi_sym(miaudio, "MusicPlayer_Open"), ["i32", "ptr", "ptr"], [p, ffi_ptr(f)]);
 }
-func MusicPlayer_Play(p) {
+any_t func MusicPlayer_Play(p) {
     ffi_call_v(ffi_sym(miaudio, "MusicPlayer_Play"), ["void", "ptr"], [p]);
 }
-func MusicPlayer_GetState(p) {
+any_t func MusicPlayer_GetState(p) {
     return ffi_call_v(ffi_sym(miaudio, "MusicPlayer_GetState"), ["i32", "ptr"], [p]);
 }
-func MusicPlayer_GetPosition(p) {
-    return ffi_call_v(ffi_sym(miaudio, "MusicPlayer_GetPosition"), ["f64", "ptr"], [p]);
+number_t func MusicPlayer_GetPosition(p) {
+    return ffi_call_v(ffi_sym(miaudio, "MusicPlayer_GetPosition"), ["i32", "ptr"], [p]);
 }
-func MusicPlayer_GetDuration(p) {
-    return ffi_call_v(ffi_sym(miaudio, "MusicPlayer_GetDuration"), ["f64", "ptr"], [p]);
+number_t func MusicPlayer_GetDuration(p) {
+    return ffi_call_v(ffi_sym(miaudio, "MusicPlayer_GetDuration"), ["i32", "ptr"], [p]);
 }
-func MusicPlayer_Destroy(p) {
+any_t func MusicPlayer_Destroy(p) {
     ffi_call_v(ffi_sym(miaudio, "MusicPlayer_Destroy"), ["void", "ptr"], [p]);
 }
 
 var player = MusicPlayer_Create();
-var result = MusicPlayer_Open(player, "chengnan.mp3"); //城南花已开...
-if (result == 0) {
+if (player == null) {
+    output("创建播放器失败！");
+    output(ffi_last_error());
+    return false;
+}
+var result = MusicPlayer_Open(player, "ot-asset/audio/chengnan.mp3"); //城南花已开...
+if (result == 0 || result == null) {
     output("打开文件失败！");
+    output(ffi_last_error());
+    MusicPlayer_Destroy(player);
     return false;
 }
 MusicPlayer_Play(player);
+
+// 启动确认：等 state 进入「播放中(1)/暂停(2)」，2 秒窗口
+var started = false;
+var guard = 0;
+loop (started == false && guard < 20) {
+    var st = MusicPlayer_GetState(player);
+    if (st == 1 || st == 2) {
+        started = true;
+    }
+    guard = guard + 1;
+    time_sleep_ms(100);
+}
+if (started == false) {
+    output("播放器启动失败（state 未进入播放中）！");
+    MusicPlayer_Destroy(player);
+    return false;
+}
+
+// 跟踪到停止（3）；position >= duration 兜底
 loop (true) {
     var state = MusicPlayer_GetState(player);
     var position = MusicPlayer_GetPosition(player);
     var duration = MusicPlayer_GetDuration(player);
+    if (position == null || duration == null) {
+        output("\n获取播放状态失败！");
+        output(ffi_last_error());
+        stop;
+    }
     if (state == 3 || position >= duration) {
         output("\n播放结束！");
         stop;
     }
-    sleep(100);
+    time_sleep_ms(500);
 }
 MusicPlayer_Destroy(player);</code></pre>
-    <h2>Qot-A005 Win-API</h2>
-    <pre><code class="code-highlight">// FFI 版：user32.dll 是系统自带，可直接跑
+                </div>
+            </section>
+
+            <section class="demo" id="a005" data-title="Win-API 弹窗">
+                <div class="demo-head">
+                    <span class="demo-idx">A005</span>
+                    <div class="demo-titles">
+                        <h2>Win-API<span class="chip">Qot-A005</span></h2>
+                        <p class="demo-desc">user32.dll 是系统自带，无需额外 DLL：直接调 <code>MessageBoxA</code> 弹窗。</p>
+                    </div>
+                    <button class="sec-toggle" type="button" aria-expanded="true" title="折叠 / 展开">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="demo-body">
+                    <pre><code class="code-highlight">// FFI 版：user32.dll 是系统自带，可直接跑
 var user32 = ffi_load("user32.dll");
 var MB_OK = 0;                                     // 原 win32##get_const("MB_OK")
 var msgBoxAddr = ffi_sym(user32, "MessageBoxA");   // 原 get_address("MessageBoxW")：A 版直接收 ANSI 串
@@ -389,8 +1291,25 @@ var title ="Hellos";
 var text = "你好世界";
 var result = ffi_call_v(msgBoxAddr, ["i32", "ptr", "ptr", "i32"],
                         [0, ffi_ptr(text), ffi_ptr(title), MB_OK]);</code></pre>
- <h2>Qot-A006 天气API调用</h2>
-    <pre><code class="code-highlight">//Thanks to uapis.cn
+                </div>
+            </section>
+
+            <section class="demo" id="a006" data-title="天气 API">
+                <div class="demo-head">
+                    <span class="demo-idx">A006</span>
+                    <div class="demo-titles">
+                        <h2>天气 API 调用<span class="chip">Qot-A006</span></h2>
+                        <p class="demo-desc">HTTP GET uapis.cn 天气接口，<code>json_decode</code> 后输出字段并给出出行建议（Thanks to uapis.cn）。</p>
+                    </div>
+                    <button class="sec-toggle" type="button" aria-expanded="true" title="折叠 / 展开">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="demo-body">
+                    <pre><code class="code-highlight">//Thanks to uapis.cn
 http_set_user_agent("QOT-WeatherClient/1.0");
 http_set_verify_ssl(0);
 output("请输入城市名称: ");
@@ -434,8 +1353,26 @@ if (statusCode == 200) {
         output("错误信息: " + responseData);
     }
 }</code></pre>
-<h2>Qot-A007 类 · 协议 · 宏</h2>
-<pre><code class="code-highlight">// 协议方法：让自定义类型参与运算与输出
+                </div>
+            </section>
+
+            <section class="demo" id="a007" data-title="类 · 协议 · 宏">
+                <div class="demo-head">
+                    <span class="demo-idx">A007</span>
+                    <div class="demo-titles">
+                        <h2>类 · 协议 · 宏<span class="chip">Qot-A007</span></h2>
+                        <p class="demo-desc">class 的协议方法（<code>__add__</code> / <code>__eq__</code> /
+                            <code>__to_str</code>）让自定义类型参与运算与输出；外加编译期宏与官方 <code>swap!</code>。</p>
+                    </div>
+                    <button class="sec-toggle" type="button" aria-expanded="true" title="折叠 / 展开">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="demo-body">
+                    <pre><code class="code-highlight">// 协议方法：让自定义类型参与运算与输出
 class Vec2 {
     var x = 0;
     var y = 0;
@@ -460,9 +1397,25 @@ var b = 2;
 swap!(a, b);
 output(int_to_str(a));               // 2
 output(int_to_str(b));               // 1</code></pre>
+                </div>
+            </section>
 
-<h2>Qot-A008 标准库：CSV 统计</h2>
-<pre><code class="code-highlight">require "std/text.qot";
+            <section class="demo" id="a008" data-title="标准库：CSV 统计">
+                <div class="demo-head">
+                    <span class="demo-idx">A008</span>
+                    <div class="demo-titles">
+                        <h2>标准库：CSV 统计<span class="chip">Qot-A008</span></h2>
+                        <p class="demo-desc">require <code>std/text.qot</code> 与 <code>std/data.qot</code>：解析 CSV、分组求和、计数与文本清洗。</p>
+                    </div>
+                    <button class="sec-toggle" type="button" aria-expanded="true" title="折叠 / 展开">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="demo-body">
+                    <pre><code class="code-highlight">require "std/text.qot";
 require "std/data.qot";
 
 var csv = "city,amount,kind
@@ -484,9 +1437,25 @@ output(group_count(rows, 2)["a"]);   // 1
 var cleaned = trim_all(rows);
 output(normalize("  hello    world  "));   // hello world
 output(wrap("alpha beta gamma", 11));</code></pre>
+                </div>
+            </section>
 
-<h2>Qot-A009 文件处理流水线</h2>
-<pre><code class="code-highlight">require "std/fs.qot";
+            <section class="demo" id="a009" data-title="文件处理流水线">
+                <div class="demo-head">
+                    <span class="demo-idx">A009</span>
+                    <div class="demo-titles">
+                        <h2>文件处理流水线<span class="chip">Qot-A009</span></h2>
+                        <p class="demo-desc">逐行读取 → 清洗计数 → 写回 <code>clean.txt</code>，标准库 fs + text 的组合用法。</p>
+                    </div>
+                    <button class="sec-toggle" type="button" aria-expanded="true" title="折叠 / 展开">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="demo-body">
+                    <pre><code class="code-highlight">require "std/fs.qot";
 require "std/text.qot";
 
 var lines = read_lines("data.txt");
@@ -503,12 +1472,27 @@ if (lines == null) {
     output("有效行数: " + int_to_str(total));
     write_lines("clean.txt", lines);
 }</code></pre>
+                </div>
+            </section>
 
-<h2>Qot-A010 GUI：打招呼</h2>
-<p>完整源码见 <code>testing/gui/hello_gui.qot</code>（可 <code>python index.py run</code> 跑，
-    也可 <code>python index.py aot</code> 编译成单文件 exe——两引擎行为逐位一致）。
-    核心骨架：</p>
-<pre><code class="code-highlight">var w = vg_create_window("你好 · GUI", 520, 340);
+            <section class="demo" id="a010" data-title="GUI：打招呼">
+                <div class="demo-head">
+                    <span class="demo-idx">A010</span>
+                    <div class="demo-titles">
+                        <h2>GUI：打招呼<span class="chip">Qot-A010</span></h2>
+                        <p class="demo-desc">vg_* 原语搭窗口 + 事件循环：点击按钮读取输入框内容并回写标签。</p>
+                    </div>
+                    <button class="sec-toggle" type="button" aria-expanded="true" title="折叠 / 展开">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="demo-body">
+                    <p class="lede">完整源码见 <code>testing/gui/hello_gui.qot</code>（可用 <code>python index.py
+                            run</code> 运行，也可 <code>python index.py aot</code> 编译成单文件 exe——两引擎行为逐位一致）。核心骨架：</p>
+                    <pre><code class="code-highlight">var w = vg_create_window("你好 · GUI", 520, 340);
 var name_box = vg_create_textbox(w, "在这里输入名字...", 40, 104, 300, 34);
 var btn_hello = vg_create_button(w, "打招呼", 40, 152, 140, 42);
 var result = vg_create_label(w, "结果会显示在这里", 40, 216, 440, 28);
@@ -530,11 +1514,295 @@ loop (running == 1) {
         }
     }
 }</code></pre>
+                </div>
+            </section>
 
-    <blockquote>
-        <a href="index.html">回退</a></br>
-    </blockquote>
+            <p class="empty" id="empty">没有匹配的示例，换个关键词试试（例如 <code>ffi</code>、<code>http</code>、<code>vg_</code>）。</p>
 
+            <footer class="doc-footer">
+                <a href="index.html">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M19 12H5M11 18l-6-6 6-6" />
+                    </svg>
+                    返回首页
+                </a>
+                <span>QOT · More Demos · 10 例</span>
+            </footer>
+        </main>
+    </div>
+
+    <button class="to-top" id="toTop" type="button" aria-label="回到顶部">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 19V5M5 12l7-7 7 7" />
+        </svg>
+    </button>
+
+    <script>
+        (function () {
+            'use strict';
+
+            var $ = function (sel, root) { return (root || document).querySelector(sel); };
+            var $$ = function (sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); };
+
+            /* ================= 语法高亮 ================= */
+            var KW = new Set(('var func return if else eif for in loop stop continue class macro require this ' +
+                'true false null while break').split(' '));
+            var TY = new Set('any_t number_t string_t bool_t array_t dict_t void_t'.split(' '));
+            var TOKEN_RE = /\/\/[^\n]*|\/\*[\s\S]*?\*\/|L?"(?:[^"\\]|\\[\s\S])*"|\b\d+(?:\.\d+)?\b|[A-Za-z_]\w*/g;
+
+            function esc(s) {
+                return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            }
+
+            function paint(src) {
+                var out = '', last = 0, m;
+                TOKEN_RE.lastIndex = 0;
+                while ((m = TOKEN_RE.exec(src)) !== null) {
+                    var t = m[0], ch = t.charAt(0), cls = '';
+                    if (m.index > last) out += esc(src.slice(last, m.index));
+                    if (ch === '/') {
+                        cls = 'tok-com';
+                    } else if (ch === '"' || (ch === 'L' && t.charAt(1) === '"')) {
+                        cls = 'tok-str';
+                    } else if (ch >= '0' && ch <= '9') {
+                        cls = 'tok-num';
+                    } else if (KW.has(t)) {
+                        cls = 'tok-kw';
+                    } else if (TY.has(t)) {
+                        cls = 'tok-type';
+                    } else if (src.charAt(m.index + t.length) === '!') {
+                        cls = 'tok-macro';
+                    } else {
+                        var j = m.index + t.length;
+                        while (src.charAt(j) === ' ') j++;
+                        if (src.charAt(j) === '(') cls = 'tok-fn';
+                    }
+                    out += cls ? '<span class="' + cls + '">' + esc(t) + '</span>' : esc(t);
+                    last = m.index + t.length;
+                }
+                out += esc(src.slice(last));
+                return out;
+            }
+
+            var ICON_COPY = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+                'stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" ' +
+                'height="11" rx="2"></rect><path d="M5 15V5a2 2 0 0 1 2-2h8"></path></svg>';
+            var ICON_CHECK = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+                'stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12">' +
+                '</polyline></svg>';
+
+            var COLLAPSE_OVER = 26;
+
+            function buildCard(code) {
+                var raw = code.textContent.replace(/^[\r\n]+/, '').replace(/\s+$/, '');
+                var lines = raw.split('\n');
+                var pre = code.parentNode;
+                var card = document.createElement('figure');
+                var gutter = '';
+                for (var i = 1; i <= lines.length; i++) gutter += '<span>' + i + '</span>';
+
+                card.className = 'code-card';
+                card.innerHTML =
+                    '<div class="code-head">' +
+                    '<span class="lang">QOT</span>' +
+                    '<span class="code-meta">' + lines.length + ' 行</span>' +
+                    '<button class="btn-copy" type="button">' + ICON_COPY + '<span>复制</span></button>' +
+                    '</div>' +
+                    '<div class="code-scroll">' +
+                    '<div class="gutter" aria-hidden="true">' + gutter + '</div>' +
+                    '<pre><code class="tok">' + paint(raw) + '</code></pre>' +
+                    '</div>' +
+                    '<div class="code-fade" aria-hidden="true"></div>';
+
+                if (lines.length > COLLAPSE_OVER) {
+                    card.classList.add('folding');
+                    var btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'code-expand';
+                    btn.innerHTML = '<span>展开全部 ' + lines.length + ' 行</span>' +
+                        '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+                        'stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">' +
+                        '<polyline points="6 9 12 15 18 9"></polyline></svg>';
+                    btn.addEventListener('click', function () {
+                        var open = card.classList.toggle('expanded');
+                        btn.firstChild.textContent = open ? '收起' : ('展开全部 ' + lines.length + ' 行');
+                        if (!open) card.querySelector('.code-scroll').scrollTop = 0;
+                    });
+                    card.appendChild(btn);
+                }
+
+                card.querySelector('.btn-copy').addEventListener('click', function () {
+                    copyText(raw, this);
+                });
+
+                pre.parentNode.replaceChild(card, pre);
+                card._raw = raw;
+            }
+
+            function copyText(text, btn) {
+                var done = function () {
+                    btn.classList.add('done');
+                    btn.innerHTML = ICON_CHECK + '<span>已复制</span>';
+                    clearTimeout(btn._timer);
+                    btn._timer = setTimeout(function () {
+                        btn.classList.remove('done');
+                        btn.innerHTML = ICON_COPY + '<span>复制</span>';
+                    }, 1600);
+                };
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text).then(done, function () { fallback(); });
+                } else {
+                    fallback();
+                }
+                function fallback() {
+                    var ta = document.createElement('textarea');
+                    ta.value = text;
+                    ta.setAttribute('readonly', '');
+                    ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0';
+                    document.body.appendChild(ta);
+                    ta.select();
+                    try { document.execCommand('copy'); done(); } catch (e) { /* 忽略 */ }
+                    document.body.removeChild(ta);
+                }
+            }
+
+            $$('.demo pre > code').forEach(buildCard);
+
+            /* ================= 目录 + 区块折叠 ================= */
+            var sections = $$('.demo');
+            var nav = $('#nav');
+            var tocLinks = [];
+
+            sections.forEach(function (sec, i) {
+                var li = document.createElement('li');
+                var a = document.createElement('a');
+                a.href = '#' + sec.id;
+                a.innerHTML = '<span class="n">' + (i + 1 < 10 ? '0' : '') + (i + 1) + '</span>' +
+                    '<span class="t">' + sec.dataset.title + '</span>';
+                li.appendChild(a);
+                nav.appendChild(li);
+                tocLinks.push(a);
+
+                var toggle = $('.sec-toggle', sec);
+                toggle.addEventListener('click', function () {
+                    var collapsed = sec.classList.toggle('collapsed');
+                    toggle.setAttribute('aria-expanded', String(!collapsed));
+                    toggle.title = collapsed ? '展开该示例' : '折叠该示例';
+                });
+            });
+
+            /* ================= 滚动：进度 / 高亮 / 回顶 ================= */
+            var progress = $('#progress');
+            var toTop = $('#toTop');
+            var ticking = false;
+
+            function onScroll() {
+                if (ticking) return;
+                ticking = true;
+                requestAnimationFrame(function () {
+                    ticking = false;
+                    var y = window.pageYOffset || document.documentElement.scrollTop;
+                    var max = document.documentElement.scrollHeight - window.innerHeight;
+                    progress.style.width = (max > 0 ? Math.min(100, (y / max) * 100) : 0) + '%';
+                    toTop.classList.toggle('show', y > 600);
+
+                    var active = -1;
+                    for (var i = 0; i < sections.length; i++) {
+                        if (sections[i].classList.contains('is-hidden')) continue;
+                        if (sections[i].getBoundingClientRect().top <= 140) active = i;
+                        else break;
+                    }
+                    if (active < 0) active = 0;
+                    if (y + window.innerHeight >= document.documentElement.scrollHeight - 4) {
+                        for (var k = sections.length - 1; k >= 0; k--) {
+                            if (!sections[k].classList.contains('is-hidden')) { active = k; break; }
+                        }
+                    }
+                    tocLinks.forEach(function (a, i) {
+                        a.classList.toggle('active', i === active);
+                    });
+                    var cur = tocLinks[active];
+                    if (cur) {
+                        var r = cur.getBoundingClientRect();
+                        var box = nav.getBoundingClientRect();
+                        if (r.top < box.top || r.bottom > box.bottom) {
+                            cur.scrollIntoView({ block: 'nearest' });
+                        }
+                    }
+                });
+            }
+
+            window.addEventListener('scroll', onScroll, { passive: true });
+            window.addEventListener('resize', onScroll);
+            onScroll();
+
+            toTop.addEventListener('click', function () {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+
+            /* ================= 搜索过滤 ================= */
+            var search = $('#search');
+            var empty = $('#empty');
+            var haystack = sections.map(function (sec) {
+                var code = sec.querySelector('code');
+                return (sec.dataset.title + ' ' + (sec.querySelector('.demo-desc') || {}).textContent +
+                    ' ' + (code ? code.textContent : '')).toLowerCase();
+            });
+
+            function filter(q) {
+                q = q.trim().toLowerCase();
+                var shown = 0;
+                sections.forEach(function (sec, i) {
+                    var hit = !q || haystack[i].indexOf(q) !== -1;
+                    sec.classList.toggle('is-hidden', !hit);
+                    tocLinks[i].parentNode.classList.toggle('is-hidden', !hit);
+                    if (hit) shown++;
+                });
+                empty.classList.toggle('show', shown === 0);
+                onScroll();
+            }
+
+            search.addEventListener('input', function () { filter(search.value); });
+            search.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape') {
+                    search.value = '';
+                    filter('');
+                    search.blur();
+                }
+            });
+
+            document.addEventListener('keydown', function (e) {
+                var tag = (document.activeElement || {}).tagName;
+                if (e.key === '/' && tag !== 'INPUT' && tag !== 'TEXTAREA') {
+                    e.preventDefault();
+                    search.focus();
+                    search.select();
+                }
+            });
+
+            /* ================= 移动端抽屉 ================= */
+            var sidebar = $('#sidebar');
+            var scrim = $('#scrim');
+            var menuBtn = $('#menuBtn');
+
+            function closeDrawer() {
+                sidebar.classList.remove('open');
+                scrim.classList.remove('show');
+            }
+
+            menuBtn.addEventListener('click', function () {
+                var open = sidebar.classList.toggle('open');
+                scrim.classList.toggle('show', open);
+            });
+            scrim.addEventListener('click', closeDrawer);
+            tocLinks.forEach(function (a) { a.addEventListener('click', closeDrawer); });
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape') closeDrawer();
+            });
+        })();
+    </script>
 </body>
 
 </html>

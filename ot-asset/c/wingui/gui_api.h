@@ -14,6 +14,8 @@
 #include "controls_basic.h"
 #include "controls_extended.h"
 #include "layout_theme.h"
+#include "scrollpane.h"
+#include "virtual_list.h"
 #include <CommCtrl.h>
 
 namespace gui
@@ -22,11 +24,13 @@ namespace gui
     
     inline bool Initialize()
     {
-        
+
         INITCOMMONCONTROLSEX icex = {};
         icex.dwSize = sizeof(INITCOMMONCONTROLSEX);
         icex.dwICC = ICC_WIN95_CLASSES;
         InitCommonControlsEx(&icex);
+        // COM 初始化（WIC 图片解码 / DComp 相关组件需要；S_FALSE = 已初始化，正常）
+        CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
         return true;
     }
 

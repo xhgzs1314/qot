@@ -1649,12 +1649,7 @@ namespace qot
     }
     void BuiltinManager::registerBuiltins()
     {
-        // 【M1 / G-5】注册名单来自 builtins.toml（经 builtins_manifest.h 展开），
-        // 不再在这里逐条手写。手写那份表正是 G-5 的根因：Python 表与 C++ 表
-        // 各自漂移，`parts` / `beair` 在 VM 侧静默缺失（调用返回 null 无诊断）。
-        // 现在清单登记了而本 TU 没有对应函数符号 → 展开处符号未声明 →
-        // 编译失败；反之 C++ 多写了清单里没有的注册，也会被 _dbg_builtins.py
-        // 的文本对账抓出来。
+     
 #define QOT_REG_BUILTIN(_name, _fn) registerFunction(#_name, _fn);
         QOT_VM_BUILTINS(QOT_REG_BUILTIN)
 #undef QOT_REG_BUILTIN

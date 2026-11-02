@@ -1,15 +1,5 @@
 /* ===========================================================================
- * qot_plugin_abi.h —— QOT 原生插件公共 ABI（M7 冻结 · v2 · ）
- *
- * 本文件是插件作者的**唯一**依赖：一个自包含公共头（不依赖 qot_aot_runtime.h）。
- * 冻结文档：docs/（布局表 / 所有权 / 错误通道 / 版本规则）。
- *
- * 修改本文件的纪律（SPEC R17）：
- *   * qot_plugin_api 只允许**尾部追加**字段，且必须 bump QOT_PLUGIN_ABI_VERSION；
- *   * 本文件与 ot-asset/c/aot/qot_aot_runtime.h 的
- *     `8< BEGIN/END QOT_PLUGIN_ABI` 嵌入段**逐字节一致**
- *     （testing/unit/test_ffi_abi.py 钉住）—— 改这里必须同步改那里；
- *   * 语义变更（不改布局）同样 bump 版本并在 docs/ 记变更行。
+ * qot_plugin_abi.h —— QOT 原生插件公共 ABI
  * =========================================================================== */
 #ifndef QOT_PLUGIN_ABI_H
 #define QOT_PLUGIN_ABI_H
@@ -21,8 +11,8 @@
 extern "C" {
 #endif
 
-/* ABI 版本：v1 = CP-4 的 C 标量调用面（ffi_*）；v2 = M7 冻结（混族
- * ffi_call_v 分派器 + 本插件 ABI）。插件按它判兼容。 */
+/* ABI 版本：C 标量调用面（ffi_*）；
+ * ffi_call_v 分派器 + 本插件 ABI） */
 #define QOT_PLUGIN_ABI_VERSION 2u
 
 /* qot_value 标签（V16 布局的 t 字段；宿主私有标签不进本表） */

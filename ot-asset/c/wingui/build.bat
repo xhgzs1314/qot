@@ -8,6 +8,7 @@ cl /EHsc /MD /utf-8 ^
     modern_window.cpp ^
     user32.lib kernel32.lib gdi32.lib ^
     d2d1.lib dwrite.lib dxguid.lib comctl32.lib ^
+    ole32.lib d3d11.lib dxgi.lib dwmapi.lib windowscodecs.lib imm32.lib shell32.lib ^
     /Fe:ModernGUI.exe
 
 if %errorlevel% == 0 (

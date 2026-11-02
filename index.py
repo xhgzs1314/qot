@@ -1604,14 +1604,19 @@ class Evaluator:
                 return left_val % right_val
             elif op == '^':                   
                 return left_val ** right_val
-            elif op == '>':
-                return left_val > right_val
-            elif op == '<':
-                return left_val < right_val
-            elif op == '>=':
-                return left_val >= right_val
-            elif op == '<=':
-                return left_val <= right_val
+            elif op in ('>', '<', '>=', '<='):
+                if isinstance(left_val, bool) or isinstance(right_val, bool):
+                    return None
+                if isinstance(left_val, (int, float)) and \
+                        isinstance(right_val, (int, float)):
+                    if op == '>':
+                        return left_val > right_val
+                    if op == '<':
+                        return left_val < right_val
+                    if op == '>=':
+                        return left_val >= right_val
+                    return left_val <= right_val
+                return None
             elif op == '==':
                 return left_val == right_val
             elif op == '!=':

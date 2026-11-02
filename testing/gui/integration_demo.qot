@@ -1,0 +1,75 @@
+// ===========================================================================
+// integration_demo.qot —— vgui v3 任务 5 验收：系统集成（双跑）
+//
+// 覆盖：
+//   1. 剪贴板闭环：vg_clipboard_set → vg_clipboard_get → 比对（自动）；
+//   2. 任务栏进度：vg_taskbar_progress 0→100 + 状态切换（API 返回值自动
+//      断言；视觉看任务栏图标，手动）；
+//   3. 文件拖放：accept_files(true) + on_drop 绑定——脚本运行期间（前
+//      ~90 帧 ≈ 1.5 秒）可手动拖一个文件进窗口，路径显示在 label；
+//      无人值守时自动跳过（拖放链路的自动化证明见收尾探针，见文档）。
+// 90 帧后自动关窗（无人值守可跑）。
+// ===========================================================================
+
+var w = vg_create_window("integration demo", 520, 320);
+var status = vg_create_label(w, "拖一个文件进窗口试试（1.5 秒内）", 20, 20, 480, 26);
+var dropInfo = vg_create_label(w, "drop: （未拖放）", 20, 56, 480, 26);
+
+var cnt = [0, 0, 0];     // [帧数, 断言失败数, 断言总数]
+var clip = ["", ""];
+
+any_t func on_drop_evt(id, value, x, y) {
+    // value = 文件数；回调里立刻取路径（批次 = 最近一次落盘）
+    var names = "";
+    for (i in 0..value) {
+        names = names + vg_take_drop_file(i) + " ";
+    }
+    vg_label_set_text(dropInfo, "drop: " + names);
+    vg_toast(w, "收到 " + str(value) + " 个文件", 1500);
+}
+
+any_t func check(cond, tag) {
+    cnt[2] = cnt[2] + 1;
+    if (!cond) {
+        cnt[1] = cnt[1] + 1;
+        output("FAIL " + tag);
+    }
+}
+
+any_t func on_frame(dt) {
+    cnt[0] = cnt[0] + 1;
+    if (cnt[0] == 2) {
+        // ---- 1. 剪贴板闭环 ----
+        var text = "vgui v3 clipboard 你好 ✦ 123";
+        clip[0] = vg_clipboard_set(text) ? text : "";
+        clip[1] = vg_clipboard_get();
+        check(clip[1] == clip[0], "clipboard roundtrip");
+        check(vg_clipboard_set("second") == true, "clipboard overwrite");
+        check(vg_clipboard_get() == "second", "clipboard re-read");
+        // ---- 2. 任务栏进度 0→100 ----
+        var okp = vg_taskbar_progress(w, 0, 100);
+        for (p in 1..6) {
+            okp = vg_taskbar_progress(w, p * 20, 100) && okp;
+        }
+        check(okp, "taskbar progress 0->100");
+        check(vg_taskbar_state(w, 2) == true, "taskbar state normal");
+        check(vg_taskbar_progress(w, 0, 0) == true, "taskbar progress off");
+    }
+    if (cnt[0] >= 90) {
+        vg_close_window(w);
+    } else {
+        vg_request_frame();
+    }
+}
+
+vg_on_drop(w, func(id, value, x, y) -> on_drop_evt(id, value, x, y));
+vg_window_accept_files(w, true);
+vg_on_frame(func(dt) -> on_frame(dt));
+vg_show_window(w);
+vg_run();
+
+if (cnt[1] == 0) {
+    output("integration-demo-ok checks=" + str(cnt[2]) + " fails=0");
+} else {
+    output("integration-demo-FAILED checks=" + str(cnt[2]) + " fails=" + str(cnt[1]));
+}

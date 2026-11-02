@@ -1,0 +1,77 @@
+// ===========================================================================
+// text_demo.qot —— vgui v3
+//
+// 同画布六种文本：常规 / 粗体 / 居中 / 右对齐 / 自动换行 / 超长省略，
+// 另加垂直居中；测量断言：wrap 文本返回两行高度、宽度不超容器。
+// 12 帧后自动关窗（无人值守可跑）。
+// ===========================================================================
+
+var w = vg_create_window("text demo", 560, 380);
+var cv = vg_create_canvas(w, 10, 10, 540, 330);
+
+var draws = [0];
+
+any_t func scene(cw, ch) {
+    draws[0] = draws[0] + 1;
+    // 1 常规（旧原语，兼容基线）
+    vg_draw_text("常规文本 Regular", 10, 10, 15, [0.9, 0.9, 1, 1]);
+    // 2 粗体
+    vg_draw_text_ex("粗体文本 Bold", 10, 44, 220, 24, 15, [1, 0.8, 0.4, 1], 1, 0, 0);
+    // 3 水平居中
+    vg_draw_text_ex("水平居中对齐", 10, 76, 300, 24, 15, [0.6, 1, 0.7, 1], 0, 1, 0);
+    // 4 右对齐
+    vg_draw_text_ex("右对齐文本", 10, 108, 300, 24, 15, [0.6, 0.8, 1, 1], 0, 2, 0);
+    // 5 自动换行（260px 容器，长文本折多行）
+    vg_draw_text_ex("自动换行：这是一段很长的中文文本，会在到达容器宽度时自动折行到下一行继续显示，用于验证 wrap。",
+                    10, 140, 260, 90, 14, [0.9, 0.9, 0.9, 1], 0, 0, 0, 1);
+    // 6 超长省略（220px 容器 + ellipsis）
+    vg_draw_text_ex("超长省略：The quick brown fox jumps over the lazy dog repeatedly without stopping at all",
+                    300, 140, 220, 24, 14, [1, 0.6, 0.6, 1], 0, 0, 0, 1, 1);
+    // 7 垂直居中（60px 高度内）
+    vg_draw_text_ex("垂直居中", 10, 240, 200, 60, 15, [0.8, 0.7, 1, 1], 0, 0, 1);
+}
+
+vg_canvas_on_draw(cv, func(cw, ch) -> scene(cw, ch));
+
+// ---- 测量断言（不依赖绘制）----
+var LONGTEXT = "自动换行：这是一段很长的中文文本，会在到达容器宽度时自动折行到下一行继续显示，用于验证 wrap。";
+var m1 = vg_draw_measure_text_ex("短", 14);
+var m2 = vg_draw_measure_text_ex(LONGTEXT, 14, 0, 1, 200);
+var m3 = vg_draw_measure_text_ex(LONGTEXT, 14);
+
+var cnt = [0];
+any_t func on_frame(dt) {
+    cnt[0] = cnt[0] + 1;
+    if (cnt[0] >= 12) {
+        vg_close_window(w);
+    } else {
+        vg_request_frame();
+    }
+}
+vg_on_frame(func(dt) -> on_frame(dt));
+vg_show_window(w);
+vg_run();
+
+var fails = [0];
+var checks = [0];
+
+any_t func expect(cond, tag) {
+    checks[0] = checks[0] + 1;
+    if (!cond) {
+        fails[0] = fails[0] + 1;
+        output("FAIL " + tag);
+    }
+}
+
+expect(m1[1] > 0 && m1[1] < 30, "single-line height sane (" + str(m1[1]) + ")");
+expect(m2[0] <= 201, "wrap width bounded by container (" + str(m2[0]) + ")");
+expect(m2[1] >= m1[1] * 1.8, "wrapped height is multi-line (" + str(m2[1]) + " vs " + str(m1[1]) + ")");
+expect(m3[1] <= m1[1] * 1.2, "no-wrap stays single-line (" + str(m3[1]) + ")");
+expect(draws[0] > 0, "canvas drew " + str(draws[0]) + " frames");
+
+if (fails[0] == 0) {
+    output("text-demo-ok checks=" + str(checks[0]) + " frames=" + str(cnt[0]) +
+           " draws=" + str(draws[0]) + " lineH=" + str(m1[1]) + " wrapH=" + str(m2[1]));
+} else {
+    output("text-demo-FAILED checks=" + str(checks[0]) + " fails=" + str(fails[0]));
+}

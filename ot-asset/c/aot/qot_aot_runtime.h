@@ -180,6 +180,7 @@ struct QDict
     int32_t size;
     int32_t cap; // 2 的幂
     int32_t mask;
+    int32_t grow_at; // 【PROMAX-D1】size 到达即 grow（= cap*5/8-1；替代每次插入的乘法比较，逐位等价）
     QDictSlot *slots;
 };
 
@@ -436,12 +437,20 @@ static void* qotrt_xalloc(size_t n)
                 }
                 qotrt_pool.free_list[sc_d] = *static_cast<void **>(p);
                 for (size_t k = 8; k < QSC_SIZE[sc_d]; k++)
-                    ub[k] = 0xBB; // 重新毒化（本块现在“活”，下次 free 再毒化）
+                    ub[k] = 0xBB; // 重新毒化（本块现在"活"，下次 free 再毒化）
                 qotrt_dbg_add(p, n, __builtin_return_address(0), __builtin_return_address(1));
                 return p;
             }
         }
-        size_t need = (n + 15u) & ~(size_t)15u;
+        // 【P0-POOL-FIX】bump 尺寸与类表统一：块物理尺寸恒 = QSC_SIZE[sc]。
+        // 旧实现 (n+15)&~15 与类表错配（实测 n∈(64,80] 的块物理 80B 却进
+        // 96 类链；pop 后按 96B 使用 → 尾部越界写——QrtProc 的 rd_out/rd_err
+        // 恰在偏移 80/88，句柄值踩进邻块头 → 池 free_list 链损坏 → 循环
+        // spawn 场景段错误。同型危险区间：128/192/384/768/1536/3072/6144
+        // 类的「前一档 16 对齐区」。sc<0 的大块维持 16 对齐语义（malloc
+        // 直通路径，与 xfree 的 std::free 对偶，不受类表管辖）。
+        size_t need = (sc_d >= 0) ? QSC_SIZE[sc_d]
+                                  : ((n + 15u) & ~(size_t)15u);
         void *p;
         if (need > QSC_SIZE[QSC_N - 1])
         {
@@ -472,7 +481,11 @@ static void* qotrt_xalloc(size_t n)
             return p;
         }
     }
-    size_t need = (n + 15u) & ~(size_t)15u;
+    // 【P0-POOL-FIX】bump 尺寸 = 类尺寸（与 xfree 推链/毒化的类表完全
+    // 一致）。旧 (n+15)&~15 与类表错配：块物理小于类尺寸，pop 复用后
+    // 尾部越界写（crash_repro：n=70 物理 80B 进 96 类，QrtProc 写偏移
+    // 80/88 踩邻块 → free_list 链野 → 循环 spawn 段错误，-O2 放大显形）。
+    size_t need = (sc >= 0) ? QSC_SIZE[sc] : ((n + 15u) & ~(size_t)15u);
     // 阈值必须与 qotrt_xfree 的类表一致（QSC_SIZE 上界 6144）：类尺寸走
     // slab 切块（xfree 进空闲表复用），超界走 malloc（xfree 对应 std::free）。
     // b6b 崩溃复盘（0xC0000374 堆损坏）：旧阈值 8192 让 6145~8192 的块从
@@ -490,7 +503,6 @@ static void* qotrt_xalloc(size_t n)
     qotrt_pool.slab_left -= need;
     return p;
 }
-
 static void qotrt_xfree(void* p, size_t n)
 {
     if (p == nullptr)
@@ -621,6 +633,23 @@ static QEnv *qotrt_env_up(QEnv *e, int32_t k)
     while (k-- > 0 && e != nullptr)
         e = e->parent;
     return e;
+}
+
+// 【PROMAX-U1】upval 寻址的内联快路径（发射点用）。判据与 env_up/env_at
+// 逐字一致；热判据（链非空、常量合法下标）不调函数，慢形态回落原函数。
+// cgen 的每次 upval 读写从「env_up 调用 + env_at 调用」缩为一条寻址，
+// 且 gcc 内联后同级链自动 CSE（b8a 的 step 体内 4 次寻址共享一次 parent walk）。
+static inline QEnv *qotrt_env_up2(QEnv *e, int32_t k)
+{
+    while (k-- > 0 && e != nullptr)
+        e = e->parent;
+    return e;
+}
+static inline V16 *qotrt_env_at2(QEnv *e, int32_t i)
+{
+    if (e != nullptr && i >= 0 && i < e->n)
+        return &e->a[i];
+    return qotrt_env_at(e, i); // 慢形态（null/越界钳制）语义单一来源
 }
 
 // env 值槽（VT_ENV）→ 裸指针；未分配（VT_NONE 等）→ nullptr
@@ -767,11 +796,80 @@ static void qotrt_obj_set(V16 obj, int fid, V16 value)
 //   * 深度/超时上限不可被 catch（它们是资源契约，不是用户错误）；
 //   * throw 放弃的堆对象按 arena-free 定价由池持有（README 21.4 记账），
 //     不做回收 —— 修复它的 scope-arena 登记（路线图 F3 坑点）等 GC 决策一起动。
+
+// 【PROMAX-E1】自制 x64 局部跳转原语（qot_sjmp/qot_ljmp）。
+// 为什么：MinGW-w64 的 longjmp 走 SEH/展开路径，本机实测 ~1500ns/次 ——
+// b5b 的 throw/catch 单价 1628ns 里 94% 是它。原语只保存/恢复 RIP/RSP 与
+// callee-saved（RBP/RBX/R12-R15），单次 ~15ns：
+//   * qot_sjmp 挂 __attribute__((returns_twice))：编译器把它当 setjmp
+//     对待 —— 返回后强制重载寄存器缓存值，跨恢复的正确性与正规
+//     setjmp/longjmp 完全同律（这正是 returns_twice 属性存在的意义）；
+//   * 恢复集合 = x64 调用约定的 callee-saved 集合 + 栈 + 返回地址：
+//     qot_ljmp 之后执行流精确回到「qot_sjmp 调用点之后」且寄存器态与
+//     「刚从 qot_sjmp 正常返回」一致（除返回值为 1 而非 0）；
+//   * 与正规 longjmp 的差别仅在于不做 SEH 展开登记 —— 本运行时的着陆点
+//     全部是 POD（无 C++ 析构语义可跳过），展开是纯开销；
+//   * MSVC / 非 x64 / QOT_NO_FAST_SJ=1：回落正规 setjmp/longjmp。
+#if defined(__GNUC__) && defined(__x86_64__) && !defined(QOT_NO_FAST_SJ)
+#define QOT_FAST_SJ 1
+struct QrtJmpBuf
+{
+    void *rip, *rsp, *rbp, *rbx, *r12, *r13, *r14, *r15;
+};
+static __attribute__((returns_twice, noinline)) int qot_sjmp(QrtJmpBuf *j)
+{
+    // SysV 与 Win64 的差别只在参数寄存器；%0 由编译器分配（任何 GP 寄存器皆可）。
+    __asm__ __volatile__(
+        "movq (%%rsp), %%rax\n\t"   // 返回地址（qot_sjmp 的 ret 目标）
+        "movq %%rax, 0(%0)\n\t"
+        "leaq 8(%%rsp), %%rax\n\t"  // 调用者 ret 之后的 rsp 快照
+        "movq %%rax, 8(%0)\n\t"
+        "movq %%rbp, 16(%0)\n\t"
+        "movq %%rbx, 24(%0)\n\t"
+        "movq %%r12, 32(%0)\n\t"
+        "movq %%r13, 40(%0)\n\t"
+        "movq %%r14, 48(%0)\n\t"
+        "movq %%r15, 56(%0)\n\t"
+        :
+        : "r"(j)
+        : "rax", "memory");
+    return 0; // 直接路径返回 0；恢复路径由 qot_ljmp 代返回 1
+}
+static __attribute__((noreturn, noinline)) void qot_ljmp(QrtJmpBuf *j, int v)
+{
+    __asm__ __volatile__(
+        "movq 8(%0), %%rsp\n\t"  // 恢复调用者栈
+        "movq 0(%0), %%rax\n\t"  // rip（qot_sjmp 的返回地址）
+        "pushq %%rax\n\t"        // 作为 ret 目标压栈（写在新 rsp-8，即原 ret 槽）
+        "movq %1, %%rax\n\t"     // 返回值 = v（≠0）
+        "movq 16(%0), %%rbp\n\t"
+        "movq 24(%0), %%rbx\n\t"
+        "movq 32(%0), %%r12\n\t"
+        "movq 40(%0), %%r13\n\t"
+        "movq 48(%0), %%r14\n\t"
+        "movq 56(%0), %%r15\n\t"
+        "ret\n\t"
+        :
+        : "r"(j), "r"((int64_t)v)
+        : "rax", "rbp", "rbx", "r12", "r13", "r14", "r15", "rsp", "memory");
+    __builtin_unreachable();
+}
+struct QotrtLanding
+{
+    QrtJmpBuf jb;
+    QotrtLanding *prev;
+};
+#define QOT_SJ_SET(l) qot_sjmp(&(l)->jb)
+#define QOT_SJ_JMP(l) qot_ljmp(&(l)->jb, 1)
+#else
 struct QotrtLanding
 {
     jmp_buf jb;
     QotrtLanding *prev;
 };
+#define QOT_SJ_SET(l) setjmp((l)->jb)
+#define QOT_SJ_JMP(l) longjmp((l)->jb, 1)
+#endif
 
 #ifdef QOT_RT_SPLIT
 extern QotrtLanding *qotrt_landings;
@@ -1019,6 +1117,7 @@ static V16 qotrt_dict_new()
     d->size = 0;
     d->cap = 8;
     d->mask = 7;
+    d->grow_at = 8 * 5 / 8 - 1;
     d->slots = static_cast<QDictSlot *>(qotrt_xalloc(sizeof(QDictSlot) * 8));
     for (int32_t i = 0; i < 8; i++)
         d->slots[i].h = QD_EMPTY;
@@ -1046,6 +1145,7 @@ static void qotrt_dict_grow(QDict *d, int32_t ncap)
     int32_t ocap = d->cap;
     d->cap = ncap;
     d->mask = ncap - 1;
+    d->grow_at = ncap * 5 / 8 - 1;
     d->size = 0;
     d->slots = static_cast<QDictSlot *>(qotrt_xalloc(sizeof(QDictSlot) * static_cast<size_t>(ncap)));
     for (int32_t i = 0; i < ncap; i++)
@@ -1077,7 +1177,9 @@ static V16 *qotrt_dict_at(QDict *d, const char *k, int32_t klen, uint64_t h)
 {
     // 增长触发线 0.75 → 0.625（M-PERF 收尾探测三连之一）：更稀的表把期望
     // 探测数压下来；rehash 提前 ~17% 触发，摊还成本不变（倍增）。
-    if ((d->size + 1) * 8 >= d->cap * 5)
+    // 【PROMAX-D1】乘法比较换缓存阈值（语义逐位等价：cap 为 2^n 时 cap*5/8
+    // 是整数，原判据 (size+1)*8 >= cap*5 ⇔ size >= cap*5/8 - 1 == grow_at）。
+    if (d->size >= d->grow_at)
         qotrt_dict_grow(d, d->cap * 2);
     int32_t mask = d->mask;
     int32_t step = qotrt_probe_step(h, mask);
@@ -1147,6 +1249,21 @@ static inline uint64_t qotrt_vhash(V16 *v)
     if (q->hash == 0)
         q->hash = qotrt_hash(q->s, static_cast<size_t>(q->len));
     return q->hash; // 哈希缓存：常量键/复用键只算一次（T-33 对齐）
+}
+
+// 【PROMAX-D2】find 的首槽特化（发射点内联展开用）。
+// 判据与 qotrt_dict_find 逐字一致（同 h → 同 i 起点）：只比较首槽。
+//   * 首槽 tag 命中且 keyeq → 值槽指针（负载 0.625 下 ~62% 的查找走这条）；
+//   * 否则返回 nullptr —— 调用方回落完整 qotrt_dict_find 重探（首槽重比一次
+//     ~2ns，只在 miss 分支付）。
+// 与直接给 find 挂 always_inline 的取舍：内联整 find 是 ~40 指令 × 全部调用点
+// （icache 与编译体积代价），首槽特化是 ~12 指令且 miss 分支冷。
+static inline V16 *qotrt_dict_find1(QDict *d, const char *k, int32_t klen, uint64_t h)
+{
+    QDictSlot *sl = &d->slots[static_cast<int32_t>(h & static_cast<uint64_t>(d->mask))];
+    if (sl->h == h && qotrt_slot_keyeq(sl, k, klen))
+        return &sl->v;
+    return nullptr;
 }
 
 // ---------------------------------------------------------------- 字符串化（逐字节对齐 VM）
@@ -1575,7 +1692,7 @@ static void qotrt_throw(V16 v)
     }
     qotrt_thrown = v;
     QotrtLanding *top = qotrt_landings;
-    longjmp(top->jb, 1);
+    QOT_SJ_JMP(top);
 }
 
 // ---- err()/is_err()/err_val() 的内置入口（args/argc 签名，进 builtins.toml）----
@@ -1929,6 +2046,38 @@ static void qotrt_output(V16 *args, int argc)
     }
     else
         std::fputc('\n', stdout);
+}
+
+static V16 qotrt_input(V16 *args, int argc)
+{
+    if (argc > 0)
+    {
+        QBuf p = {nullptr, 0, 0};
+        for (int i = 0; i < argc; i++)
+        {
+            if (i > 0)
+                qbuf_append(&p, " ", 1);
+            qotrt_to_str_value(&args[i], &p);
+        }
+        if (p.p)
+        {
+            std::fputs(p.p, stdout);
+            qotrt_xfree(p.p, p.cap); // 提示串不保留引用
+        }
+        std::fflush(stdout); // 与 Python input(prompt) 同律：提示先落地再等输入
+    }
+    QBuf b = {nullptr, 0, 0};
+    for (;;)
+    {
+        int c = std::fgetc(stdin);
+        if (c == EOF)
+            break; // EOF：已读到的部分行（或空串）直接交付
+        if (c == '\n')
+            break; // 整行到手（'\n' 未入缓冲，无需剥尾；CRLF 已在文本模式归一）
+        char ch = static_cast<char>(c);
+        qbuf_append(&b, &ch, 1);
+    }
+    return qotrt_str_from_qbuf(&b); // 缓冲所有权移交字符串（零拷贝采纳）
 }
 
 static V16 qotrt_push(V16 *args, int argc)
@@ -8979,6 +9128,15 @@ struct QrtFfiSym
 {
     void *fn;      // 函数地址（farproc）
     int32_t lib;   // 所属 lib 槽下标（ffi_free 时按它批量失效）
+    // 【PROMAX-F1】类型数组解析缓存：typed ffi_call 的逐项 prim_bytes +
+    // memcpy + NUL 终结是每次调用的固定税（类型串不变时纯浪费）。键 =
+    // QArr 对象指针 + 元素 QStr 指针串（字符串不可变 ⇒ 指针相同 ⇒ 内容
+    // 相同），比对 8 次指针等价于免全部解析。
+    const QArr *tc_arr;   // 上次的类型数组对象（nullptr = 无缓存）
+    const void *tc_ptrs[9];
+    int32_t tc_n;
+    char tc_codes[9][16];
+    int tc_ret_fam;
 };
 
 struct QrtFfiSymSlot
@@ -9065,6 +9223,10 @@ static int32_t qotrt_ffitab_add(QrtFfiLib *p)
         }
         qotrt_ffitab = nt;
         qotrt_ffitab_cap = nc;
+        // 【P0-FFI-TAB】扩容后必须重置自由链头：新槽 [old_cap, nc) 才是
+        // 空闲区。旧实现漏了这一步 —— qotrt_ffitab_free 仍为 -1，
+        // 下面 table[-1] 越界读写 + 返回句柄 -1（坏句柄）。
+        qotrt_ffitab_free = old_cap;
     }
     int32_t h = qotrt_ffitab_free;
     qotrt_ffitab_free = qotrt_ffitab[h].next_free;
@@ -9110,6 +9272,7 @@ static int32_t qotrt_fsymtab_add(QrtFfiSym *p)
         }
         qotrt_fsymtab = nt;
         qotrt_fsymtab_cap = nc;
+           qotrt_fsymtab_free = old_cap;
     }
     int32_t h = qotrt_fsymtab_free;
     qotrt_fsymtab_free = qotrt_fsymtab[h].next_free;
@@ -9265,6 +9428,9 @@ static V16 qotrt_ffi_sym(V16 *args, int argc)
     QrtFfiSym *s = static_cast<QrtFfiSym *>(qotrt_xalloc(sizeof(QrtFfiSym)));
     s->fn = fn;
     s->lib = 0;
+    s->tc_arr = nullptr;   // PROMAX-F1：缓存空初始化
+    s->tc_n = 0;
+    s->tc_ret_fam = 0;
     // 反查 lib 槽下标（供 ffi_free 批量失效）；找不到 = 野句柄，防御置 -1
     for (int32_t i = 1; i < qotrt_ffitab_cap; i++)
     {
@@ -9468,16 +9634,68 @@ static V16 qotrt_ffi_call_impl(V16 *args, int argc, bool typed)
     int arg_n = 0;
     char codes[9][16];
     const char **tbuf = nullptr;
+    static const char *cache_buf[9]; // 缓存命中时的 tbuf 载体（指向 sym->tc_codes）
     if (typed)
     {
-        int ret_fam = 0;
-        tbuf = qrt_ffi_types(&args[1], &arg_n, codes, 8, &ret_fam);
-        if (!tbuf)
+        // 【PROMAX-F1】缓存命中：类型数组对象 + 元素 QStr 指针串全等
+        //（字符串不可变 ⇒ 内容必然相同）→ 复用上次解析，免逐项
+        // prim_bytes/memcpy/NUL 终结。未命中回落原解析并回填缓存。
+        bool hit = false;
+        if (args[1].t == VT_ARR)
         {
-            qotrt_ffi_seterr("ffi_call_v: bad types array");
-            return qotrt_null_v();
+            QArr *ta = static_cast<QArr *>(args[1].u.p);
+            int32_t tn = ta ? ta->len : 0;
+            if (sym->tc_arr == ta && sym->tc_n == tn && tn >= 1 && tn <= 9)
+            {
+                hit = true;
+                for (int32_t i = 0; i < tn; i++)
+                {
+                    if (ta->a[i].t != VT_STR || ta->a[i].u.p != sym->tc_ptrs[i])
+                    {
+                        hit = false;
+                        break;
+                    }
+                }
+                if (hit)
+                {
+                    arg_n = sym->tc_n - 1;
+                    for (int32_t i = 0; i < sym->tc_n; i++)
+                        cache_buf[i] = sym->tc_codes[i];
+                    tbuf = cache_buf;
+                    ret_code = tbuf[0];
+                }
+            }
         }
-        ret_code = tbuf[0];
+        if (!hit)
+        {
+            int ret_fam = 0;
+            tbuf = qrt_ffi_types(&args[1], &arg_n, codes, 8, &ret_fam);
+            if (!tbuf)
+            {
+                qotrt_ffi_seterr("ffi_call_v: bad types array");
+                return qotrt_null_v();
+            }
+            ret_code = tbuf[0];
+            // 回填缓存（只在全部元素是 STR 时建立——prim_bytes 对非 STR 的
+            // 数字化视图无法用指针等价追踪）
+            if (args[1].t == VT_ARR)
+            {
+                QArr *ta = static_cast<QArr *>(args[1].u.p);
+                int32_t tn = ta ? ta->len : 0;
+                bool fillable = (tn >= 1 && tn <= 9);
+                for (int32_t i = 0; fillable && i < tn; i++)
+                    fillable = (ta->a[i].t == VT_STR);
+                if (fillable)
+                {
+                    sym->tc_arr = ta;
+                    sym->tc_n = tn;
+                    for (int32_t i = 0; i < tn; i++)
+                        sym->tc_ptrs[i] = ta->a[i].u.p;
+                    std::memcpy(sym->tc_codes, codes, sizeof(codes));
+                    sym->tc_ret_fam = ret_fam;
+                }
+            }
+        }
     }
     // 实参数组
     V16 *arrv = &args[typed ? 2 : 1];
@@ -11169,4 +11387,73 @@ static V16 qotrt_socket_udp_recv(V16 *args, int argc)
     q->s = buf;
     buf[n] = 0;
     return qrt_str_v(q);
+}
+
+// 【PROMAX-NET】select 多路复用：句柄数组 + 超时 ms → 就绪句柄数组。
+// 读就绪面（accept/可读/对端关闭全算就绪——关闭由后续 recv 的 "" 判定，
+// 与 recv 的 EOF 契约闭合）。v0 契约：
+//   * 入参非数组/超时非法 → null；句柄集中非法项跳过（不炸）；
+//   * 就绪数组是新数组（入参不变）；超时/错误 → 空数组（语义：无就绪，
+//     与"错误"不可区分——调用方拿 recv 结果判定真伪）；
+//   * 句柄数上限 FD_SETSIZE-1（Windows 63 / POSIX 1023），超限忽略
+//     （std.net 的 http_server v0 按 63 并发设计，超出走排队）。
+static V16 qotrt_socket_select(V16 *args, int argc)
+{
+    (void)argc;
+    if (args[0].t != VT_ARR)
+        return qotrt_null_v();
+    bool okn;
+    int64_t ms = qotrt_prim_i64(&args[1], &okn);
+    if (!okn || ms < 0)
+        ms = 0;
+    if (!qotrt_net_init())
+        return qotrt_null_v();
+    QArr *in = static_cast<QArr *>(args[0].u.p);
+    int32_t n = in ? in->len : 0;
+    fd_set rs;
+    FD_ZERO(&rs);
+    int nfds = 0, count = 0;
+    for (int32_t i = 0; i < n && count < FD_SETSIZE - 1; i++)
+    {
+        QrtSock *p = qotrt_sock_of(&in->a[i]);
+        if (!p)
+            continue;
+#if defined(_WIN32)
+        FD_SET(p->fd, &rs);
+#else
+        FD_SET(static_cast<int>(p->fd), &rs);
+        if (static_cast<int>(p->fd) + 1 > nfds)
+            nfds = static_cast<int>(p->fd) + 1;
+#endif
+        count++;
+    }
+    if (count == 0)
+        return qotrt_arr_new(0);
+    timeval tv;
+    tv.tv_sec = static_cast<long>(ms / 1000);
+    tv.tv_usec = static_cast<long>((ms % 1000) * 1000);
+    int r = ::select(
+#if defined(_WIN32)
+        0,
+#else
+        nfds,
+#endif
+        &rs, nullptr, nullptr, &tv);
+    if (r <= 0)
+        return qotrt_arr_new(0); // 超时/错误 → 空集（调用方语义上无就绪）
+    V16 out = qotrt_arr_new(static_cast<int32_t>(r));
+    QArr *a = static_cast<QArr *>(out.u.p);
+    for (int32_t i = 0; i < n; i++)
+    {
+        QrtSock *p = qotrt_sock_of(&in->a[i]);
+        if (!p)
+            continue;
+#if defined(_WIN32)
+        if (FD_ISSET(p->fd, &rs))
+#else
+        if (FD_ISSET(static_cast<int>(p->fd), &rs))
+#endif
+            qotrt_arr_push(a, qotrt_num(in->a[i].u.d)); // 原句柄值直通
+    }
+    return out;
 }

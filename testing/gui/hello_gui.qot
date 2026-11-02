@@ -1,21 +1,4 @@
-// ===========================================================================
-// hello_gui.qot —— GUI 可用性验证小工具
-//
-// 给 Python 初学者的对照表（左 = tkinter, 右 = QOT）：
-//   tk.Tk()                    对应  vg_create_window(标题, 宽, 高)
-//   root.title("...")          对应  vg_set_window_title(w, "...")
-//   tk.Label(root, text=...)   对应  vg_create_label(w, 文本, x, y, 宽, 高)
-//   tk.Entry(root)             对应  vg_create_textbox(w, 占位文本, x, y, 宽, 高)
-//   entry.get()                对应  vg_textbox_get_text(id)
-//   tk.Button(command=回调)     对应  vg_create_button(w, 文本, x, y, 宽, 高)
-//   label.config(text="...")   对应  vg_label_set_text(id, "...")
-//   root.mainloop()            对应  loop { vg_wait_event(15) ... }
-//   root.destroy()             对应  vg_close_window(w)
-//
-// 与 tkinter 的唯一差别：tkinter 的 command= 是"按钮被点时帮你调函数"，
-// QOT 把同一件事写成主循环里的显式分派：事件 [控件id, kind, value]，
-// kind 1 = 点击。两个引擎（解释器 / 原生 exe）行为逐位一致。
-// ===========================================================================
+// hello_gui.qot —— GUI 可用性验证
 
 var w = vg_create_window("你好 · GUI", 520, 340);
 vg_set_window_bg_gradient(w, [0.06, 0.06, 0.13, 1], [0.11, 0.09, 0.2, 1]);
@@ -71,7 +54,4 @@ loop (running == 1) {
         }
     }
 }
-
-// 关窗后的控制台报告：同时验证 output 与 GUI 共存
 output("hello-gui-ok events=" + events + " greets=" + greets);
-

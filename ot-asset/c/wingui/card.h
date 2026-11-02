@@ -28,6 +28,13 @@ public:
     bool HandleMouseUp(const Point& mousePos, int button) override;
     
     void SetOnClick(std::function<void()> callback) { m_clickCallback = callback; }
+
+    // v4：状态位（hover 补充基类 disabled）
+    unsigned StyleFlags() const override {
+        unsigned f = UIComponent::StyleFlags();
+        if (m_isHovered) f |= 0x1;
+        return f;
+    }
     
 private:
     void DrawShadow(Renderer* renderer);
@@ -114,45 +121,62 @@ inline void Card::DrawShadow(Renderer* renderer) {
 
 inline void Card::Draw(Renderer* renderer) {
     if (!m_visible || !renderer) return;
-    
-    DrawShadow(renderer);
-    
-    
+
+    unsigned flags = StyleFlags();
     float width = m_bounds.Width();
     float height = m_bounds.Height();
     float centerX = (m_bounds.left + m_bounds.right) / 2;
     float centerY = (m_bounds.top + m_bounds.bottom) / 2;
     float scaledWidth = width * m_currentHoverScale;
     float scaledHeight = height * m_currentHoverScale;
-    
+
     Rect adjustedBounds(
         centerX - scaledWidth / 2,
         centerY - scaledHeight / 2,
         centerX + scaledWidth / 2,
         centerY + scaledHeight / 2
     );
-    
-    RoundedRect cardRect;
-    cardRect.rect = adjustedBounds;
-    cardRect.radiusX = m_borderRadius;
-    cardRect.radiusY = m_borderRadius;
-    
-    renderer->FillRoundedRect(cardRect, m_backgroundColor);
-    renderer->DrawRoundedRect(cardRect, m_borderColor, 1.5f);
-    
-    
-    Rect titleRect = adjustedBounds;
-    titleRect.top += 20;
-    titleRect.bottom = titleRect.top + 30;
-    renderer->DrawText(m_title, titleRect, Color(1, 1, 1, 0.95f), 18.0f, true, true);
-    
-    
-    Rect subtitleRect = adjustedBounds;
-    subtitleRect.top += 55;
-    subtitleRect.bottom = subtitleRect.top + 25;
-    renderer->DrawText(m_subtitle, subtitleRect, Color(0.7f, 0.7f, 0.85f, 0.8f), 12.0f, false, true);
-    
-    
+
+    if (m_paintFn) {
+        // v4：owner-draw 接管卡片面绘制（阴影与子组件照常——容器语义保留：
+        // 回调只负责画卡片本身的内容，children 在回调返回后照常绘制）
+        gui::Rect save = m_bounds;
+        // 回调期间以卡片 adjustedBounds 为本地原点
+        m_bounds = adjustedBounds;
+        m_paintFn(renderer, adjustedBounds.Width(), adjustedBounds.Height(), flags);
+        m_bounds = save;
+    } else {
+        DrawShadow(renderer);
+
+        RoundedRect cardRect;
+        cardRect.rect = adjustedBounds;
+        cardRect.radiusX = m_style.radiusSet ? m_style.radius : m_borderRadius;
+        cardRect.radiusY = cardRect.radiusX;
+
+        Color bg;
+        if (!ResolvedStateBg(flags, bg)) bg = m_backgroundColor;
+        if (m_style.bgGradSet) {
+            renderer->FillRoundedRectGradient(cardRect, m_style.bgGrad1, m_style.bgGrad2,
+                                              m_style.bgGradVertical != 0);
+        } else {
+            renderer->FillRoundedRect(cardRect, bg);
+        }
+        Color bc = m_style.borderSet ? m_style.borderColor : m_borderColor;
+        renderer->DrawRoundedRect(cardRect, bc, m_style.borderSet ? m_style.borderWidth : 1.5f);
+
+        Rect titleRect = adjustedBounds;
+        titleRect.top += 20;
+        titleRect.bottom = titleRect.top + 30;
+        Color tc;
+        if (!ResolvedStateText(flags, tc)) tc = Color(1, 1, 1, 0.95f);
+        renderer->DrawText(m_title, titleRect, tc, 18.0f, true, true);
+
+        Rect subtitleRect = adjustedBounds;
+        subtitleRect.top += 55;
+        subtitleRect.bottom = subtitleRect.top + 25;
+        renderer->DrawText(m_subtitle, subtitleRect, Color(0.7f, 0.7f, 0.85f, 0.8f), 12.0f, false, true);
+    }
+
     for (auto& child : m_children) {
         child->Draw(renderer);
     }

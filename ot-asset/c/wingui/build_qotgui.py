@@ -20,8 +20,12 @@ OUT_DIR = os.path.join(ROOT, 'build')
 
 # wingui 是 header-only；只有这几个 .cpp 需要编译
 SRCS = ['qotgui_abi.cpp', 'modern_window.cpp', 'renderer.cpp']
+# v2：DComp 渲染栈（d3d11/dxgi）+ DWM 窗口原语（dwmapi）+ WIC 图片（windowscodecs）
+# v3：+ shell32（文件拖放 DragAcceptFiles 系列）
+# dcomp.dll 动态解析（老系统无此库也能回退运行），不进导入表
 LIBS = ['-ld2d1', '-ldwrite', '-lole32', '-luuid', '-lcomctl32', '-limm32',
-        '-lgdi32', '-luser32']
+        '-lgdi32', '-luser32', '-ld3d11', '-ldxgi', '-ldwmapi',
+        '-lwindowscodecs', '-lshell32']
 
 
 def main():
@@ -49,8 +53,11 @@ def main():
         return 0
 
     dll = args.out or os.path.join(OUT_DIR, 'qotgui.dll')
-    cmd = ['g++', '-shared', '-o', dll] + objs + LIBS + ['-Wl,--out-implib',
-                                                         os.path.join(OUT_DIR, 'libqotgui.a')]
+    # MinGW 运行时全静态链入（libgcc/libstdc++/winpthread）：宿主进程
+    # （Python/用户 exe）没有 MinGW 环境时 DLL 也能独立装载，杜绝
+    # 依赖缺失与多版本运行时混装崩溃。系统库（user32/d2d1…）仍走导入表。
+    cmd = ['g++', '-shared', '-o', dll, '-static'] \
+        + objs + LIBS + ['-Wl,--out-implib', os.path.join(OUT_DIR, 'libqotgui.a')]
     print('[ld ]', ' '.join(cmd))
     r = subprocess.run(cmd)
     if r.returncode != 0:

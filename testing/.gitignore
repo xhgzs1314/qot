@@ -8,5 +8,5 @@ __pycache__/
 *.pyc
 .pytest_cache/
 
-# 性能报告（除非显式要留档）
+# 性能报告
 perf/report-*.md

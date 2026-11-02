@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""qot pkg —— 包格式与构建流水线（M6 · 0）。
+"""qot pkg —— 包格式与构建流水线
 
 包 = 目录 + `qot.pkg` 清单（TOML，qot_toml 解析）：
 
@@ -20,15 +20,6 @@
                            再 AOT 编译 entry → <pkg>/build/<name>.exe
   * run   <dir> [-- args]  build（增量）后运行产物；**cwd = 包目录**（插件与
                            数据的相对路径稳定）；args 透传（args_get 口径）
-
-验收（ M6）：从拿到包目录到跑起来 = **一条命令**
-（`python index.py pkg run <dir>`）。dll 输出说明：VM 弃管后嵌入单元 = 独立
-exe（宿主经 proc_spawn/FFI 调用）；AOT 管线的 -shared dll 形态等真实需求
-触发（宪法 7），已在 roadmap 登记，不在本命令面假装支持。
-
-设计边界（登记）：不做依赖解析/锁文件/中心仓库（M6 范围 = 本地包流水线；
-.qot require 的编译期内联已由 F0 覆盖"库复用"面）；插件清单只做**构建编排**
-（调用面仍是 plugin_load，M7 冻结 ABI 不因清单增加名字空间语义）。
 """
 import os
 import shutil

@@ -38,7 +38,7 @@ QOT 是一款简洁易用的解释型脚本语言，设计目标是降低编程�
 
 -  动态类型系统，兼顾灵活性与语义检查
 
--  内置图形界面（`vg_*` 约 70 个函数，Direct2D 渲染，解释器与原生程序双实现），见 [GUI 手册](plugin/gui_manual.html)
+-  内置图形界面（`vg_*` 约 130 个函数，DirectComposition + Direct2D 渲染，事件回调 + 绘制原语，解释器与原生程序双实现），见 [vgui 手册](plugin/vgui-extension.html)
 -  类与对象模型、协议元语（运算符/迭代/输出的编译期绑定）、编译期宏（`macro` + `name!()`）
 
 # 快速开始
@@ -140,7 +140,8 @@ qguoat hdps
 | [plugin/objects.html](plugin/objects.html) | 类与对象 |
 | [plugin/protocols.html](plugin/protocols.html) | 协议元语 |
 | [plugin/macros.html](plugin/macros.html) | 编译期宏 |
-| [plugin/gui_manual.html](plugin/gui_manual.html) | GUI 开发手册 |
+| [plugin/vgui-extension.html](plugin/vgui-extension.html) | vgui 手册（`vg_*` 官方 GUI：渲染栈、事件回调、绘制原语） |
+| [plugin/gui_manual.html](plugin/gui_manual.html) | 轻量 Tk 窗口（`window_*`）手册 |
 
 # 项目结构
 
@@ -1620,7 +1621,7 @@ var wide_str = L"宽字符串";
 qguoat run program.qot
 ```
 
-直接解释执行 `.qot` 源文件。启动快，适合改一行看一眼；但执行慢，而且**不支持 `vg_*` GUI**。
+直接解释执行 `.qot` 源文件。启动快，适合改一行看一眼；执行慢。`vg_*` 图形界面可用（经 `build/qotgui.dll`）。
 
 `--console` 把脚本输出转到网页运行台 `localhost:8000`：
 
@@ -1695,7 +1696,7 @@ qguoat run script.qbc
 
 要性能用 QTC，要藏源码用 QBC。QBC 不会让程序变快。
 
-### 13.5 包模式（`pkg`，M6）
+### 13.5 包模式（`pkg`）
 
 一个"包" = 目录 + `qot.pkg` 清单。拿到别人的包目录后，**一条命令**跑起来：
 
@@ -2528,7 +2529,7 @@ output(x);
 
 | 集合 | 数量 | 说明 |
 | --- | --- | --- |
-| 解释器 + 原生程序都有 | 340 | 放心用（含全部 `vg_*` GUI 函数） |
+| 解释器 + 原生程序都有 | 396 | 放心用（含全部 `vg_*` GUI 函数） |
 | 仅解释器 | 59 | 写进原生程序会在编译期报错；ShellCode、部分系统调用属于这一类 |
 | 仅原生程序 | 3 | 原生后端专有 |
 | 含旧字节码 VM | 47 | 冻结的历史面（两条活跃路径多数也可用）；纯 VM 专属的 5 个两条活跃路径都不可用 |
@@ -2537,82 +2538,140 @@ output(x);
 
 ## 22. 图形界面
 
-QOT 的官方图形界面是 **`vg_*` 系列（约 70 个函数，Direct2D 渲染）**，在
+QOT 的官方图形界面是 **`vg_*` 系列（约 130 个函数，DirectComposition + Direct2D 渲染）**，在
 解释器与原生程序上**双实现**：同一份 C++ 源（`ot-asset/c/wingui`），
 解释器经 `build/qotgui.dll` 驱动，原生程序编译期直接链接——行为由同一份
 代码保证一致。控件覆盖：窗口、标签、按钮、复选框、开关、输入框、滑块、
-进度条、卡片、下拉、列表、选项卡、加载指示。
+进度条、卡片、下拉、列表、选项卡、加载指示、画布（自由绘制）、图片。
+
+设计哲学：**框架只提供原语，不封装效果**。毛玻璃 = 透明窗口 + 半透明背景 +
+backdrop 原语自由组合；流畅动画 = `vg_on_frame` + `vg_easing` 自己写；
+精致视觉 = `vg_draw_*` 绘制原语（渐变/裁剪/变换/模糊/图片）自由作画。
+上限在开发者手里，不在框架里。
 
 | API | 函数数 | 可用环境 | 说明 |
 | --- | --- | --- | --- |
-| `vg_*` | 约 70 | **解释器 + 原生程序** | 官方 GUI（wingui / Direct2D） |
+| `vg_*` | 约 130 | **解释器 + 原生程序** | 官方 GUI（wingui / DComp + Direct2D） |
 | `window_*` | 14 | 解释器 | 轻量 Tk 窗口，适合极简脚本 |
 
-### 22.1 事件模型：轮询（vg_wait_event / vg_poll_event）
+### 22.1 事件模型：回调为主，轮询兼容（v2 双通道）
 
-按钮"回调"在 QOT 里是主循环的显式事件分派：
+**回调绑定**（推荐）：`vg_on_click(id, fn)` 一行绑定，事件触发时由消息循环
+线程反向调用 QOT 闭包——外部语言从此不必轮询：
 
 ```
 var w = vg_create_window("演示", 520, 340);
 var box = vg_create_textbox(w, "在这里输入名字...", 40, 104, 300, 34);
 var btn = vg_create_button(w, "打招呼", 40, 152, 140, 42);
 var result = vg_create_label(w, "结果会显示在这里", 40, 216, 440, 28);
-vg_show_window(w);
 
-var running = 1;
-loop (running == 1) {
-    var ev = vg_wait_event(15);          // 泵消息；空闲近零 CPU
-    if (ev == null) {
-        continue;                        // 超时无事件，下一轮
-    }
-    var id = ev[0];
-    var kind = ev[1];                    // 1 点击 / 2 改变 / 3 选中 / 9 窗口已关闭
-    if (kind == 1 && id == btn) {
-        var name = vg_textbox_get_text(box);
-        vg_label_set_text(result, "你好, " + name + "！");
-    }
-    if (kind == 9) {
-        running = 0;                     // 窗口被 X 掉 → 退出主循环
-    }
+any_t func say_hello(id, value, x, y) {
+    var name = vg_textbox_get_text(box);
+    vg_label_set_text(result, "你好, " + name + "！");
 }
+
+vg_on_click(btn, func(id, value, x, y) -> say_hello(id, value, x, y));
+vg_on_close(w, func(id, value, x, y) -> 0);
+
+vg_show_window(w);
+vg_run();        // 控制权交给消息循环，全部窗口关闭后返回
 ```
 
-`vg_wait_event(ms)` 内部泵 Windows 消息并把控件事件排队，事件延迟 ≤1ms、
-空闲 CPU 近零；`vg_poll_event()` 是它的非阻塞版。**为什么不做成
-`command=函数` 那样的回调**：C 实现层无法反向调用各引擎的函数值，轮询让
-解释器与原生程序天然同语义。
+回调统一签名 `fn(id, value, x, y)`；QOT 里函数值用 lambda 单表达式
+`func(...) -> ...` 传递（可委托命名函数做多语句逻辑）。**注意**：回调体内
+更新跨函数可见的计数要用引用类型（数组下标 / `arr_push`）——解释器侧
+函数内对全局名字赋值是丢弃的（见 [21.2](#212-语义差异)）。
 
-### 22.2 完整可运行示例
+**轮询**（v1 兼容保留，与回调可并存）：`vg_wait_event(ms)` 内部泵 Windows
+消息并把事件排队，事件延迟 ≤1ms、空闲 CPU 近零；`vg_poll_event()` 是它的
+非阻塞版。老的轮询主循环代码不用改一行。
 
-`testing/gui/hello_gui.qot`——输入名字 → 点「打招呼」→ 显示问候（这就是
-tkinter 初学者第一课的 QOT 版，源码头部带 tkinter ↔ QOT 逐行对照表）。
-两种跑法：
+事件 kind 全集（两侧一致，见 `ot-asset/c/wingui/qotgui_abi.h`）：
+1 点击 / 2 改变 / 3 选中 / 8 动画完成 / 9 全关 / 10-15 鼠标（按下·抬起·
+移动·进入·离开·双击）/ 16 滚动（v3，value=偏移，滚轮·拖拽·编程滚动统一
+触发）/ 20 键按下 / 21 字符 / 22 文本实时改变 / 30 关闭
+请求 / 31 尺寸 / 32 焦点 / 33 失焦 / 40 载入 / 50 菜单命令（v3，value=选中
+项 id，0=取消）/ 51 拖放文件（v3，value=文件数，x/y=落点客户坐标；路径经
+`vg_take_drop_file(i)` 在回调内立刻取）。
+
+### 22.2 生命周期与帧原语
 
 ```
-python index.py run testing/gui/hello_gui.qot      # 解释器（需先构建 build/qotgui.dll）
-python index.py aot testing/gui/hello_gui.qot hello.exe   # 原生程序
+vg_on_load(w, func(id, value, x, y) -> setup());    // 窗口首次显示
+vg_on_close(w, func(id, value, x, y) -> 0);         // 关闭请求（配 vg_prevent_close 可否决）
+vg_on_resize(w, func(id, value, x, y) -> 0);        // x/y = 新客户区宽高
+
+var token = vg_on_frame(func(dt) -> tick(dt));      // 每帧回调（rAF 模型）
+// tick 里调 vg_request_frame() 续下一帧；不请求即自然停帧，零空转
 ```
 
-`build/qotgui.dll` 由 `python ot-asset/c/wingui/build_qotgui.py` 构建。
+### 22.3 完整可运行示例
 
-### 22.3 vg_* 函数速查
+`testing/gui/hello_gui.qot`——轮询范式的 tkinter 初学者第一课；
+`testing/gui/callback_smoke.qot`——v2 全回调驱动 + 帧原语 + Canvas 绘制原语
+（30 帧后自动关窗，无人值守可跑）。两种跑法：
+
+```
+python index.py run testing/gui/callback_smoke.qot          # 解释器（需先构建 build/qotgui.dll）
+python index.py aot testing/gui/callback_smoke.qot hello.exe  # 原生程序
+```
+
+`build/qotgui.dll` 由 `python ot-asset/c/wingui/build_qotgui.py` 构建
+（全静态链接，宿主不需要 MinGW 运行时）。
+
+### 22.4 vg_* 函数速查
 
 常用子集（完整清单见 [内置函数参考](plugin/function_inside.html)，按 GUI 组过滤）：
 
 | 类别 | 函数 |
 | --- | --- |
-| 窗口 | `vg_create_window` / `vg_show_window` / `vg_close_window` / `vg_run`（阻塞式消息循环） / `vg_set_window_title` / `vg_set_window_size` / `vg_set_window_bg_gradient` |
-| 创建 | `vg_create_label / _button / _checkbox / _toggle / _textbox / _slider / _progressbar / _card / _combobox / _listbox / _tabcontrol / _spinner` |
-| 通用 | `vg_set_position` / `vg_set_size` / `vg_set_visible` / `vg_set_enabled` / `vg_destroy` |
+| 窗口 | `vg_create_window` / `vg_show_window` / `vg_close_window` / `vg_run`（阻塞式消息循环） / `vg_set_window_title` / `vg_set_window_size` / `vg_set_window_bg_gradient` / `vg_set_window_bg_rgba`（带透明度） |
+| 创建 | `vg_create_label / _button / _checkbox / _toggle / _textbox / _slider / _progressbar / _card / _combobox / _listbox / _tabcontrol / _spinner / _canvas / _image` |
+| 通用 | `vg_set_position` / `vg_set_size` / `vg_set_visible` / `vg_set_enabled` / `vg_set_opacity`（组件透明度） / `vg_destroy` |
 | 文字 | `vg_button_set_text` / `vg_label_set_text` / `vg_card_set_title` / `vg_textbox_get_text` / `vg_textbox_set_placeholder` / `vg_label_set_font_size` |
 | 状态 | `vg_slider_get_value` / `vg_checkbox_get_checked` / `vg_combobox_get_selected` / `vg_listbox_get_selected`（及对应 set） |
 | 外观 | `vg_button_set_color` / `vg_button_set_text_color` / `vg_label_set_text_color` / `vg_button_set_border_radius` / `vg_card_set_bg_color` |
-| 事件 | `vg_wait_event(ms)` / `vg_poll_event()` |
+| 事件回调 | `vg_bind(id, mask, fn)` / `vg_on_click` / `vg_on_change` / `vg_on_select` / `vg_on_mouse` / `vg_on_key` / `vg_on_text` / `vg_on_close` / `vg_on_resize` / `vg_on_load` / `vg_unbind(token)` |
+| 轮询（兼容） | `vg_wait_event(ms)` / `vg_poll_event()` |
+| 帧与动画 | `vg_on_frame(fn)` / `vg_off_frame` / `vg_request_frame` / `vg_easing(t, kind)`（12 种缓动纯函数）/ `vg_animate(id, prop, from, to, ms, easing)` / `vg_animate_stop` |
+| 窗口原语 | `vg_window_transparent` / `vg_window_backdrop` / `vg_set_window_round` / `vg_set_window_borderless` / `vg_set_window_topmost` / `vg_prevent_close` / `vg_window_drag` / `vg_window_minimize / _maximize / _restore` / `vg_set_theme` / `vg_set_font` |
+| 画布绘制 | `vg_canvas_on_draw(id, fn)` + `vg_draw_fill_rect / _stroke_rect / _fill_round_rect / _stroke_round_rect / _fill_ellipse / _stroke_ellipse / _line / _text / _measure_text / _gradient_rect` |
+| 绘制进阶 | `vg_draw_push_clip / _pop_clip` / `vg_draw_push_translate / _push_rotate / _push_scale / _pop_transform` / `vg_draw_push_blur / _pop_blur` / `vg_draw_image` |
+| 图片资源 | `vg_image_load(path)` / `vg_image_size` / `vg_image_free` / `vg_create_image(win, path, ...)` |
 
-**注意**：事件循环未运行期间（比如在 `vg_run()` 之后的代码）界面不会有响应；
-所有 UI 搭建和 `vg_wait_event` 主循环请按 22.1 的骨架来。
+**其它**（布局/滚动/模态/富文本/系统集成；kind16 滚动、50 菜单、51 拖放，掩码 0x80000 / 0x100000 / 0x200000）：
 
-### 22.4 window_*（解释器可用，轻量替代）
+| 类别 | 函数 |
+| --- | --- |
+| 布局 | `vg_layout_begin(win, "vbox"\|"hbox"\|"grid"\|"absolute")` / `vg_layout_add(win, id)`（登记即快照自然尺寸）/ `vg_layout_spacing(win, n)` / `vg_layout_padding(win, all \| lr,tb \| l,t,r,b)` / `vg_layout_cols(win, n)`（网格列数）/ `vg_layout_props(id, margin, fill, align, weight)`（fill 0 自然 1 交叉轴拉伸 2 全拉伸；align 0起1中2末；weight 主轴伸展权重）/ `vg_layout_end(win)`（立即重排；此后 resize 自动重排）/ `vg_get_pos(id)` / `vg_get_size(id)` / `vg_window_client_size(win)` |
+| 滚动容器 | `vg_create_scrollpane(win, x, y, w, h)` / `vg_scroll_content(id, content_h)` / `vg_scroll_attach(sp, id, x, y, w, h)`（坐标=内容坐标）/ `vg_scroll_offset(id)` / `vg_scroll_to(id, offset)`；滚轮/拖拽/编程滚动统一发 kind=16（value=偏移） |
+| 虚拟化列表 | `vg_create_vlist(win, x, y, w, h)` / `vg_list_set_count(id, n)` / `vg_list_on_data(id, fn)`（fn(row)→文本，零拷贝）/ `vg_list_add_item(id, text)`（数组模式）/ `vg_list_draw_count(id)`（虚拟化自证：只随可视区增长） |
+| 模态对话框 | `vg_show_dialog(win, parent)` → 结果码（阻塞至关闭，父窗冻结）/ `vg_set_dialog_result(win, code)`（回调内设置）；嵌套天然支持 |
+| 菜单 | `vg_create_menu()` / `vg_menu_add_item(mid, text)` → 项 id / `vg_menu_separator(mid)` / `vg_menu_popup(mid, win, x, y)` → 选中项 id（同步，0=取消；并发 kind=50）/ `vg_menu_destroy(mid)` |
+| 轻提示 | `vg_toast(win, text[, ms=2200])`（底部居中卡片自动淡出，不挡输入） |
+| 富文本 | `vg_draw_text_ex(text, x, y, w, h, size, color, bold, halign, valign[, wrap[, ellipsis]])`（对齐 0起1中2末；Canvas 回调期间可用）/ `vg_draw_measure_text_ex(text, size[, bold[, wrap[, maxw]]])` → [w, h]（wrap 返回换行后实际宽高，布局量行高用） |
+| 系统集成 | `vg_clipboard_set(text)` / `vg_clipboard_get()` / `vg_window_accept_files(win, on)`（kind=51，value=文件数，x/y=落点）/ `vg_take_drop_file(i)`（回调里立刻取）/ `vg_taskbar_progress(win, done, total)` / `vg_taskbar_state(win, state)`（0无 1不确定 2正常 3错误 4暂停） |
+
+**v3 帧驱动**：动画/帧请求活跃期间自动提升系统定时器分辨率（winmm
+`timeBeginPeriod`，动态解析），WM_TIMER 心跳 8ms —— 高频动画帧率由 vsync
+主导（≈60fps），空闲自动还原。实测：800×600 + 40 控件 + 每帧 400 图元的
+Canvas 动画稳定 60fps（修正前 34fps，瓶颈是节拍不是重绘）。
+
+（样式原语 + 绘制接管——组件外观全面可定制；颜色一律 `[r,g,b,a]` 0~1）：
+
+| 类别 | 函数 |
+| --- | --- |
+| 样式叠加 | `vg_style_bg(id, color)` / `vg_style_bg_gradient(id, c1, c2[, vertical])` / `vg_style_border(id, color, width)` / `vg_style_radius(id, r)` / `vg_style_padding(id, l, t, r, b)` / `vg_style_text(id, color, size[, bold])` / `vg_style_reset(id)`；未设置的属性走组件默认（零定制 = 外观不变） |
+| 状态样式 | `vg_style_state_bg(id, which, color)` / `vg_style_state_text(id, which, color)`；which：1 悬停 2 按下 3 禁用 4 焦点（命中优先级 禁用>按下>焦点>悬停） |
+| 绘制接管 | `vg_on_paint(id, fn)`：注册后组件默认绘制整体被替换，每帧调 `fn(w, h, state)`——回调里用 `vg_draw_*` 原语自由作画（坐标 = 组件本地原点）；输入语义（点击/拖拽/滚轮）不变；`state` 位 0x1 悬停 0x2 按下 0x4 禁用 0x8 焦点；容器类（卡片/滚动区/虚拟列表）不支持接管 |
+| 状态查询 | `vg_style_flags(id)` → 状态位数值 |
+| 部件样式 | `vg_toast_style(win, bg, text, border, radius)` / `vg_scroll_style(id, track, thumb, width)`（滚动条）/ `vg_menu_bg(mid, color)` + `vg_menu_hover_bg` + `vg_menu_text_color` + `vg_menu_border(mid, color, width)`（**菜单 v4 起为自绘 popup**：无边框合成窗口，样式可定制，支持键盘 ↑↓/Enter/ESC 与失焦取消） |
+
+**注意**：`vg_run()` 是回调模式的主入口（绑定后调用它，控制权交给消息
+循环）；轮询模式按 `loop { vg_wait_event(15) ... }` 骨架来。两者不要混在
+同一窗口上同时使用主循环。
+
+### 22.5 window_*（解释器可用，轻量替代）
 
 | 函数 | 作用 |
 | --- | --- |
@@ -2649,14 +2708,14 @@ window_loop(win);
 **注意**：GUI 函数只在解释器侧可用，编译成原生程序会在编译期报「该内置在原生后端缺席」。
 事件回调里要改的变量请声明在**顶层**（解释器里函数内写全局变量不生效，见 [21.2](#212-语义差异)）。
 
-### 22.5 附录：vg_* 详细参考（旧版手册）
+### 22.6 附录：vg_* 详细参考（旧版手册）
 
 以下小节来自旧版手册的详细说明。**过时之处**：事件模型已改为轮询
 （`vg_wait_event` / `vg_poll_event`，见 22.1），旧 `*_on_*` 回调注册函数
 已移除；实现也不再依赖旧字节码 VM（现为 wingui，双引擎同源）。创建、
 属性、取值等函数形态仍然适用，可作速查。
 
-### 22.6 附录 A：旧版事件绑定（`*_on_*` 已移除，历史参考）
+### 22.7 附录 A：旧版事件绑定（`*_on_*` 已移除，历史参考）
 
 旧实现支持 `*_on_*` 回调注册的四种写法（前三种可混用）。**这套函数已从
 API 移除**，现行事件模型见 22.1——本节仅作历史参考。
@@ -2740,7 +2799,7 @@ vg_combobox_on_selected(cb, pick);
 
 **形参个数请照着上表写全**，不要指望「少写几个就只收前几个」。
 
-### 22.7 附录 B：函数总表（旧版 62 个形态；现行清单以[内置函数参考](plugin/function_inside.html)的 GUI 组为准）
+### 22.8 附录 B：函数总表（旧版 62 个形态；现行清单以[内置函数参考](plugin/function_inside.html)的 GUI 组为准）
 
 #### 生命周期与窗口
 
@@ -2848,7 +2907,7 @@ vg_combobox_on_selected(cb, pick);
 
 ⚠ `vg_tabcontrol` **没有**切换事件回调，也没有 `get_selected`。
 
-### 22.8 附录 C：一个完整例子（旧版形态，事件部分需按 22.1 改写）
+### 22.9 附录 C：一个完整例子（旧版形态，事件部分需按 22.1 改写）
 
 ```
 var win;
@@ -2894,7 +2953,7 @@ vg_run();
 vg_uninit();
 ```
 
-### 22.9 附录 D：注意事项（旧版要点，现行实现基本沿用）
+### 22.10 附录 D：注意事项（旧版要点，现行实现基本沿用）
 
 - **返回值是 ID 字符串**，不是对象；`vg_*` 函数失败时**只返回 `false`，不报错**，控件没反应先查 ID 传对没有
 - **窗口类函数不收窗口 ID**（`vg_show_window` / `vg_close_window` / `vg_set_window_*`），多传一个 `win` 会把真参数挤掉

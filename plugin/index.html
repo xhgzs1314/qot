@@ -3,213 +3,319 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>QOT 文档中心</title>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap"
-        rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="assets/unified.css">
+    <link rel="stylesheet" href="assets/qdoc.css">
     <style>
-        .plugins-grid {
-            padding: 2rem;
-            background: var(--ifm-background-color);
+        html,
+        body {
             height: 100%;
-            overflow-y: auto;
-        }
-
-        .plugins-title {
-            font-size: 1.75rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-        }
-
-        .plugins-subtitle {
-            color: var(--ifm-font-color-secondary);
-            margin-bottom: 2rem;
-            font-size: 0.9rem;
-        }
-
-        .plugin-cards {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-            gap: 1.25rem;
-        }
-
-        .plugin-card {
-            background: white;
-            border-radius: 16px;
-            border: 1px solid var(--ifm-border-color);
-            padding: 1.5rem;
-            transition: all 0.25s;
-            text-decoration: none;
-            display: block;
-            position: relative;
             overflow: hidden;
         }
 
-        .plugin-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 4px;
-            height: 100%;
-            background: var(--ifm-color-primary);
-            opacity: 0;
-            transition: opacity 0.25s;
+        body {
+            font-size: 14.5px;
         }
 
-        .plugin-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 12px 24px -12px rgba(0, 0, 0, 0.15);
-            border-color: var(--ifm-color-primary-light);
+        .shell {
+            display: flex;
+            height: 100vh;
         }
 
-        .plugin-card:hover::before {
-            opacity: 1;
+        .side {
+            width: 300px;
+            flex: none;
+            background: #fff;
+            border-right: 1px solid var(--line);
+            display: flex;
+            flex-direction: column;
+            padding: 26px 20px 16px;
         }
 
-        .plugin-icon {
-            width: 48px;
-            height: 48px;
-            background: linear-gradient(135deg, var(--ifm-color-primary-light), var(--ifm-color-primary));
-            border-radius: 14px;
+        .side .q-brand {
+            margin-bottom: 18px;
+        }
+
+        .side .q-search {
+            margin-bottom: 14px;
+        }
+
+        .menu {
+            flex: 1 1 auto;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            padding-bottom: 8px;
+            scrollbar-width: thin;
+        }
+
+        .m-group {
+            margin-bottom: 16px;
+        }
+
+        .m-title {
+            font: 600 10px/1 var(--sans);
+            letter-spacing: .16em;
+            text-transform: uppercase;
+            color: var(--ink-3);
+            margin: 0 0 8px 9px;
+        }
+
+        .m-item {
             display: flex;
             align-items: center;
-            justify-content: center;
-            margin-bottom: 1rem;
+            gap: 10px;
+            padding: 8px 10px;
+            border-radius: 8px;
+            color: var(--ink-2);
+            text-decoration: none;
+            font-size: 13.5px;
+            line-height: 1.4;
+            transition: background .15s, color .15s;
+            cursor: pointer;
+            border: 0;
         }
 
-        .plugin-icon i {
-            font-size: 1.4rem;
-            color: white;
+        .m-item i {
+            width: 16px;
+            flex: none;
+            font-size: 12.5px;
+            color: var(--ink-3);
+            text-align: center;
+            transition: color .15s;
         }
 
-        .plugin-card h3 {
-            font-size: 1.1rem;
+        .m-item:hover {
+            background: #f1f4f9;
+            color: var(--ink);
+            border: 0;
+        }
+
+        .m-item.active {
+            background: var(--accent-soft);
+            color: #3730a3;
             font-weight: 600;
-            margin-bottom: 0.5rem;
-            color: var(--ifm-font-color-base);
         }
 
-        .plugin-card p {
-            font-size: 0.85rem;
-            color: var(--ifm-font-color-secondary);
-            margin-bottom: 1.25rem;
-            line-height: 1.5;
+        .m-item.active i {
+            color: var(--accent);
         }
 
-        .plugin-btn {
+        .m-item.q-hidden {
+            display: none;
+        }
+
+        .side-foot {
+            border-top: 1px solid var(--line);
+            padding-top: 12px;
+            font-size: 11.5px;
+            color: var(--ink-3);
+            line-height: 1.6;
+        }
+
+        .side-foot a {
+            color: var(--ink-2);
+            text-decoration: none;
+            border: 0;
             display: inline-flex;
             align-items: center;
-            gap: 0.5rem;
-            padding: 0.4rem 1rem;
-            background: var(--ifm-color-primary);
-            color: white;
-            border-radius: 30px;
-            font-size: 0.8rem;
-            font-weight: 500;
-            text-decoration: none;
-            transition: all 0.2s;
+            gap: 6px;
         }
 
-        .plugin-btn:hover {
-            background: var(--ifm-color-primary-dark);
-            transform: translateX(2px);
+        .side-foot a:hover {
+            color: var(--accent);
+        }
+
+        .main {
+            flex: 1 1 auto;
+            min-width: 0;
+            position: relative;
+            background: var(--bg);
+        }
+
+        .frame {
+            width: 100%;
+            height: 100%;
+            border: 0;
+            display: block;
+            background: #fff;
+        }
+
+        .loading {
+            position: absolute;
+            inset: 0;
+            display: none;
+            place-items: center;
+            background: rgba(255, 255, 255, .86);
+            backdrop-filter: blur(2px);
+            z-index: 5;
+        }
+
+        .loading.show {
+            display: grid;
+        }
+
+        .spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid var(--line);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin .7s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .hint {
+            margin-top: 10px;
+            font-size: 11px;
+            color: var(--ink-3);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .hint kbd {
+            font: 600 9.5px/1 var(--mono);
+            color: #8792a6;
+            border: 1px solid var(--line);
+            border-radius: 4px;
+            padding: 3px 5px;
+            background: #f8fafc;
         }
     </style>
 </head>
 
 <body>
-    <div class="docusaurus-layout">
-        <aside class="docusaurus-sidebar">
-            <div class="sidebar-header">
-                <h1><i class="fas fa-cube"></i> QOT</h1>
-                <p>文档中心</p>
+    <div class="shell">
+        <aside class="side">
+            <a class="q-brand" href="index.html">
+                <span class="q-brand-mark">Q</span>
+                <span>
+                    <span class="q-brand-name">QOT 文档中心</span>
+                    <span class="q-brand-sub">Documentation</span>
+                </span>
+            </a>
+
+            <div class="q-search">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round">
+                    <circle cx="11" cy="11" r="7" />
+                    <path d="M20 20l-3.6-3.6" />
+                </svg>
+                <input id="menuSearch" type="search" placeholder="搜索文档" autocomplete="off" spellcheck="false">
+                <kbd>/</kbd>
             </div>
-            <nav class="docusaurus-menu" id="docMenu">
-                <div class="menu-category">
-                    <div class="menu-category-title">入门指南</div>
-                    <a class="menu-item" data-page="doc.html"><i class="fas fa-file-alt"></i> 语言总述</a>
-                    <a class="menu-item" data-page="application.html"><i class="fas fa-rocket"></i> 实战应用</a>
+
+            <nav class="menu" id="docMenu">
+                <div class="m-group">
+                    <div class="m-title">入门指南</div>
+                    <a class="m-item" data-page="doc.html"><i class="fas fa-file-alt"></i> 语言总述</a>
+                    <a class="m-item" data-page="application.html"><i class="fas fa-rocket"></i> 实战应用</a>
                 </div>
-                <div class="menu-category">
-                    <div class="menu-category-title">语言基础</div>
-                    <a class="menu-item" data-page="function_inside.html"><i class="fas fa-list"></i> 内置函数参考</a>
-                    <a class="menu-item" data-page="stdlib.html"><i class="fas fa-box"></i> 标准库</a>
-                    <a class="menu-item" data-page="demos.html"><i class="fas fa-graduation-cap"></i> 学习例子</a>
+                <div class="m-group">
+                    <div class="m-title">语言基础</div>
+                    <a class="m-item" data-page="function_inside.html"><i class="fas fa-list"></i> 内置函数参考</a>
+                    <a class="m-item" data-page="stdlib.html"><i class="fas fa-box"></i> 标准库</a>
+                    <a class="m-item" data-page="demos.html"><i class="fas fa-graduation-cap"></i> 学习例子</a>
                 </div>
-                <div class="menu-category">
-                    <div class="menu-category-title">语言进阶</div>
-                    <a class="menu-item" data-page="objects.html"><i class="fas fa-object-group"></i> 类与对象</a>
-                    <a class="menu-item" data-page="protocols.html"><i class="fas fa-link"></i> 协议元语</a>
-                    <a class="menu-item" data-page="macros.html"><i class="fas fa-magic"></i> 编译期宏</a>
+                <div class="m-group">
+                    <div class="m-title">语言进阶</div>
+                    <a class="m-item" data-page="objects.html"><i class="fas fa-object-group"></i> 类与对象</a>
+                    <a class="m-item" data-page="protocols.html"><i class="fas fa-link"></i> 协议元语</a>
+                    <a class="m-item" data-page="macros.html"><i class="fas fa-magic"></i> 编译期宏</a>
                 </div>
-                
-                <div class="menu-category">
-                    <div class="menu-category-title">扩展开发</div>
-                    <a class="menu-item" data-page="chinese-dsl-guide.html"><i class="fas fa-language"></i> 语言扩展指南</a>
-                    <a class="menu-item" data-page="funcdoc.html"><i class="fas fa-plug"></i> 原生插件开发</a>
-                    <a class="menu-item" data-page="vgui-extension.html"><i class="fas fa-microchip"></i> Vgui
-                        扩展开发</a>
-                    <a class="menu-item" data-page="shellcode.html"><i class="fas fa-shield-alt"></i> ShellCode 扩展</a>
+                <div class="m-group">
+                    <div class="m-title">扩展开发</div>
+                    <a class="m-item" data-page="chinese-dsl-guide.html"><i class="fas fa-language"></i> 语言扩展指南</a>
+                    <a class="m-item" data-page="funcdoc.html"><i class="fas fa-plug"></i> 原生插件开发</a>
+                    <a class="m-item" data-page="vgui-extension.html"><i class="fas fa-microchip"></i> Vgui 扩展开发</a>
+                    <a class="m-item" data-page="shellcode.html"><i class="fas fa-shield-alt"></i> ShellCode 扩展</a>
                 </div>
-                <div class="menu-category">
-                    <div class="menu-category-title">GUI 开发</div>
-                    <a class="menu-item" data-page="gui_manual.html"><i class="fas fa-paintbrush"></i> GUI 开发手册</a>
+                <div class="m-group">
+                    <div class="m-title">GUI 开发</div>
+                    <a class="m-item" data-page="gui_manual.html"><i class="fas fa-paint-brush"></i> GUI 开发手册</a>
                 </div>
-                <div class="menu-category">
-                    <div class="menu-category-title">其它</div>
-                    <a class="menu-item" id="show-plugins"><i class="fas fa-puzzle-piece"></i> 插件列表</a>
-                    </div>
+                <div class="m-group">
+                    <div class="m-title">其它</div>
+                    <a class="m-item" data-page="plugins.html"><i class="fas fa-puzzle-piece"></i> 插件列表</a>
+                </div>
             </nav>
+
+            <div class="side-foot">
+                <a href="../index.html"><i class="fas fa-arrow-left"></i> 返回项目根目录</a>
+            </div>
         </aside>
 
-        <main class="docusaurus-content">
-            <div class="loading-overlay" id="loadingOverlay" style="display: none;">
-                <div class="docusaurus-spinner"></div>
+        <main class="main">
+            <div class="loading" id="loadingOverlay">
+                <div class="spinner"></div>
             </div>
-            <iframe id="contentFrame" class="content-iframe" src="doc.html"></iframe>
+            <iframe id="contentFrame" class="frame" src="doc.html" title="文档内容"></iframe>
         </main>
     </div>
 
     <script>
-        const frame = document.getElementById('contentFrame');
-        const loading = document.getElementById('loadingOverlay');
-        const menuItems = document.querySelectorAll('.menu-item[data-page]');
-        const showPluginsBtn = document.getElementById('show-plugins');
-        function loadPlugins() {
-            frame.src = 'about:blank';
-            setTimeout(() => {
-                frame.src = 'plugins.html';  
-            }, 10);
-        }
+        (function () {
+            var frame = document.getElementById('contentFrame');
+            var loading = document.getElementById('loadingOverlay');
+            var items = Array.prototype.slice.call(document.querySelectorAll('.m-item'));
+            var search = document.getElementById('menuSearch');
 
-        function loadPage(url) {
-            frame.src = url;
-        }
-        menuItems.forEach(item => {
-            item.addEventListener('click', (e) => {
-                e.preventDefault();
-                const page = item.getAttribute('data-page');
-                if (page) {
-                    document.querySelectorAll('.menu-item').forEach(i => i.classList.remove('active'));
-                    item.classList.add('active');
-                    loadPage(page);
-                }
+            function activate(item) {
+                items.forEach(function (i) { i.classList.remove('active'); });
+                if (item) item.classList.add('active');
+            }
+
+            items.forEach(function (item) {
+                item.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    var page = item.getAttribute('data-page');
+                    if (!page) return;
+                    activate(item);
+                    loading.classList.add('show');
+                    frame.src = page;
+                });
             });
-        });
 
-        showPluginsBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            document.querySelectorAll('.menu-item').forEach(i => i.classList.remove('active'));
-            showPluginsBtn.classList.add('active');
-            loadPlugins();
-        });
-        if (menuItems.length > 0) {
-            menuItems[0].classList.add('active');
-        }
+            frame.addEventListener('load', function () {
+                loading.classList.remove('show');
+            });
+
+            activate(items.filter(function (i) {
+                return i.getAttribute('data-page') === 'doc.html';
+            })[0]);
+
+            if (search) {
+                search.addEventListener('input', function () {
+                    var q = search.value.trim().toLowerCase();
+                    items.forEach(function (item) {
+                        var hit = !q || item.textContent.toLowerCase().indexOf(q) !== -1;
+                        item.classList.toggle('q-hidden', !hit);
+                    });
+                });
+                search.addEventListener('keydown', function (e) {
+                    if (e.key === 'Escape') {
+                        search.value = '';
+                        items.forEach(function (i) { i.classList.remove('q-hidden'); });
+                        search.blur();
+                    }
+                });
+                document.addEventListener('keydown', function (e) {
+                    var tag = (document.activeElement || {}).tagName;
+                    if (e.key === '/' && tag !== 'INPUT' && tag !== 'TEXTAREA') {
+                        e.preventDefault();
+                        search.focus();
+                        search.select();
+                    }
+                });
+            }
+        })();
     </script>
 </body>
 
