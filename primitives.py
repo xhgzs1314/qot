@@ -4394,6 +4394,147 @@ def _qg_dll():
             dll.qg_scroll_style.argtypes = [ctypes.c_int] + [ctypes.c_float] * 9
             dll.qg_menu_border.restype = ctypes.c_int
             dll.qg_menu_border.argtypes = [ctypes.c_int] + [ctypes.c_float] * 5
+            # ---- 绘制原语（路径/画刷/富文本/效果层/离屏面） ----
+            for nm, ret in (('qg_path_reset', ctypes.c_int),
+                            ('qg_path_close', ctypes.c_int),
+                            ('qg_brush_end', ctypes.c_int),
+                            ('qg_rich_begin', ctypes.c_int),
+                            ('qg_draw_pop_blend', ctypes.c_int),
+                            ('qg_draw_pop_shadow', ctypes.c_int),
+                            ('qg_draw_pop_mask', ctypes.c_int),
+                            ('qg_draw_push_clip_path', ctypes.c_int),
+                            ('qg_surface_end', ctypes.c_int),
+                            ('qg_backend_info', ctypes.c_int)):
+                f = getattr(dll, nm, None)
+                if f is not None:
+                    f.restype = ret
+                    f.argtypes = []
+            for nm in ('qg_path_move_to', 'qg_path_line_to'):
+                f = getattr(dll, nm, None)
+                if f is not None:
+                    f.restype = ctypes.c_int
+                    f.argtypes = [ctypes.c_float] * 2
+            for nm in ('qg_path_quad_to',):
+                f = getattr(dll, nm, None)
+                if f is not None:
+                    f.restype = ctypes.c_int
+                    f.argtypes = [ctypes.c_float] * 4
+            dll.qg_path_bezier_to.restype = ctypes.c_int
+            dll.qg_path_bezier_to.argtypes = [ctypes.c_float] * 6
+            dll.qg_path_arc.restype = ctypes.c_int
+            dll.qg_path_arc.argtypes = [ctypes.c_float] * 6
+            dll.qg_path_svg_arc.restype = ctypes.c_int
+            dll.qg_path_svg_arc.argtypes = [ctypes.c_float] * 3 + \
+                                           [ctypes.c_int] * 2 + [ctypes.c_float] * 2
+            for nm in ('qg_path_rect', 'qg_draw_fill_rect_brush'):
+                f = getattr(dll, nm, None)
+                if f is not None:
+                    f.restype = ctypes.c_int
+                    f.argtypes = [ctypes.c_int] + [ctypes.c_float] * 4 \
+                        if nm.startswith('qg_draw') else [ctypes.c_float] * 4
+            dll.qg_path_round_rect.restype = ctypes.c_int
+            dll.qg_path_round_rect.argtypes = [ctypes.c_float] * 6
+            dll.qg_path_ellipse.restype = ctypes.c_int
+            dll.qg_path_ellipse.argtypes = [ctypes.c_float] * 4
+            dll.qg_path_fill.restype = ctypes.c_int
+            dll.qg_path_fill.argtypes = [ctypes.c_float] * 4
+            dll.qg_path_fill_brush.restype = ctypes.c_int
+            dll.qg_path_fill_brush.argtypes = [ctypes.c_int]
+            dll.qg_path_stroke.restype = ctypes.c_int
+            dll.qg_path_stroke.argtypes = [ctypes.c_float] * 5
+            dll.qg_path_stroke_brush.restype = ctypes.c_int
+            dll.qg_path_stroke_brush.argtypes = [ctypes.c_int, ctypes.c_float]
+            dll.qg_path_bounds.restype = ctypes.c_int
+            dll.qg_path_bounds.argtypes = [ctypes.POINTER(ctypes.c_float)] * 4
+            dll.qg_path_hit.restype = ctypes.c_int
+            dll.qg_path_hit.argtypes = [ctypes.c_float, ctypes.c_float]
+            dll.qg_path_stroke_hit.restype = ctypes.c_int
+            dll.qg_path_stroke_hit.argtypes = [ctypes.c_float, ctypes.c_float, ctypes.c_float]
+            for nm in ('qg_path_line_cap', 'qg_path_line_join'):
+                f = getattr(dll, nm, None)
+                if f is not None:
+                    f.restype = ctypes.c_int
+                    f.argtypes = [ctypes.c_int]
+            dll.qg_path_miter_limit.restype = ctypes.c_int
+            dll.qg_path_miter_limit.argtypes = [ctypes.c_float]
+            dll.qg_path_dash.restype = ctypes.c_int
+            dll.qg_path_dash.argtypes = [ctypes.POINTER(ctypes.c_float),
+                                         ctypes.c_int, ctypes.c_float]
+            dll.qg_brush_solid.restype = ctypes.c_int
+            dll.qg_brush_solid.argtypes = [ctypes.c_float] * 4
+            dll.qg_brush_linear_begin.restype = ctypes.c_int
+            dll.qg_brush_linear_begin.argtypes = [ctypes.c_float] * 4
+            dll.qg_brush_radial_begin.restype = ctypes.c_int
+            dll.qg_brush_radial_begin.argtypes = [ctypes.c_float] * 6
+            dll.qg_brush_add_stop.restype = ctypes.c_int
+            dll.qg_brush_add_stop.argtypes = [ctypes.c_float] * 5
+            dll.qg_brush_free.restype = None
+            dll.qg_brush_free.argtypes = [ctypes.c_int]
+            dll.qg_brush_extend.restype = ctypes.c_int
+            dll.qg_brush_extend.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int]
+            dll.qg_brush_transform.restype = ctypes.c_int
+            dll.qg_brush_transform.argtypes = [ctypes.c_int] + [ctypes.c_float] * 6
+            dll.qg_brush_bitmap.restype = ctypes.c_int
+            dll.qg_brush_bitmap.argtypes = [ctypes.c_int]
+            for nm, n in (('qg_draw_stroke_rect_brush', 5),
+                          ('qg_draw_fill_round_rect_brush', 5),
+                          ('qg_draw_stroke_round_rect_brush', 6),
+                          ('qg_draw_stroke_ellipse_brush', 5)):
+                f = getattr(dll, nm, None)
+                if f is not None:
+                    f.restype = ctypes.c_int
+                    f.argtypes = [ctypes.c_int] + [ctypes.c_float] * n
+            for nm in ('qg_draw_fill_ellipse_brush',):
+                f = getattr(dll, nm, None)
+                if f is not None:
+                    f.restype = ctypes.c_int
+                    f.argtypes = [ctypes.c_int] + [ctypes.c_float] * 4
+            dll.qg_rich_add.restype = ctypes.c_int
+            dll.qg_rich_add.argtypes = [ctypes.c_char_p, ctypes.c_float] + \
+                                       [ctypes.c_float] * 4 + [ctypes.c_int] * 4
+            dll.qg_rich_add_brush.restype = ctypes.c_int
+            dll.qg_rich_add_brush.argtypes = [ctypes.c_char_p, ctypes.c_float,
+                                              ctypes.c_int] + [ctypes.c_int] * 4
+            dll.qg_rich_line_height.restype = ctypes.c_int
+            dll.qg_rich_line_height.argtypes = [ctypes.c_float, ctypes.c_float]
+            dll.qg_rich_spacing.restype = ctypes.c_int
+            dll.qg_rich_spacing.argtypes = [ctypes.c_float] * 4
+            dll.qg_rich_draw.restype = ctypes.c_int
+            dll.qg_rich_draw.argtypes = [ctypes.c_float] * 4 + [ctypes.c_int] * 3
+            dll.qg_rich_measure.restype = ctypes.c_int
+            dll.qg_rich_measure.argtypes = [ctypes.c_int, ctypes.c_float,
+                                            ctypes.POINTER(ctypes.c_float),
+                                            ctypes.POINTER(ctypes.c_float)]
+            dll.qg_draw_push_blend.restype = ctypes.c_int
+            dll.qg_draw_push_blend.argtypes = [ctypes.c_int] + [ctypes.c_float] * 4
+            dll.qg_draw_push_shadow.restype = ctypes.c_int
+            dll.qg_draw_push_shadow.argtypes = [ctypes.c_float] * 10
+            dll.qg_draw_push_mask.restype = ctypes.c_int
+            dll.qg_draw_push_mask.argtypes = [ctypes.c_int] + [ctypes.c_float] * 5
+            for nm in ('qg_surface_create',):
+                f = getattr(dll, nm, None)
+                if f is not None:
+                    f.restype = ctypes.c_int
+                    f.argtypes = [ctypes.c_int, ctypes.c_int]
+            dll.qg_surface_begin.restype = ctypes.c_int
+            dll.qg_surface_begin.argtypes = [ctypes.c_int]
+            dll.qg_surface_draw.restype = ctypes.c_int
+            dll.qg_surface_draw.argtypes = [ctypes.c_int] + [ctypes.c_float] * 5 + \
+                                           [ctypes.c_int]
+            dll.qg_surface_pixel.restype = ctypes.c_int
+            dll.qg_surface_pixel.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int] + \
+                                            [ctypes.POINTER(ctypes.c_float)] * 4
+            dll.qg_surface_free.restype = None
+            dll.qg_surface_free.argtypes = [ctypes.c_int]
+            dll.qg_draw_image_ex.restype = ctypes.c_int
+            dll.qg_draw_image_ex.argtypes = [ctypes.c_int] + [ctypes.c_float] * 5 + \
+                                            [ctypes.c_int] + [ctypes.c_float] * 4
+            dll.qg_draw_image_round.restype = ctypes.c_int
+            dll.qg_draw_image_round.argtypes = [ctypes.c_int] + [ctypes.c_float] * 5 + \
+                                               [ctypes.c_int] + [ctypes.c_float]
+            dll.qg_backend_info.restype = ctypes.c_int
+            dll.qg_backend_info.argtypes = [ctypes.POINTER(ctypes.c_int),
+                                            ctypes.POINTER(ctypes.c_int)]
             _QG_DLL = dll
             return dll
     _qg_err_set('找不到 qotgui.dll —— 请先运行 '
@@ -4450,7 +4591,11 @@ def _vg_create_named(builtin_name, kind):
         fn = getattr(dll, 'qg_create_' + kind, None)
         if fn is None:
             return None
-        if kind in ('slider', 'progressbar', 'spinner'):
+        # 无 text 参数的控件族（C ABI 5 参）；v6 修正：combobox/listbox/
+        # tabcontrol 此前误走 6 参分支（参数错位 + args[5] 越界）
+        if kind in ('slider', 'progressbar', 'spinner',
+                    'combobox', 'listbox', 'tabcontrol',
+                    'table', 'colorpicker', 'datepicker'):
             x = int(_qg_num(args[1], 50)); y = int(_qg_num(args[2], 50))
             w = int(_qg_num(args[3], 160)); hh = int(_qg_num(args[4], 28))
             r = fn(win, x, y, w, hh)
@@ -4494,7 +4639,10 @@ def _vg_create(kind):
         fn = getattr(dll, 'qg_create_' + kind, None)
         if fn is None:
             return None
-        if kind in ('slider', 'progressbar', 'spinner'):
+        # 无 text 参数的控件族（C ABI 5 参）；v6 修正同 _vg_create_named
+        if kind in ('slider', 'progressbar', 'spinner',
+                    'combobox', 'listbox', 'tabcontrol',
+                    'table', 'colorpicker', 'datepicker'):
             x = int(_qg_num(args[1], 50)); y = int(_qg_num(args[2], 50))
             w = int(_qg_num(args[3], 160)); hh = int(_qg_num(args[4], 28))
             r = fn(win, x, y, w, hh)
@@ -5324,6 +5472,868 @@ def vg_draw_pop_blur_handler(*args):
         return False
     dll.qg_draw_pop_blur()
     return True
+
+
+# ---- v5 · Fluent 级绘制原语（路径/画刷/富文本/效果层/离屏面/图片精控） ----
+
+def _vg_f(v, d=0.0):
+    return _qg_cfloat(_qg_num(v, d))
+
+
+def _qg_cfloat(x):
+    import ctypes as _c
+    return _c.c_float(float(x))
+
+
+def _vg_stops_pairs(arr):
+    """渐变停靠点 [[pos, [r,g,b,a]], ...] → (pos 列表, 颜色列表)；非法返回 None"""
+    if not isinstance(arr, (list, tuple)) or len(arr) < 2:
+        return None
+    pos, colors = [], []
+    for ent in arr:
+        if not isinstance(ent, (list, tuple)) or len(ent) < 2:
+            return None
+        pos.append(float(_qg_num(ent[0], 0)))
+        c = ent[1]
+        if not isinstance(c, (list, tuple)) or len(c) < 3:
+            return None
+        a = float(_qg_num(c[3], 1)) if len(c) > 3 else 1.0
+        colors.append((float(_qg_num(c[0], 0)), float(_qg_num(c[1], 0)),
+                       float(_qg_num(c[2], 0)), a))
+    return pos, colors
+
+
+def _vg_brush_from_stops(dll, radial, params, stops):
+    sp = _vg_stops_pairs(stops)
+    if not sp:
+        return None
+    if radial:
+        if dll.qg_brush_radial_begin(*[_qg_cfloat(v) for v in params]) != 1:
+            return None
+    else:
+        if dll.qg_brush_linear_begin(*[_qg_cfloat(v) for v in params]) != 1:
+            return None
+    for p, c in zip(sp[0], sp[1]):
+        dll.qg_brush_add_stop(_qg_cfloat(p), _qg_cfloat(c[0]), _qg_cfloat(c[1]),
+                              _qg_cfloat(c[2]), _qg_cfloat(c[3]))
+    bid = dll.qg_brush_end()
+    return bid if bid > 0 else None
+
+
+def vg_path_begin_handler(*args):
+    dll = _qg_dll()
+    if not dll:
+        return False
+    return dll.qg_path_reset() == 1
+
+
+def vg_path_move_to_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    return dll.qg_path_move_to(_vg_f(args[0]), _vg_f(args[1])) == 1
+
+
+def vg_path_line_to_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    return dll.qg_path_line_to(_vg_f(args[0]), _vg_f(args[1])) == 1
+
+
+def vg_path_quad_to_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 4:
+        return False
+    return dll.qg_path_quad_to(*[_vg_f(a) for a in args[:4]]) == 1
+
+
+def vg_path_curve_to_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 6:
+        return False
+    return dll.qg_path_bezier_to(*[_vg_f(a) for a in args[:6]]) == 1
+
+
+def vg_path_arc_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 6:
+        return False
+    return dll.qg_path_arc(*[_vg_f(a) for a in args[:6]]) == 1
+
+
+def vg_path_svg_arc_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 7:
+        return False
+    return dll.qg_path_svg_arc(_vg_f(args[0]), _vg_f(args[1]), _vg_f(args[2]),
+                               int(_qg_num(args[3], 0)), int(_qg_num(args[4], 0)),
+                               _vg_f(args[5]), _vg_f(args[6])) == 1
+
+
+def vg_path_rect_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 4:
+        return False
+    return dll.qg_path_rect(*[_vg_f(a) for a in args[:4]]) == 1
+
+
+def vg_path_round_rect_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 5:
+        return False
+    rr = _vg_f(args[4], 4.0)
+    return dll.qg_path_round_rect(_vg_f(args[0]), _vg_f(args[1]), _vg_f(args[2]),
+                                  _vg_f(args[3]), rr, rr) == 1
+
+
+def vg_path_ellipse_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 4:
+        return False
+    return dll.qg_path_ellipse(*[_vg_f(a) for a in args[:4]]) == 1
+
+
+def vg_path_close_handler(*args):
+    dll = _qg_dll()
+    if not dll:
+        return False
+    return dll.qg_path_close() == 1
+
+
+def vg_path_fill_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 1:
+        return False
+    c = _vg_color_at(args, 0)
+    return dll.qg_path_fill(*[_qg_cfloat(v) for v in c]) == 1
+
+
+def vg_path_fill_brush_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 1:
+        return False
+    return dll.qg_path_fill_brush(int(_qg_num(args[0], 0))) == 1
+
+
+def vg_path_stroke_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    c = _vg_color_at(args, 0)
+    return dll.qg_path_stroke(*[_qg_cfloat(v) for v in c] + [_vg_f(args[1], 1.0)]) == 1
+
+
+def vg_path_stroke_brush_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    return dll.qg_path_stroke_brush(int(_qg_num(args[0], 0)), _vg_f(args[1], 1.0)) == 1
+
+
+def vg_path_bounds_handler(*args):
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll:
+        return None
+    x = _c.c_float(); y = _c.c_float(); w = _c.c_float(); h = _c.c_float()
+    if dll.qg_path_bounds(_c.byref(x), _c.byref(y), _c.byref(w), _c.byref(h)) != 1:
+        return None
+    return [x.value, y.value, w.value, h.value]
+
+
+def vg_path_hit_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    return dll.qg_path_hit(_vg_f(args[0]), _vg_f(args[1])) == 1
+
+
+def vg_path_stroke_hit_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 3:
+        return False
+    return dll.qg_path_stroke_hit(_vg_f(args[0]), _vg_f(args[1]), _vg_f(args[2], 1.0)) == 1
+
+
+def vg_path_line_cap_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 1:
+        return False
+    return dll.qg_path_line_cap(int(_qg_num(args[0], 0))) == 1
+
+
+def vg_path_line_join_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 1:
+        return False
+    return dll.qg_path_line_join(int(_qg_num(args[0], 0))) == 1
+
+
+def vg_path_miter_limit_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 1:
+        return False
+    return dll.qg_path_miter_limit(_vg_f(args[0], 10.0)) == 1
+
+
+def vg_path_dash_handler(*args):
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 1:
+        return False
+    arr = args[0]
+    if not isinstance(arr, (list, tuple)):
+        return False
+    vals = [float(_qg_num(v, 0)) for v in arr]
+    phase = _vg_f(args[1], 0.0) if len(args) > 1 else _qg_cfloat(0.0)
+    n = len(vals)
+    carr = (_c.c_float * max(n, 1))(*vals) if n > 0 else (_c.c_float * 1)(0.0)
+    return dll.qg_path_dash(carr if n > 0 else None, n, phase) == 1
+
+
+def vg_brush_solid_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 1:
+        return None
+    c = _vg_color_at(args, 0)
+    bid = dll.qg_brush_solid(*[_qg_cfloat(v) for v in c])
+    return bid if bid > 0 else None
+
+
+def vg_brush_linear_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 5:
+        return None
+    return _vg_brush_from_stops(dll, False, args[:4], args[4])
+
+
+def vg_brush_radial_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 4:
+        return None
+    cx, cy, r = float(_qg_num(args[0], 0)), float(_qg_num(args[1], 0)), float(_qg_num(args[2], 1))
+    return _vg_brush_from_stops(dll, True, [cx, cy, cx, cy, r, r], args[3])
+
+
+def vg_brush_radial_focus_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 7:
+        return None
+    return _vg_brush_from_stops(dll, True, [float(_qg_num(a, 0)) for a in args[:6]], args[6])
+
+
+def vg_brush_bitmap_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 1:
+        return None
+    bid = dll.qg_brush_bitmap(int(_qg_num(args[0], 0)))
+    return bid if bid > 0 else None
+
+
+def vg_brush_extend_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 3:
+        return False
+    return dll.qg_brush_extend(int(_qg_num(args[0], 0)),
+                               int(_qg_num(args[1], 0)),
+                               int(_qg_num(args[2], 0))) == 1
+
+
+def vg_brush_transform_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 7:
+        return False
+    return dll.qg_brush_transform(int(_qg_num(args[0], 0)),
+                                  *[_vg_f(a) for a in args[1:7]]) == 1
+
+
+def vg_brush_free_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 1:
+        return False
+    dll.qg_brush_free(int(_qg_num(args[0], 0)))
+    return True
+
+
+def vg_draw_fill_rect_brush_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 5:
+        return False
+    return dll.qg_draw_fill_rect_brush(int(_qg_num(args[0], 0)),
+                                       *[_vg_f(a) for a in args[1:5]]) == 1
+
+
+def vg_draw_stroke_rect_brush_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 6:
+        return False
+    return dll.qg_draw_stroke_rect_brush(int(_qg_num(args[0], 0)),
+                                         *[_vg_f(a) for a in args[1:6]]) == 1
+
+
+def vg_draw_fill_round_rect_brush_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 6:
+        return False
+    return dll.qg_draw_fill_round_rect_brush(int(_qg_num(args[0], 0)),
+                                             *[_vg_f(a) for a in args[1:6]]) == 1
+
+
+def vg_draw_stroke_round_rect_brush_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 7:
+        return False
+    return dll.qg_draw_stroke_round_rect_brush(int(_qg_num(args[0], 0)),
+                                               *[_vg_f(a) for a in args[1:7]]) == 1
+
+
+def vg_draw_fill_ellipse_brush_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 5:
+        return False
+    return dll.qg_draw_fill_ellipse_brush(int(_qg_num(args[0], 0)),
+                                          *[_vg_f(a) for a in args[1:5]]) == 1
+
+
+def vg_draw_stroke_ellipse_brush_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 6:
+        return False
+    return dll.qg_draw_stroke_ellipse_brush(int(_qg_num(args[0], 0)),
+                                            *[_vg_f(a) for a in args[1:6]]) == 1
+
+
+def _vg_rich_flags(args, base):
+    """bold/italic/underline/strike 四标志（默认 0）"""
+    return [int(_qg_num(args[base + i], 0)) if len(args) > base + i else 0
+            for i in range(4)]
+
+
+def vg_rich_begin_handler(*args):
+    dll = _qg_dll()
+    if not dll:
+        return False
+    return dll.qg_rich_begin() == 1
+
+
+def vg_rich_add_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 3:
+        return False
+    c = _vg_color_at(args, 2)
+    flags = _vg_rich_flags(args, 3)
+    weight = 700 if flags[0] else 400
+    return dll.qg_rich_add(_qg_bytes(args[0]), _vg_f(args[1], 16.0),
+                           *[_qg_cfloat(v) for v in c],
+                           weight, flags[1], flags[2], flags[3]) == 1
+
+
+def vg_rich_add_weight_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 4:
+        return False
+    c = _vg_color_at(args, 2)
+    flags = _vg_rich_flags(args, 4)
+    weight = int(_qg_num(args[3], 400))
+    return dll.qg_rich_add(_qg_bytes(args[0]), _vg_f(args[1], 16.0),
+                           *[_qg_cfloat(v) for v in c],
+                           weight, flags[1], flags[2], flags[3]) == 1
+
+
+def vg_rich_add_brush_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 3:
+        return False
+    flags = _vg_rich_flags(args, 4)
+    weight = int(_qg_num(args[3], 400)) if len(args) > 3 else 400
+    return dll.qg_rich_add_brush(_qg_bytes(args[0]), _vg_f(args[1], 16.0),
+                                 int(_qg_num(args[2], 0)),
+                                 weight, flags[1], flags[2], flags[3]) == 1
+
+
+def vg_rich_line_height_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 1:
+        return False
+    baseline = _vg_f(args[1], 0.0) if len(args) > 1 else _qg_cfloat(0.0)
+    return dll.qg_rich_line_height(_vg_f(args[0], 0.0), baseline) == 1
+
+
+def vg_rich_spacing_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 4:
+        return False
+    return dll.qg_rich_spacing(*[_vg_f(a) for a in args[:4]]) == 1
+
+
+def vg_rich_draw_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 7:
+        return False
+    return dll.qg_rich_draw(*[_vg_f(a) for a in args[:4]] +
+                            [int(_qg_num(args[4], 0)), int(_qg_num(args[5], 0)),
+                             int(_qg_num(args[6], 0))]) == 1
+
+
+def vg_rich_measure_handler(*args):
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return None
+    w = _c.c_float(); h = _c.c_float()
+    if dll.qg_rich_measure(int(_qg_num(args[0], 0)), _vg_f(args[1], 0.0),
+                           _c.byref(w), _c.byref(h)) != 1:
+        return None
+    return [w.value, h.value]
+
+
+def vg_draw_push_blend_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 1:
+        return False
+    b = [float(_qg_num(args[i], 0)) for i in range(1, 5)] if len(args) >= 5 else [0.0] * 4
+    return dll.qg_draw_push_blend(int(_qg_num(args[0], 0)),
+                                  *[_qg_cfloat(v) for v in b]) == 1
+
+
+def vg_draw_pop_blend_handler(*args):
+    dll = _qg_dll()
+    if not dll:
+        return False
+    return dll.qg_draw_pop_blend() == 1
+
+
+def vg_draw_push_shadow_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 4:
+        return False
+    c = _vg_color_at(args, 0)
+    b = [float(_qg_num(args[i], 0)) for i in range(4, 8)] if len(args) >= 8 else [0.0] * 4
+    return dll.qg_draw_push_shadow(*[_qg_cfloat(v) for v in c] +
+                                   [_vg_f(args[1], 8.0), _vg_f(args[2], 0.0),
+                                    _vg_f(args[3], 0.0)] +
+                                   [_qg_cfloat(v) for v in b]) == 1
+
+
+def vg_draw_pop_shadow_handler(*args):
+    dll = _qg_dll()
+    if not dll:
+        return False
+    return dll.qg_draw_pop_shadow() == 1
+
+
+def vg_draw_push_mask_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 5:
+        return False
+    opacity = _vg_f(args[5], 1.0) if len(args) > 5 else _qg_cfloat(1.0)
+    return dll.qg_draw_push_mask(int(_qg_num(args[0], 0)),
+                                 *[_vg_f(a) for a in args[1:5]], opacity) == 1
+
+
+def vg_draw_pop_mask_handler(*args):
+    dll = _qg_dll()
+    if not dll:
+        return False
+    return dll.qg_draw_pop_mask() == 1
+
+
+def vg_draw_push_clip_path_handler(*args):
+    dll = _qg_dll()
+    if not dll:
+        return False
+    return dll.qg_draw_push_clip_path() == 1
+
+
+def vg_surface_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return None
+    sid = dll.qg_surface_create(int(_qg_num(args[0], 0)), int(_qg_num(args[1], 0)))
+    return sid if sid > 0 else None
+
+
+def vg_surface_begin_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 1:
+        return False
+    return dll.qg_surface_begin(int(_qg_num(args[0], 0))) == 1
+
+
+def vg_surface_end_handler(*args):
+    dll = _qg_dll()
+    if not dll:
+        return False
+    return dll.qg_surface_end() == 1
+
+
+def vg_surface_draw_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 5:
+        return False
+    alpha = _vg_f(args[5], 1.0) if len(args) > 5 else _qg_cfloat(1.0)
+    interp = int(_qg_num(args[6], 1)) if len(args) > 6 else 1
+    return dll.qg_surface_draw(int(_qg_num(args[0], 0)),
+                               *[_vg_f(a) for a in args[1:5]], alpha, interp) == 1
+
+
+def vg_surface_pixel_handler(*args):
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or len(args) < 3:
+        return None
+    r = _c.c_float(); g = _c.c_float(); b = _c.c_float(); a = _c.c_float()
+    if dll.qg_surface_pixel(int(_qg_num(args[0], 0)), int(_qg_num(args[1], 0)),
+                            int(_qg_num(args[2], 0)),
+                            _c.byref(r), _c.byref(g), _c.byref(b),
+                            _c.byref(a)) != 1:
+        return None
+    return [r.value, g.value, b.value, a.value]
+
+
+def vg_surface_free_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 1:
+        return False
+    dll.qg_surface_free(int(_qg_num(args[0], 0)))
+    return True
+
+
+def vg_draw_image_ex_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 6:
+        return False
+    alpha = _vg_f(args[5], 1.0)
+    interp = int(_qg_num(args[6], 1)) if len(args) > 6 else 1
+    src = [float(_qg_num(args[i], 0)) for i in range(7, 11)] if len(args) > 7 else [0, 0, 0, 0]
+    return dll.qg_draw_image_ex(int(_qg_num(args[0], 0)),
+                                *[_vg_f(a) for a in args[1:5]], alpha, interp,
+                                *[_qg_cfloat(v) for v in src]) == 1
+
+
+def vg_draw_image_round_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 6:
+        return False
+    alpha = _vg_f(args[5], 1.0)
+    interp = int(_qg_num(args[6], 1)) if len(args) > 6 else 1
+    radius = _vg_f(args[7], 0.0) if len(args) > 7 else _qg_cfloat(0.0)
+    return dll.qg_draw_image_round(int(_qg_num(args[0], 0)),
+                                   *[_vg_f(a) for a in args[1:5]], alpha, interp,
+                                   radius) == 1
+
+
+def vg_backend_handler(*args):
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll:
+        return None
+    composed = _c.c_int(); dpi = _c.c_int()
+    if dll.qg_backend_info(_c.byref(composed), _c.byref(dpi)) != 1:
+        return None
+    return [composed.value, dpi.value]
+
+
+# ---- v6 · 声明式视觉模板（路径句柄/文字样式/模板 part-state-transition） ----
+
+def vg_path_store_handler(*args):
+    """vg_path_store() 把当前构建路径固化为几何句柄（部件形状/命中/裁剪共用）"""
+    dll = _qg_dll()
+    if not dll:
+        return None
+    gid = dll.qg_path_store()
+    return gid if gid > 0 else None
+
+
+def vg_path_free_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 1:
+        return False
+    dll.qg_path_free(int(_qg_num(args[0], 0)))
+    return True
+
+
+def vg_geo_hit_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 3:
+        return False
+    return dll.qg_geo_hit(int(_qg_num(args[0], 0)),
+                          _vg_f(args[1]), _vg_f(args[2])) == 1
+
+
+def vg_textstyle_handler(*args):
+    """vg_textstyle(size, weight, italic, halign, wrap, family) → ts id"""
+    dll = _qg_dll()
+    if not dll or len(args) < 1:
+        return None
+    fam = _qg_bytes(args[5]) if len(args) > 5 else b''
+    ts = dll.qg_textstyle_create(
+        _vg_f(args[0], 14.0),
+        int(_qg_num(args[1], 400)) if len(args) > 1 else 400,
+        int(_qg_num(args[2], 0)) if len(args) > 2 else 0,
+        int(_qg_num(args[3], 1)) if len(args) > 3 else 1,
+        int(_qg_num(args[4], 0)) if len(args) > 4 else 0,
+        fam)
+    return ts if ts > 0 else None
+
+
+def vg_textstyle_free_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 1:
+        return False
+    dll.qg_textstyle_free(int(_qg_num(args[0], 0)))
+    return True
+
+
+def vg_tpl_create_handler(*args):
+    dll = _qg_dll()
+    if not dll:
+        return None
+    tid = dll.qg_tpl_create()
+    return tid if tid > 0 else None
+
+
+def _vg_tpl_arr(v, n, dflt):
+    """数组参数归一：[v0..vn-1]（None/缺项补默认）"""
+    out = list(dflt)
+    if isinstance(v, (list, tuple)):
+        for i in range(min(n, len(v))):
+            out[i] = float(_qg_num(v[i], out[i]))
+    return out
+
+
+def vg_tpl_part_handler(*args):
+    """vg_tpl_part(tpl, name, shape, a, b, c, path_id, fill_kind, fill色,
+    fill_brush, stroke[色,宽], inset, textslot, anchor)
+    shape：0 矩形 1 圆角(a=radius) 2 椭圆 3 路径(a>0 定尺寸框) 4 定尺寸圆角(a=w,b=h,c=r)
+    5 定尺寸椭圆(a=w,b=h) 6 水平条(a=高,b=radius)；anchor 0 左 1 中 2 右"""
+    dll = _qg_dll()
+    if not dll or len(args) < 3:
+        return False
+    tpl = int(_qg_num(args[0], 0))
+    name = _qg_bytes(args[1])
+    shape = int(_qg_num(args[2], 0))
+
+    def num(i, d):
+        return _qg_num(args[i], d) if len(args) > i else d
+
+    a = _vg_f(num(3, 0.0))
+    b = _vg_f(num(4, 0.0))
+    c = _vg_f(num(5, 0.0))
+    path_id = int(num(6, 0))
+    fill_kind = int(num(7, 0))
+    fill = _vg_tpl_arr(args[8] if len(args) > 8 else None, 4, [0.0, 0.0, 0.0, 1.0])
+    fill_brush = int(num(9, 0))
+    stroke = args[10] if len(args) > 10 else None
+    stroke_set = 1 if isinstance(stroke, (list, tuple)) and len(stroke) >= 1 else 0
+    sc = _vg_tpl_arr(stroke[0] if stroke_set else None, 4, [0.0, 0.0, 0.0, 1.0])
+    sw = _vg_f(stroke[1], 1.0) if (stroke_set and len(stroke) > 1) else _qg_cfloat(1.0)
+    inset = _vg_tpl_arr(args[11] if len(args) > 11 else None, 4, [0.0, 0.0, 0.0, 0.0])
+    textslot = int(num(12, 0))
+    anchor = int(num(13, 0))
+    return dll.qg_tpl_part(tpl, name, shape, a, b, c, path_id, anchor,
+                           fill_kind, *[_qg_cfloat(v) for v in fill], fill_brush,
+                           stroke_set, *[_qg_cfloat(v) for v in sc], sw,
+                           *[_qg_cfloat(v) for v in inset], textslot) == 1
+
+
+def vg_tpl_part_text_handler(*args):
+    """vg_tpl_part_text(tpl, part, ts, halign, valign, margin, color) 文字槽精调"""
+    dll = _qg_dll()
+    if not dll or len(args) < 3:
+        return False
+    ha = int(_qg_num(args[3], -1)) if len(args) > 3 else -1
+    va = int(_qg_num(args[4], -1)) if len(args) > 4 else -1
+    margin = _vg_tpl_arr(args[5] if len(args) > 5 else None, 4, [0.0, 0.0, 0.0, 0.0])
+    color = args[6] if len(args) > 6 else None
+    cset = 1 if isinstance(color, (list, tuple)) else 0
+    cc = _vg_tpl_arr(color if cset else None, 4, [0.0, 0.0, 0.0, 1.0])
+    return dll.qg_tpl_part_text(int(_qg_num(args[0], 0)), _qg_bytes(args[1]),
+                                int(_qg_num(args[2], 0)), ha, va,
+                                *[_qg_cfloat(v) for v in margin],
+                                cset, *[_qg_cfloat(v) for v in cc]) == 1
+
+
+def vg_tpl_part_dyn_handler(*args):
+    """vg_tpl_part_dyn(tpl, part, mode, src, range, c2) 值驱动几何
+    mode：0 无 1 宽按值 2 位移 3 缩放(c2[0]=最小) 4 透明 5 高按值 6 色lerp(c2=第二色/渐变尾色)"""
+    dll = _qg_dll()
+    if not dll or len(args) < 4:
+        return False
+    c2 = _vg_tpl_arr(args[5] if len(args) > 5 else None, 4, [0.0, 0.0, 0.0, 1.0])
+    rng = _vg_f(args[4], 0.0) if len(args) > 4 else _qg_cfloat(0.0)
+    return dll.qg_tpl_part_dyn(int(_qg_num(args[0], 0)), _qg_bytes(args[1]),
+                               int(_qg_num(args[2], 0)), int(_qg_num(args[3], 0)),
+                               rng, *[_qg_cfloat(v) for v in c2]) == 1
+
+
+def vg_tpl_state_handler(*args):
+    """vg_tpl_state(tpl, mask, part, prop, [v0,v1,v2,v3])（或尾参展开）
+    mask：1 悬停 2 按下 4 禁用 8 焦点 16 勾选 32 展开；prop 0 填充色 1 填充刷
+    2 描边色 3 描边宽 4 平移 5 缩放 6 旋转 7 透明 8 圆角"""
+    dll = _qg_dll()
+    if not dll or len(args) < 4:
+        return False
+    v = _vg_tpl_arr(args[4] if (len(args) > 4 and isinstance(args[4], (list, tuple)))
+                    else None, 4, [0.0, 0.0, 0.0, 0.0])
+    if len(args) > 4 and not isinstance(args[4], (list, tuple)):
+        for i in range(4):
+            if len(args) > 4 + i:
+                v[i] = float(_qg_num(args[4 + i], 0.0))
+    return dll.qg_tpl_state(int(_qg_num(args[0], 0)), int(_qg_num(args[1], 0)),
+                            _qg_bytes(args[2]) if len(args) > 2 else b'',
+                            int(_qg_num(args[3], 0)),
+                            *[_qg_cfloat(x) for x in v]) == 1
+
+
+def vg_tpl_transition_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 4:
+        return False
+    return dll.qg_tpl_transition(int(_qg_num(args[0], 0)), int(_qg_num(args[1], 0)),
+                                 _vg_f(args[2], 200.0), int(_qg_num(args[3], 0))) == 1
+
+
+def vg_tpl_free_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 1:
+        return False
+    dll.qg_tpl_free(int(_qg_num(args[0], 0)))
+    return True
+
+
+def vg_apply_tpl_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    return dll.qg_apply_template(int(_qg_num(args[0], 0)), int(_qg_num(args[1], 0))) == 1
+
+
+def vg_clear_tpl_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 1:
+        return False
+    return dll.qg_clear_template(int(_qg_num(args[0], 0))) == 1
+
+
+def vg_tpl_default_handler(*args):
+    """vg_tpl_default(type) → tpl id；type：0 按钮 1 勾选 2 开关 3 滑块 4 进度 5 组合 6 选项卡"""
+    dll = _qg_dll()
+    if not dll or len(args) < 1:
+        return None
+    tid = dll.qg_tpl_default(int(_qg_num(args[0], 0)))
+    return tid if tid > 0 else None
+
+
+# ---- v6 配套 · 表格 / 颜色选择器 / 日期选择器 ----
+
+def vg_table_add_column_handler(*args):
+    """vg_table_add_column(id, title, width)；width<=0 均分剩余"""
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    w = _qg_cfloat(_qg_num(args[2], 0.0)) if len(args) > 2 else _qg_cfloat(0.0)
+    return dll.qg_table_add_column(int(_qg_num(args[0], 0)),
+                                   _qg_bytes(args[1]), w) == 1
+
+
+def vg_table_add_row_handler(*args):
+    """vg_table_add_row(id, "a;b;c")——';' 分隔单元格"""
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    return dll.qg_table_add_row(int(_qg_num(args[0], 0)),
+                                _qg_bytes(args[1])) == 1
+
+
+def vg_table_set_cell_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 4:
+        return False
+    return dll.qg_table_set_cell(int(_qg_num(args[0], 0)),
+                                 int(_qg_num(args[1], 0)),
+                                 int(_qg_num(args[2], 0)),
+                                 _qg_bytes(args[3])) == 1
+
+
+def vg_table_get_selected_handler(*args):
+    """vg_table_get_selected(id) → [row, col]（无选中 [-1, -1]）"""
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or not args:
+        return None
+    row = _c.c_int(-1); col = _c.c_int(-1)
+    if dll.qg_table_get_selected(int(_qg_num(args[0], 0)),
+                                 _c.byref(row), _c.byref(col)) != 1:
+        return None
+    return [row.value, col.value]
+
+
+def vg_table_set_selected_handler(*args):
+    dll = _qg_dll()
+    if not dll or len(args) < 3:
+        return False
+    return dll.qg_table_set_selected(int(_qg_num(args[0], 0)),
+                                     int(_qg_num(args[1], 0)),
+                                     int(_qg_num(args[2], 0))) == 1
+
+
+def vg_colorpicker_set_rgb_handler(*args):
+    """vg_colorpicker_set_rgb(id, [r,g,b]) 或 (id, r, g, b)；分量 0~1"""
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    if isinstance(args[1], (list, tuple)) and len(args[1]) >= 3:
+        r = _qg_num(args[1][0], 0); g = _qg_num(args[1][1], 0); b = _qg_num(args[1][2], 0)
+    elif len(args) >= 4:
+        r = _qg_num(args[1], 0); g = _qg_num(args[2], 0); b = _qg_num(args[3], 0)
+    else:
+        return False
+    return dll.qg_colorpicker_set_rgb(int(_qg_num(args[0], 0)),
+                                      _qg_cfloat(r), _qg_cfloat(g),
+                                      _qg_cfloat(b)) == 1
+
+
+def vg_colorpicker_get_rgb_handler(*args):
+    """vg_colorpicker_get_rgb(id) → [r,g,b]（0~1）"""
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or not args:
+        return None
+    r = _c.c_float(); g = _c.c_float(); b = _c.c_float()
+    if dll.qg_colorpicker_get_rgb(int(_qg_num(args[0], 0)),
+                                  _c.byref(r), _c.byref(g), _c.byref(b)) != 1:
+        return None
+    return [r.value, g.value, b.value]
+
+
+def vg_datepicker_set_date_handler(*args):
+    """vg_datepicker_set_date(id, y, m, d) 或 (id, [y,m,d])"""
+    dll = _qg_dll()
+    if not dll or len(args) < 2:
+        return False
+    if isinstance(args[1], (list, tuple)) and len(args[1]) >= 3:
+        y = _qg_num(args[1][0], 0); m = _qg_num(args[1][1], 0); d = _qg_num(args[1][2], 0)
+    elif len(args) >= 4:
+        y = _qg_num(args[1], 0); m = _qg_num(args[2], 0); d = _qg_num(args[3], 0)
+    else:
+        return False
+    return dll.qg_datepicker_set_date(int(_qg_num(args[0], 0)),
+                                      int(y), int(m), int(d)) == 1
+
+
+def vg_datepicker_get_date_handler(*args):
+    """vg_datepicker_get_date(id) → [y, m, d]"""
+    import ctypes as _c
+    dll = _qg_dll()
+    if not dll or not args:
+        return None
+    y = _c.c_int(); m = _c.c_int(); d = _c.c_int()
+    if dll.qg_datepicker_get_date(int(_qg_num(args[0], 0)),
+                                  _c.byref(y), _c.byref(m), _c.byref(d)) != 1:
+        return None
+    return [y.value, m.value, d.value]
 
 
 # ---- v3 · 布局系统 ----
@@ -6518,6 +7528,96 @@ PRIMITIVE_IMPLS = {
     'vg_draw_image': vg_draw_image_handler,
     'vg_draw_push_blur': vg_draw_push_blur_handler,
     'vg_draw_pop_blur': vg_draw_pop_blur_handler,
+    # ---- 绘制原语 ----
+    'vg_path_begin': vg_path_begin_handler,
+    'vg_path_move_to': vg_path_move_to_handler,
+    'vg_path_line_to': vg_path_line_to_handler,
+    'vg_path_quad_to': vg_path_quad_to_handler,
+    'vg_path_curve_to': vg_path_curve_to_handler,
+    'vg_path_arc': vg_path_arc_handler,
+    'vg_path_svg_arc': vg_path_svg_arc_handler,
+    'vg_path_rect': vg_path_rect_handler,
+    'vg_path_round_rect': vg_path_round_rect_handler,
+    'vg_path_ellipse': vg_path_ellipse_handler,
+    'vg_path_close': vg_path_close_handler,
+    'vg_path_fill': vg_path_fill_handler,
+    'vg_path_fill_brush': vg_path_fill_brush_handler,
+    'vg_path_stroke': vg_path_stroke_handler,
+    'vg_path_stroke_brush': vg_path_stroke_brush_handler,
+    'vg_path_bounds': vg_path_bounds_handler,
+    'vg_path_hit': vg_path_hit_handler,
+    'vg_path_stroke_hit': vg_path_stroke_hit_handler,
+    'vg_path_line_cap': vg_path_line_cap_handler,
+    'vg_path_line_join': vg_path_line_join_handler,
+    'vg_path_miter_limit': vg_path_miter_limit_handler,
+    'vg_path_dash': vg_path_dash_handler,
+    'vg_brush_solid': vg_brush_solid_handler,
+    'vg_brush_linear': vg_brush_linear_handler,
+    'vg_brush_radial': vg_brush_radial_handler,
+    'vg_brush_radial_focus': vg_brush_radial_focus_handler,
+    'vg_brush_bitmap': vg_brush_bitmap_handler,
+    'vg_brush_extend': vg_brush_extend_handler,
+    'vg_brush_transform': vg_brush_transform_handler,
+    'vg_brush_free': vg_brush_free_handler,
+    'vg_draw_fill_rect_brush': vg_draw_fill_rect_brush_handler,
+    'vg_draw_stroke_rect_brush': vg_draw_stroke_rect_brush_handler,
+    'vg_draw_fill_round_rect_brush': vg_draw_fill_round_rect_brush_handler,
+    'vg_draw_stroke_round_rect_brush': vg_draw_stroke_round_rect_brush_handler,
+    'vg_draw_fill_ellipse_brush': vg_draw_fill_ellipse_brush_handler,
+    'vg_draw_stroke_ellipse_brush': vg_draw_stroke_ellipse_brush_handler,
+    'vg_rich_begin': vg_rich_begin_handler,
+    'vg_rich_add': vg_rich_add_handler,
+    'vg_rich_add_weight': vg_rich_add_weight_handler,
+    'vg_rich_add_brush': vg_rich_add_brush_handler,
+    'vg_rich_line_height': vg_rich_line_height_handler,
+    'vg_rich_spacing': vg_rich_spacing_handler,
+    'vg_rich_draw': vg_rich_draw_handler,
+    'vg_rich_measure': vg_rich_measure_handler,
+    'vg_draw_push_blend': vg_draw_push_blend_handler,
+    'vg_draw_pop_blend': vg_draw_pop_blend_handler,
+    'vg_draw_push_shadow': vg_draw_push_shadow_handler,
+    'vg_draw_pop_shadow': vg_draw_pop_shadow_handler,
+    'vg_draw_push_mask': vg_draw_push_mask_handler,
+    'vg_draw_pop_mask': vg_draw_pop_mask_handler,
+    'vg_draw_push_clip_path': vg_draw_push_clip_path_handler,
+    'vg_surface': vg_surface_handler,
+    'vg_surface_begin': vg_surface_begin_handler,
+    'vg_surface_end': vg_surface_end_handler,
+    'vg_surface_draw': vg_surface_draw_handler,
+    'vg_surface_pixel': vg_surface_pixel_handler,
+    'vg_surface_free': vg_surface_free_handler,
+    'vg_draw_image_ex': vg_draw_image_ex_handler,
+    'vg_draw_image_round': vg_draw_image_round_handler,
+    'vg_backend': vg_backend_handler,
+    # ---- v6：声明式视觉模板 ----
+    'vg_path_store': vg_path_store_handler,
+    'vg_path_free': vg_path_free_handler,
+    'vg_geo_hit': vg_geo_hit_handler,
+    'vg_textstyle': vg_textstyle_handler,
+    'vg_textstyle_free': vg_textstyle_free_handler,
+    'vg_tpl_create': vg_tpl_create_handler,
+    'vg_tpl_part': vg_tpl_part_handler,
+    'vg_tpl_part_text': vg_tpl_part_text_handler,
+    'vg_tpl_part_dyn': vg_tpl_part_dyn_handler,
+    'vg_tpl_state': vg_tpl_state_handler,
+    'vg_tpl_transition': vg_tpl_transition_handler,
+    'vg_tpl_free': vg_tpl_free_handler,
+    'vg_apply_tpl': vg_apply_tpl_handler,
+    'vg_clear_tpl': vg_clear_tpl_handler,
+    'vg_tpl_default': vg_tpl_default_handler,
+    # ---- v6 配套：表格 / 颜色选择器 / 日期选择器 ----
+    'vg_create_table': _vg_create_named('vg_create_table', 'table'),
+    'vg_table_add_column': vg_table_add_column_handler,
+    'vg_table_add_row': vg_table_add_row_handler,
+    'vg_table_set_cell': vg_table_set_cell_handler,
+    'vg_table_get_selected': vg_table_get_selected_handler,
+    'vg_table_set_selected': vg_table_set_selected_handler,
+    'vg_create_colorpicker': _vg_create_named('vg_create_colorpicker', 'colorpicker'),
+    'vg_colorpicker_set_rgb': vg_colorpicker_set_rgb_handler,
+    'vg_colorpicker_get_rgb': vg_colorpicker_get_rgb_handler,
+    'vg_create_datepicker': _vg_create_named('vg_create_datepicker', 'datepicker'),
+    'vg_datepicker_set_date': vg_datepicker_set_date_handler,
+    'vg_datepicker_get_date': vg_datepicker_get_date_handler,
     # ---- v3：文本富能力 ----
     'vg_draw_text_ex': vg_draw_text_ex_handler,
     'vg_draw_measure_text_ex': vg_draw_measure_text_ex_handler,

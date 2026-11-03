@@ -3,6 +3,7 @@
 #include "ui_component.h"
 #include "renderer.h"
 #include "animation.h"
+#include "visual_template.h"
 
 namespace gui {
 
@@ -27,6 +28,12 @@ public:
     void Update(float deltaTime) override;
 
     // v4：无交互态，直接用基类（disabled 位）
+
+    // ---- v6：模板通道（主值 = 进度 0..1，动画值实时驱动填充条）----
+    float TplValue(int src) const override {
+        (void)src;
+        return m_value;
+    }
     
 private:
     float m_value;
@@ -106,6 +113,11 @@ inline void ProgressBar::Draw(Renderer* renderer) {
     // v4：owner-draw 接管（进度视觉全交回调，值可从外部状态取）
     if (m_paintFn) {
         m_paintFn(renderer, m_bounds.Width(), m_bounds.Height(), StyleFlags());
+        return;
+    }
+    // v6：声明式视觉模板
+    if (m_tplId) {
+        RenderTemplate(this, renderer, StyleFlags());
         return;
     }
 

@@ -3,6 +3,7 @@
 #include "ui_component.h"
 #include "renderer.h"
 #include "animation.h"
+#include "visual_template.h"
 #include <functional>
 
 namespace gui {
@@ -37,6 +38,17 @@ public:
         if (m_isHovered) f |= 0x1;
         if (m_isDragging) f |= 0x2;
         return f;
+    }
+
+    // ---- v6：模板通道（主值 = 归一化 0..1）----
+    float TplValue(int src) const override {
+        (void)src;
+        float span = m_maxValue - m_minValue;
+        if (span <= 0.0f) return 0.0f;
+        float v = (m_value - m_minValue) / span;
+        if (v < 0.0f) v = 0.0f;
+        if (v > 1.0f) v = 1.0f;
+        return v;
     }
     
 private:
@@ -145,6 +157,11 @@ inline void Slider::Draw(Renderer* renderer) {
     // v4：owner-draw 接管（值可经回调自行绘制；拖拽语义不变）
     if (m_paintFn) {
         m_paintFn(renderer, m_bounds.Width(), m_bounds.Height(), StyleFlags());
+        return;
+    }
+    // v6：声明式视觉模板
+    if (m_tplId) {
+        RenderTemplate(this, renderer, StyleFlags());
         return;
     }
     unsigned flags = StyleFlags();

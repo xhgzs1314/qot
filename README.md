@@ -38,7 +38,7 @@ QOT 是一款简洁易用的解释型脚本语言，设计目标是降低编程�
 
 -  动态类型系统，兼顾灵活性与语义检查
 
--  内置图形界面（`vg_*` 约 130 个函数，DirectComposition + Direct2D 渲染，事件回调 + 绘制原语，解释器与原生程序双实现），见 [vgui 手册](plugin/vgui-extension.html)
+-  内置图形界面（`vg_*` 约 270 个函数，DirectComposition + Direct2D 渲染，声明式视觉模板 + 事件回调 + Fluent 级绘制原语，解释器与原生程序双实现），见 [vgui 手册](plugin/vgui-extension.html)
 -  类与对象模型、协议元语（运算符/迭代/输出的编译期绑定）、编译期宏（`macro` + `name!()`）
 
 # 快速开始
@@ -2538,11 +2538,12 @@ output(x);
 
 ## 22. 图形界面
 
-QOT 的官方图形界面是 **`vg_*` 系列（约 130 个函数，DirectComposition + Direct2D 渲染）**，在
+QOT 的官方图形界面是 **`vg_*` 系列（约 270 个函数，DirectComposition + Direct2D 渲染）**，在
 解释器与原生程序上**双实现**：同一份 C++ 源（`ot-asset/c/wingui`），
 解释器经 `build/qotgui.dll` 驱动，原生程序编译期直接链接——行为由同一份
 代码保证一致。控件覆盖：窗口、标签、按钮、复选框、开关、输入框、滑块、
-进度条、卡片、下拉、列表、选项卡、加载指示、画布（自由绘制）、图片。
+进度条、卡片、下拉、列表、选项卡、加载指示、画布（自由绘制）、图片，
+以及 v6 配套的**表格、颜色选择器、日期选择器**。
 
 设计哲学：**框架只提供原语，不封装效果**。毛玻璃 = 透明窗口 + 半透明背景 +
 backdrop 原语自由组合；流畅动画 = `vg_on_frame` + `vg_easing` 自己写；
@@ -2551,7 +2552,7 @@ backdrop 原语自由组合；流畅动画 = `vg_on_frame` + `vg_easing` 自己�
 
 | API | 函数数 | 可用环境 | 说明 |
 | --- | --- | --- | --- |
-| `vg_*` | 约 130 | **解释器 + 原生程序** | 官方 GUI（wingui / DComp + Direct2D） |
+| `vg_*` | 约 270 | **解释器 + 原生程序** | 官方 GUI（wingui / DComp + Direct2D） |
 | `window_*` | 14 | 解释器 | 轻量 Tk 窗口，适合极简脚本 |
 
 ### 22.1 事件模型：回调为主，轮询兼容（v2 双通道）
@@ -2592,7 +2593,9 @@ vg_run();        // 控制权交给消息循环，全部窗口关闭后返回
 触发）/ 20 键按下 / 21 字符 / 22 文本实时改变 / 30 关闭
 请求 / 31 尺寸 / 32 焦点 / 33 失焦 / 40 载入 / 50 菜单命令（v3，value=选中
 项 id，0=取消）/ 51 拖放文件（v3，value=文件数，x/y=落点客户坐标；路径经
-`vg_take_drop_file(i)` 在回调内立刻取）。
+`vg_take_drop_file(i)` 在回调内立刻取）/ 52 状态位变化（v6，value=新状态
+位全量：0x1 悬停 0x2 按下 0x4 禁用 0x8 焦点 0x10 勾选 0x20 展开；绑定位
+0x400000）。
 
 ### 22.2 生命周期与帧原语
 
@@ -2639,6 +2642,35 @@ python index.py aot testing/gui/callback_smoke.qot hello.exe  # 原生程序
 | 绘制进阶 | `vg_draw_push_clip / _pop_clip` / `vg_draw_push_translate / _push_rotate / _push_scale / _pop_transform` / `vg_draw_push_blur / _pop_blur` / `vg_draw_image` |
 | 图片资源 | `vg_image_load(path)` / `vg_image_size` / `vg_image_free` / `vg_create_image(win, path, ...)` |
 
+**v5 Fluent 级绘制原语**（Canvas 回调期间可用；路径/画刷句柄跨帧复用，设备重建后失效需重建）：
+
+| 类别 | 函数 |
+| --- | --- |
+| 路径几何 | `vg_path_begin()` / `vg_path_move_to / _line_to / _quad_to / _curve_to` / `vg_path_arc`（极坐标）/ `vg_path_svg_arc`（W3C 端点参数化）/ `vg_path_rect / _round_rect / _ellipse / _close` → `vg_path_fill(color)` / `vg_path_fill_brush(id)` / `vg_path_stroke(color, w)` / `vg_path_stroke_brush` / `vg_path_bounds()` → [x,y,w,h] / `vg_path_hit(x, y)`（真值命中）/ `vg_path_stroke_hit` |
+| 线型 | `vg_path_line_cap`（0平头1方头2圆头）/ `vg_path_line_join` / `vg_path_miter_limit` / `vg_path_dash([d1,d2...], phase)`——对全部描边生效 |
+| 画刷 | `vg_brush_solid(color)` / `vg_brush_linear(x0,y0,x1,y1, stops)` / `vg_brush_radial(cx,cy,r, stops)` / `vg_brush_radial_focus(...)`（stops = [[pos, color], ...] 多停靠点）/ `vg_brush_bitmap(img)` + `vg_brush_extend`（平铺）/ `vg_brush_transform` / `vg_brush_free`；形状×画刷 `vg_draw_fill_rect_brush / _stroke_rect_brush / _fill_round_rect_brush / ...` |
+| 富文本 | `vg_rich_begin()` / `vg_rich_add(text, size, color[, weight[, italic...]])` / `vg_rich_add_brush`（渐变文字）/ `vg_rich_line_height` / `vg_rich_spacing` / `vg_rich_draw(x, y, w, h, halign, valign, wrap)` / `vg_rich_measure` |
+| 合成效果层 | `vg_draw_push_blend(mode, x, y, w, h)`（13 种 D2D 混合，pop 成对）/ `vg_draw_push_shadow(color, blur, dx, dy, bounds)`（GPU 高斯真阴影）/ `vg_draw_push_mask(brush, ...)`（画刷 alpha 蒙版）/ `vg_draw_push_clip_path()`（任意路径裁剪，pop 用 `vg_draw_pop_clip`）——后三者仅合成路径（`vg_backend()[0]==1`） |
+| 离屏面 | `vg_surface(w, h)` → id / `vg_surface_begin(id)`（后续绘制进面）/ `vg_surface_end()` / `vg_surface_draw(id, x, y, w, h, alpha, interp)`（画一次贴多帧）/ `vg_surface_pixel(id, x, y)` → [r,g,b,a]（真值断言）/ `vg_surface_free` |
+| 图片精控 | `vg_draw_image_ex(img, x, y, w, h, alpha, interp, sx, sy, sw, sh)` / `vg_draw_image_round(..., radius)`（圆角头像） |
+| 路径句柄 | `vg_path_store()` 把当前路径固化为几何句柄（部件形状/命中/裁剪共用；几何挂工厂跨设备安全）/ `vg_geo_hit(path, x, y)` / `vg_path_free` |
+
+**v6 声明式视觉模板**（控件呈现 = 数据驱动的部件模板；与 `vg_on_paint` 代码通道长期并存）：
+
+| 类别 | 函数 |
+| --- | --- |
+| 模板数据 | `vg_tpl_create()` → tpl id / `vg_tpl_part(tpl, name, shape, a, b, c, path_id, fill_kind, fill色, fill_brush, stroke[色,宽], inset, textslot, anchor)` / `vg_tpl_part_text(tpl, part, ts, halign, valign, margin, color)` / `vg_tpl_part_dyn(tpl, part, mode, src, range, c2)`（值驱动几何）/ `vg_tpl_state(tpl, mask, part, prop, 值)` / `vg_tpl_transition(tpl, mask, ms, easing)` / `vg_tpl_free` |
+| 应用 | `vg_apply_tpl(id, tpl)` / `vg_clear_tpl(id)` / `vg_tpl_default(type)`（0按钮1勾选2开关3滑块4进度5组合6选项卡——复制后渐进定制） |
+| 资源 | `vg_textstyle(size, weight, italic, halign, wrap, family)` → ts id / `vg_textstyle_free` |
+
+**v6 配套数据控件**：
+
+| 类别 | 函数 |
+| --- | --- |
+| 表格 | `vg_create_table(win, x, y, w, h)` / `vg_table_add_column(id, title, width)`（width≤0 均分剩余）/ `vg_table_add_row(id, "a;b;c")` / `vg_table_set_cell(id, row, col, text)` / `vg_table_get_selected(id)` → [row, col] / `vg_table_set_selected(id, row, col)`；单击行发 kind=3（value=行，x=列），滚轮滚动 |
+| 颜色选择器 | `vg_create_colorpicker(win, x, y, w, h)` / `vg_colorpicker_set_rgb(id, [r,g,b])` / `vg_colorpicker_get_rgb(id)` → [r,g,b]；SV 方块 + 色相条拖拽实时发 kind=2（value=0xRRGGBB 打包） |
+| 日期选择器 | `vg_create_datepicker(win, x, y, w, h)` / `vg_datepicker_set_date(id, y, m, d)` / `vg_datepicker_get_date(id)` → [y,m,d]；月历翻月点选发 kind=2（value=YYYYMMDD 打包），非法日期拒收 |
+
 **其它**（布局/滚动/模态/富文本/系统集成；kind16 滚动、50 菜单、51 拖放，掩码 0x80000 / 0x100000 / 0x200000）：
 
 | 类别 | 函数 |
@@ -2671,7 +2703,75 @@ Canvas 动画稳定 60fps（修正前 34fps，瓶颈是节拍不是重绘）。
 循环）；轮询模式按 `loop { vg_wait_event(15) ... }` 骨架来。两者不要混在
 同一窗口上同时使用主循环。
 
-### 22.5 window_*（解释器可用，轻量替代）
+### 22.5 声明式视觉模板（v6）
+
+控件呈现 = **数据驱动的部件模板**（ControlTemplate + VisualState +
+Transition）：`vg_tpl_create()` 造模板 → `vg_tpl_part` 逐部件登记 →
+`vg_tpl_state` 声明状态覆盖 → `vg_tpl_transition` 声明状态过渡 →
+`vg_apply_tpl(id, tpl)` 应用到控件。模板跨控件共享（句柄化），动画状态挂
+控件实例；`vg_on_paint` 代码通道与模板数据通道长期并存（优先级：
+on_paint 接管 > 模板 > 控件默认），后续一切新控件都吃到它。
+
+```
+// 从默认模板起步，渐进定制（同名 part 更新、状态覆盖追加）
+var tpl = vg_tpl_default(0);                       // 0=按钮 1=勾选 2=开关
+                                                   // 3=滑块 4=进度 5=下拉 6=选项卡
+vg_tpl_part(tpl, "bg", 1, 12, 0, 0, 0,             // 名叫 bg 的部件：shape=1 圆角，
+    1, [0.12, 0.50, 0.35, 1], 0,                   //   a=12 半径；fill_kind=1 纯色
+    [[0.5, 1.0, 0.75, 0.8], 1.5],                  //   stroke = [色, 宽]
+    null, 0, 0);                                   //   inset/textslot/anchor 默认
+vg_tpl_state(tpl, 1, "bg", 0, [0.95, 0.45, 0.20, 1]);  // hover(掩码 1)：填充色变
+vg_tpl_state(tpl, 2, "bg", 4, [0, -2]);                // pressed(掩码 2)：上移 2px
+vg_tpl_transition(tpl, 3, 250, 2);                     // 悬停+按下的切换 250ms 缓动 2
+vg_apply_tpl(btn, tpl);
+```
+
+要点：
+
+| 概念 | 说明 |
+| --- | --- |
+| part 形状 shape | 0 矩形 / 1 圆角（a=半径）/ 2 椭圆 / 3 路径（path_id 来自 `vg_path_store`，a>0 时定尺寸框内适配）/ 4 定尺寸圆角（a=w b=h c=r，垂直居中锚定）/ 5 定尺寸椭圆 / 6 水平条（a=高 b=半径，水平满宽垂直居中）；anchor 0 左 1 中 2 右 |
+| 填充 fill_kind | 0 无 / 1 纯色 / 2 画刷句柄（`vg_brush_solid` 等）/ 3 双色垂直渐变（fill 色 → dyn 的 c2 色） |
+| 文字槽 | part 设 `textslot=1` 画控件文本；`vg_tpl_part_text` 配 ts（`vg_textstyle(size, weight, italic, halign, wrap, family)`）精调字体与对齐 |
+| 状态掩码 mask | 1 悬停 / 2 按下 / 4 禁用 / 8 焦点 / **16 勾选** / **32 展开**——全部命中当前状态才生效；prop：0 填充色 1 填充刷 2 描边色 3 描边宽 4 平移 5 缩放 6 旋转 7 透明 8 圆角 |
+| 过渡 transition | `vg_tpl_transition(tpl, mask, ms, easing)`——状态位变化的切换自动插值（12 缓动同 `vg_easing`），过渡期自动续帧、结束自然停帧 |
+| 值驱动 dyn | `vg_tpl_part_dyn(tpl, part, mode, src, range, c2)`：mode 0 无 1 宽按值 2 x 位移（range<0 自动） 3 缩放（c2[0]=最小比例） 4 透明 5 高按值（锚底） 6 填充色按值 lerp；src 0 主值（滑块/进度/勾选） 1 检查动画进度——slider 的滑块、progressbar 的填充条、toggle 的推钮都由它驱动 |
+
+勾选/展开态会进状态位（`vg_style_flags` 高位 0x10 / 0x20），状态位变化
+实时发 **kind=52** 事件（value=新状态位全量，绑定位 0x400000）——UI 状态
+第一次成为一等公民事件流。完整示范见 `testing/gui/tpl_v6.qot`
+（同一按钮套 5 种模板 + 默认模板全家桶，64 断言，双侧可跑）。
+
+### 22.6 数据控件三件套（v6 配套）
+
+表格、颜色选择器、日期选择器——同样吃模板红利（容器框可换肤，动态内容
+代码绘制）：
+
+```
+// 表格：列 + 行（';' 分隔单元格），单击行选中
+var tbl = vg_create_table(w, 20, 20, 420, 220);
+vg_table_add_column(tbl, "名称", 140);          // width<=0 = 均分剩余
+vg_table_add_column(tbl, "数量", 0);
+vg_table_add_row(tbl, "机械键盘;7;199.0");
+vg_table_set_cell(tbl, 2, 2, "99.0");
+vg_bind(tbl, 4, func(id, v, x, y) -> output("选中行 " + str(v) + " 列 " + str(x)));
+
+// 颜色选择器：SV 方块 + 色相条，拖拽实时 CHANGE
+var cp = vg_create_colorpicker(w, 470, 20, 240, 200);
+vg_bind(cp, 2, func(id, v, x, y) -> output("0x" + str(v)));   // v = 0xRRGGBB 打包
+vg_colorpicker_set_rgb(cp, [1.0, 0.6, 0.2]);
+
+// 日期选择器：月历翻月点选，CHANGE
+var dp = vg_create_datepicker(w, 470, 240, 260, 260);
+vg_bind(dp, 2, func(id, v, x, y) -> output(str(v)));          // v = YYYYMMDD 打包
+vg_datepicker_set_date(dp, 2026, 11, 3);
+```
+
+注意：颜色/日期的 CHANGE 是**程序化设置也会发**的事件（`vg_colorpicker_set_rgb`
+/ `vg_datepicker_set_date` 同样触发），拖拽类高频路径已按「绑定过才入队」
+节流。验收：`testing/gui/pickers_table.qot`（38 断言，双侧可跑）。
+
+### 22.7 window_*（解释器可用，轻量替代）
 
 | 函数 | 作用 |
 | --- | --- |
@@ -2708,14 +2808,14 @@ window_loop(win);
 **注意**：GUI 函数只在解释器侧可用，编译成原生程序会在编译期报「该内置在原生后端缺席」。
 事件回调里要改的变量请声明在**顶层**（解释器里函数内写全局变量不生效，见 [21.2](#212-语义差异)）。
 
-### 22.6 附录：vg_* 详细参考（旧版手册）
+### 22.8 附录：vg_* 详细参考（旧版手册）
 
 以下小节来自旧版手册的详细说明。**过时之处**：事件模型已改为轮询
 （`vg_wait_event` / `vg_poll_event`，见 22.1），旧 `*_on_*` 回调注册函数
 已移除；实现也不再依赖旧字节码 VM（现为 wingui，双引擎同源）。创建、
 属性、取值等函数形态仍然适用，可作速查。
 
-### 22.7 附录 A：旧版事件绑定（`*_on_*` 已移除，历史参考）
+### 22.9 附录 A：旧版事件绑定（`*_on_*` 已移除，历史参考）
 
 旧实现支持 `*_on_*` 回调注册的四种写法（前三种可混用）。**这套函数已从
 API 移除**，现行事件模型见 22.1——本节仅作历史参考。
@@ -2799,7 +2899,7 @@ vg_combobox_on_selected(cb, pick);
 
 **形参个数请照着上表写全**，不要指望「少写几个就只收前几个」。
 
-### 22.8 附录 B：函数总表（旧版 62 个形态；现行清单以[内置函数参考](plugin/function_inside.html)的 GUI 组为准）
+### 22.10 附录 B：函数总表（旧版 62 个形态；现行清单以[内置函数参考](plugin/function_inside.html)的 GUI 组为准）
 
 #### 生命周期与窗口
 
@@ -2907,7 +3007,7 @@ vg_combobox_on_selected(cb, pick);
 
 ⚠ `vg_tabcontrol` **没有**切换事件回调，也没有 `get_selected`。
 
-### 22.9 附录 C：一个完整例子（旧版形态，事件部分需按 22.1 改写）
+### 22.11 附录 C：一个完整例子（旧版形态，事件部分需按 22.1 改写）
 
 ```
 var win;
@@ -2953,7 +3053,7 @@ vg_run();
 vg_uninit();
 ```
 
-### 22.10 附录 D：注意事项（旧版要点，现行实现基本沿用）
+### 22.12 附录 D：注意事项（旧版要点，现行实现基本沿用）
 
 - **返回值是 ID 字符串**，不是对象；`vg_*` 函数失败时**只返回 `false`，不报错**，控件没反应先查 ID 传对没有
 - **窗口类函数不收窗口 ID**（`vg_show_window` / `vg_close_window` / `vg_set_window_*`），多传一个 `win` 会把真参数挤掉

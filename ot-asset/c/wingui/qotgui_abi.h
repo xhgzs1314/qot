@@ -48,6 +48,7 @@ extern "C" {
 #define QG_EVT_LOAD       40   /* 窗口首次显示 */
 #define QG_EVT_MENU       50   /* v3：菜单命令（value = 选中项 id；0 = 取消） */
 #define QG_EVT_DROP       51   /* v3：拖放文件（value = 文件数，x/y = 落点客户坐标） */
+#define QG_EVT_STATE      52   /* v6：控件状态位变化（value = 新状态位全量） */
 
 /* ---- 绑定掩码位（kind 对应的固定 bit） ---- */
 #define QG_BIT_CLICK      0x00001u
@@ -73,7 +74,8 @@ extern "C" {
 #define QG_BIT_SCROLL     0x80000u   /* kind 16 滚动        */
 #define QG_BIT_MENU       0x100000u  /* kind 50 菜单命令    */
 #define QG_BIT_DROP       0x200000u  /* kind 51 拖放文件    */
-#define QG_BIT_ALL        0x3FFFFFu
+#define QG_BIT_STATE      0x400000u  /* kind 52 状态位变化（v6） */
+#define QG_BIT_ALL        0x7FFFFFu
 
 /* ---- 生命周期 ---- */
 QOTGUI_API int  qg_init(void);
@@ -127,6 +129,27 @@ QOTGUI_API int  qg_create_tabcontrol(int win, int x, int y, int w, int h);
 QOTGUI_API int  qg_create_spinner(int win, int x, int y, int w, int h);
 QOTGUI_API int  qg_create_canvas(int win, int x, int y, int w, int h);
 QOTGUI_API int  qg_create_image(int win, const char *path, int x, int y, int w, int h);
+
+/* ---- v6 配套：表格 / 颜色选择器 / 日期选择器 ----
+ * Table：列（title+width，width<=0 均分剩余）+ 行（';' 分隔单元格串）；
+ *   单击行选中 → kind=3 SELECT（value=行索引，x=列索引）；滚轮滚动；
+ *   容器框吃 v6 模板（bg part），表头/网格/行文本动态结构代码绘制。
+ * ColorPicker：SV 方块（横饱和度/纵明度）+ 色相条 + 当前色预览；
+ *   拖拽实时 → kind=2 CHANGE（value = 0xRRGGBB packed）。
+ * DatePicker：月历（头部翻月 + 星期行 + 6x7 日格，今天描边、选中填充）；
+ *   点选 → kind=2 CHANGE（value = YYYYMMDD packed，如 20261103）。 */
+QOTGUI_API int  qg_create_table(int win, int x, int y, int w, int h);
+QOTGUI_API int  qg_table_add_column(int id, const char *title, float width);
+QOTGUI_API int  qg_table_add_row(int id, const char *cells);   /* ';' 分隔 */
+QOTGUI_API int  qg_table_set_cell(int id, int row, int col, const char *text);
+QOTGUI_API int  qg_table_get_selected(int id, int *row, int *col);
+QOTGUI_API int  qg_table_set_selected(int id, int row, int col);
+QOTGUI_API int  qg_create_colorpicker(int win, int x, int y, int w, int h);
+QOTGUI_API int  qg_colorpicker_set_rgb(int id, float r, float g, float b);
+QOTGUI_API int  qg_colorpicker_get_rgb(int id, float *r, float *g, float *b);
+QOTGUI_API int  qg_create_datepicker(int win, int x, int y, int w, int h);
+QOTGUI_API int  qg_datepicker_set_date(int id, int y, int m, int d);
+QOTGUI_API int  qg_datepicker_get_date(int id, int *y, int *m, int *d);
 
 /* ---- 通用属性 ---- */
 QOTGUI_API int  qg_set_text(int id, const char *text);
@@ -386,6 +409,188 @@ QOTGUI_API void qg_draw_pop_transform(void);
 QOTGUI_API void qg_draw_image(int img, float x, float y, float w, float h, float alpha);
 QOTGUI_API void qg_draw_push_blur(float radius, float x, float y, float w, float h);
 QOTGUI_API void qg_draw_pop_blur(void);
+
+/* ===========================================================================
+ * v5：绘制原语
+ *
+ *   * 路径几何：moveTo/lineTo/quad/bezier/arc/SVG 弧/子形状 → fill/stroke；
+ *     bounds/hitTest 让矢量图形可交互；
+ *   * 画刷系统：多停靠点线性/径向（焦点偏移）/位图画刷，句柄化跨帧复用；
+ *     extend（平铺）与 transform 让位图画刷即 WinUI ImageBrush；
+ *   * 线型：cap/join/miter/dash（对全部描边原语生效）；
+ *   * 富文本：vg_rich_*（inline 混排：每 span 字号/颜色/字重/斜体/下划线/
+ *     删除线/渐变画刷文字 + 行高/字距）；
+ *   * 合成效果层：16 种混合模式（qg_draw_push_blend）、任意内容 GPU 高斯
+ *     真阴影（qg_draw_push_shadow）、画刷透明度蒙版（qg_draw_push_mask）、
+ *     任意路径几何裁剪（qg_draw_push_clip_path，pop 用 qg_draw_pop_clip）；
+ *   * 离屏面：qg_surface_*（缓存层：画一次贴多帧）+ 像素读回
+ *     （qg_surface_pixel，真值断言/测试用；仅 DComp 路径）；
+ *   * 图片精控：qg_draw_image_ex（插值模式 + 源矩形）、
+ *     qg_draw_image_round（圆角裁剪）；
+ *   * 能力探测：qg_backend_info（合成路径 + DPI）。
+ *
+ * 状态语义（与 v2 事件通道相同的"单绘制上下文"纪律）：
+ *   路径/画刷构建器/富文本 span 都是【当前绘制上下文】的暂存状态，
+ *   Canvas 回调内使用（路径坐标相对画布原点，与 vg_draw_* 一致）。
+ *   画刷/离屏面句柄（brush id / surface id）跨帧存活（ABI 层表管理，
+ *   设备重建后失效 —— 与图片 id 同一先例；free 显式回收）。
+ * 混合模式常量 = D2D1_COMPOSITE_MODE 枚举值（0..12）：
+ *   0 SOURCE_OVER  1 DESTINATION_OVER  2 SOURCE_IN  3 DESTINATION_IN
+ *   4 SOURCE_OUT   5 DESTINATION_OUT   6 SOURCE_ATOP 7 DESTINATION_ATOP
+ *   8 XOR          9 PLUS             10 SOURCE_COPY 11 BOUNDED_SOURCE_COPY
+ *   12 MASK_INVERT
+ * =========================================================================== */
+
+/* ---- 路径几何（构建 → 填充/描边/查询） ---- */
+QOTGUI_API int  qg_path_reset(void);
+QOTGUI_API int  qg_path_move_to(float x, float y);
+QOTGUI_API int  qg_path_line_to(float x, float y);
+QOTGUI_API int  qg_path_quad_to(float cx, float cy, float x, float y);
+QOTGUI_API int  qg_path_bezier_to(float c1x, float c1y, float c2x, float c2y, float x, float y);
+QOTGUI_API int  qg_path_arc(float cx, float cy, float rx, float ry, float startRad, float sweepRad);
+QOTGUI_API int  qg_path_svg_arc(float rx, float ry, float rotationRad,
+                                 int largeArc, int sweep, float x, float y);
+QOTGUI_API int  qg_path_rect(float x, float y, float w, float h);
+QOTGUI_API int  qg_path_round_rect(float x, float y, float w, float h, float rx, float ry);
+QOTGUI_API int  qg_path_ellipse(float cx, float cy, float rx, float ry);
+QOTGUI_API int  qg_path_close(void);
+QOTGUI_API int  qg_path_fill(float r, float g, float b, float a);
+QOTGUI_API int  qg_path_fill_brush(int brush);
+QOTGUI_API int  qg_path_stroke(float r, float g, float b, float a, float width);
+QOTGUI_API int  qg_path_stroke_brush(int brush, float width);
+QOTGUI_API int  qg_path_bounds(float *x, float *y, float *w, float *h);
+QOTGUI_API int  qg_path_hit(float x, float y);               /* 填充命中 1/0 */
+QOTGUI_API int  qg_path_stroke_hit(float x, float y, float width);
+/* 线型状态（对全部描边生效；cap 0..2 / join 0..3 见 d2d1.h） */
+QOTGUI_API int  qg_path_line_cap(int cap);
+QOTGUI_API int  qg_path_line_join(int join);
+QOTGUI_API int  qg_path_miter_limit(float limit);
+QOTGUI_API int  qg_path_dash(const float *dashes, int count, float phase);
+
+/* ---- 画刷系统（id 句柄；渐变构建器 begin → add_stop×N → end） ---- */
+QOTGUI_API int  qg_brush_solid(float r, float g, float b, float a);
+QOTGUI_API int  qg_brush_linear_begin(float x0, float y0, float x1, float y1);
+QOTGUI_API int  qg_brush_radial_begin(float cx, float cy, float fx, float fy,
+                                       float rx, float ry);
+QOTGUI_API int  qg_brush_add_stop(float pos, float r, float g, float b, float a);
+QOTGUI_API int  qg_brush_end(void);
+QOTGUI_API void qg_brush_free(int brush);
+QOTGUI_API int  qg_brush_extend(int brush, int modeX, int modeY);  /* 仅位图画刷 */
+QOTGUI_API int  qg_brush_transform(int brush,
+                                    float m11, float m12, float m21, float m22,
+                                    float dx, float dy);
+QOTGUI_API int  qg_brush_bitmap(int img);   /* 从图片 id 建位图画刷 */
+
+/* ---- 形状 × 画刷 ---- */
+QOTGUI_API int  qg_draw_fill_rect_brush(int brush, float x, float y, float w, float h);
+QOTGUI_API int  qg_draw_stroke_rect_brush(int brush, float x, float y, float w, float h, float width);
+QOTGUI_API int  qg_draw_fill_round_rect_brush(int brush, float x, float y, float w, float h, float radius);
+QOTGUI_API int  qg_draw_stroke_round_rect_brush(int brush, float x, float y, float w, float h, float radius, float width);
+QOTGUI_API int  qg_draw_fill_ellipse_brush(int brush, float cx, float cy, float rx, float ry);
+QOTGUI_API int  qg_draw_stroke_ellipse_brush(int brush, float cx, float cy, float rx, float ry, float width);
+
+/* ---- 富文本（inline 混排；weight = DWRITE_FONT_WEIGHT 数值 100..900） ---- */
+QOTGUI_API int  qg_rich_begin(void);
+QOTGUI_API int  qg_rich_add(const char *utf8, float size,
+                             float r, float g, float b, float a,
+                             int weight, int italic, int underline, int strikethrough);
+QOTGUI_API int  qg_rich_add_brush(const char *utf8, float size, int brush,
+                                   int weight, int italic, int underline, int strikethrough);
+QOTGUI_API int  qg_rich_line_height(float lineH, float baseline);   /* <=0 恢复默认 */
+QOTGUI_API int  qg_rich_spacing(float leading, float trailing,
+                                 float advance, float minAdvance);
+QOTGUI_API int  qg_rich_draw(float x, float y, float w, float h,
+                              int halign, int valign, int wrap);
+QOTGUI_API int  qg_rich_measure(int wrap, float maxw, float *out_w, float *out_h);
+
+/* ---- 合成效果层（push/pop 成对；blend/shadow 仅 DComp 路径，失败返回 0） ---- */
+QOTGUI_API int  qg_draw_push_blend(int mode, float x, float y, float w, float h);
+QOTGUI_API int  qg_draw_pop_blend(void);
+QOTGUI_API int  qg_draw_push_shadow(float r, float g, float b, float a,
+                                     float blur, float dx, float dy,
+                                     float x, float y, float w, float h);
+QOTGUI_API int  qg_draw_pop_shadow(void);
+QOTGUI_API int  qg_draw_push_mask(int brush, float x, float y, float w, float h, float opacity);
+QOTGUI_API int  qg_draw_pop_mask(void);
+QOTGUI_API int  qg_draw_push_clip_path(void);   /* pop 用 qg_draw_pop_clip */
+
+/* ---- 离屏面（缓存层：画一次贴多帧；像素读回仅 DComp 路径） ---- */
+QOTGUI_API int  qg_surface_create(int w, int h);
+QOTGUI_API int  qg_surface_begin(int id);
+QOTGUI_API int  qg_surface_end(void);
+QOTGUI_API int  qg_surface_draw(int id, float x, float y, float w, float h,
+                                 float alpha, int interp);
+QOTGUI_API int  qg_surface_pixel(int id, int x, int y,
+                                  float *r, float *g, float *b, float *a);
+QOTGUI_API void qg_surface_free(int id);
+
+/* ---- 图片精控（interp 0 nearest 1 linear；src 空矩形 = 整图） ---- */
+QOTGUI_API int  qg_draw_image_ex(int img, float x, float y, float w, float h,
+                                  float alpha, int interp,
+                                  float srcX, float srcY, float srcW, float srcH);
+QOTGUI_API int  qg_draw_image_round(int img, float x, float y, float w, float h,
+                                     float alpha, int interp, float radius);
+
+/* ---- 能力探测（合成路径 + 当前 DPI；自适应布局用） ---- */
+QOTGUI_API int  qg_backend_info(int *composed, int *dpi);
+
+/* ===========================================================================
+ * v6：声明式视觉模板（ControlTemplate + VisualState + Transition）
+ *
+ *   * 路径句柄化：vg_path_store 把当前构建路径固化为几何句柄（挂 factory，
+ *     跨设备安全）——部件形状/命中/裁剪共用；qg_geo_hit 命中测试；
+ *   * 文字样式块：qg_textstyle_create 打包 size/weight/italic/align/wrap/
+ *     family → ts 句柄（模板文字槽用）；
+ *   * 模板：qg_tpl_create → qg_tpl_part 逐部件（形状/填充/描边/inset/文字槽）
+ *     → qg_tpl_part_text 文字精调 / qg_tpl_part_dyn 值驱动几何
+ *     → qg_tpl_state 状态覆盖（mask 位：1 hover|2 pressed|4 disabled|8 focused
+ *     |16 checked|32 open）→ qg_tpl_transition 状态切换自动插值（12 缓动）；
+ *   * 应用：qg_apply_template(id, tpl) 后控件默认绘制让位（owner-draw 接管
+ *     优先级最高，模板次之）；qg_tpl_default(type) 取默认模板副本渐进定制。
+ *
+ * shape 编码：0 rect（inset 区域） 1 round（shape_a=radius） 2 ellipse
+ *   3 path（path_id；shape_a>0 = fixed 框内适配，shape_b=h）
+ *   4 fixed-round（a=w b=h c=radius，垂直居中锚定） 5 fixed-ellipse（a=w b=h）
+ *   6 hstrip（a=height b=radius，水平满宽垂直居中）；anchor：0 左 1 中 2 右
+ * fill_kind：0 none 1 color 2 brush（fill_brush 句柄）3 双色垂直渐变
+ *   （fill_color → part 的 fill2Color，后者经 qg_tpl_part_dyn 的 c2 设置）
+ * qg_tpl_state 的 prop：0 fill_color(v0..v3) 1 fill_brush(v0=句柄)
+ *   2 stroke_color 3 stroke_width(v0) 4 translate(v0,v1) 5 scale(v0,v1)
+ *   6 rotate(v0) 7 opacity(v0) 8 radius(v0)
+ * qg_tpl_part_dyn 的 value_mode：0 无 1 宽度按值 2 x 位移（range<0 自动）
+ *   3 缩放按值（c2[0]=最小比例） 4 透明度按值 5 高度按值（锚底）
+ *   6 fill 色按值 lerp（c2 = 第二色；兼作 fill_kind=3 渐变尾色）
+ * value_src：0 主值（滑块/进度/勾选） 1 检查动画进度
+ * =========================================================================== */
+QOTGUI_API int  qg_path_store(void);                    /* 当前路径 → 几何句柄 */
+QOTGUI_API void qg_path_free(int path);
+QOTGUI_API int  qg_geo_hit(int path, float x, float y);  /* 句柄几何填充命中 */
+
+QOTGUI_API int  qg_textstyle_create(float size, int weight, int italic,
+                                    int halign, int wrap, const char *family);
+QOTGUI_API void qg_textstyle_free(int ts);
+
+QOTGUI_API int  qg_tpl_create(void);
+QOTGUI_API int  qg_tpl_part(int tpl, const char *name, int shape,
+                            float shape_a, float shape_b, float shape_c, int path_id,
+                            int anchor, int fill_kind, float fr, float fg, float fb, float fa,
+                            int fill_brush,
+                            int stroke_set, float sr, float sg, float sb, float sa, float sw,
+                            float il, float it, float ir, float ib, int textslot);
+QOTGUI_API int  qg_tpl_part_text(int tpl, const char *part, int ts_id,
+                                 int halign, int valign,
+                                 float ml, float mt, float mr, float mb,
+                                 int color_set, float r, float g, float b, float a);
+QOTGUI_API int  qg_tpl_part_dyn(int tpl, const char *part, int value_mode, int value_src,
+                                float range, float c2r, float c2g, float c2b, float c2a);
+QOTGUI_API int  qg_tpl_state(int tpl, unsigned state_mask, const char *part, int prop,
+                             float v0, float v1, float v2, float v3);
+QOTGUI_API int  qg_tpl_transition(int tpl, unsigned state_mask, float ms, int easing);
+QOTGUI_API void qg_tpl_free(int tpl);
+
+QOTGUI_API int  qg_apply_template(int id, int tpl);
+QOTGUI_API int  qg_clear_template(int id);
+QOTGUI_API int  qg_tpl_default(int type);   /* 0 btn 1 chk 2 tgl 3 sld 4 prg 5 cbx 6 tab */
 
 #ifdef __cplusplus
 }

@@ -8,6 +8,7 @@
 #include <dcomp.h>
 #include <wincodec.h>
 #include <windows.h>
+#include <cmath>
 
 namespace gui {
 
@@ -80,7 +81,27 @@ Renderer::Renderer()
     , m_blurCmd(nullptr)
     , m_blurOldTarget(nullptr)
     , m_blurRadius(0.0f)
-    , m_blurBounds(0, 0, 0, 0) {
+    , m_blurBounds(0, 0, 0, 0)
+    , m_path(nullptr)
+    , m_pathSink(nullptr)
+    , m_pathFigureOpen(false)
+    , m_pathCurX(0.0f)
+    , m_pathCurY(0.0f)
+    , m_lineCap(0)
+    , m_lineJoin(0)
+    , m_miterLimit(10.0f)
+    , m_dashPhase(0.0f)
+    , m_strokeStyle(nullptr)
+    , m_strokeStyleDirty(false)
+    , m_richLineH(0.0f)
+    , m_richBaseline(0.0f)
+    , m_richLeadSpacing(0.0f)
+    , m_richTrailSpacing(0.0f)
+    , m_richAdvanceSpacing(0.0f)
+    , m_richMinAdvance(0.0f)
+    , m_richSpacingSet(false)
+    , m_surfaceOldImage(nullptr)
+    , m_surfaceOldRT(nullptr) {
 }
 
 Renderer::~Renderer() {
@@ -88,6 +109,24 @@ Renderer::~Renderer() {
     if (m_blurCmd && m_ctx) m_ctx->SetTarget(m_blurOldTarget);
     if (m_blurCmd) { m_blurCmd->Release(); m_blurCmd = nullptr; }
     if (m_blurOldTarget) { m_blurOldTarget->Release(); m_blurOldTarget = nullptr; }
+    // v5 效果层若悬空（pop 未配对），逐层还原目标再释放
+    while (!m_effectStack.empty()) {
+        EffectLayer &L = m_effectStack.back();
+        if (L.cmd && m_ctx) m_ctx->SetTarget(L.oldTarget);
+        if (L.cmd) L.cmd->Release();
+        if (L.oldTarget) L.oldTarget->Release();
+        if (L.snap) L.snap->Release();
+        m_effectStack.pop_back();
+    }
+    // 离屏面若悬空，先还原渲染目标（防御：pop 未配对就销毁）
+    if (m_surfaceOldImage && m_ctx) m_ctx->SetTarget(m_surfaceOldImage);
+    if (m_surfaceOldImage) { m_surfaceOldImage->Release(); m_surfaceOldImage = nullptr; }
+    if (m_surfaceOldRT && m_renderTarget != m_surfaceOldRT) m_renderTarget = m_surfaceOldRT;
+    m_surfaceOldRT = nullptr;
+    // 路径构建器悬空收尾
+    ClosePathSink();
+    if (m_path) { m_path->Release(); m_path = nullptr; }
+    if (m_strokeStyle) { m_strokeStyle->Release(); m_strokeStyle = nullptr; }
     ReleaseRenderTargets();
     ReleaseDCompStack();
 
@@ -273,6 +312,12 @@ void Renderer::ReleaseRenderTargets() {
     // 别名纪律：DComp 路径 m_renderTarget == m_ctx；回退路径 == m_hwndRT。
     // 同一对象只 Release 一次，三个指针一起置空 —— 顺序：先释放由目标
     // 设备分配的资源（笔刷/目标位图），再摘目标，最后释放目标设备本身。
+    // v5：离屏绘制若活跃（设备重建于 EndDraw，不可能在离屏中段 —— 防御性
+    // 处理），先还原渲染目标再释放；路径/线型挂工厂不随设备失效。
+    if (m_surfaceOldRT && m_renderTarget != m_surfaceOldRT) {
+        m_renderTarget = m_surfaceOldRT;   // HwndRT 路径的离屏还原
+    }
+    m_surfaceOldRT = nullptr;
     for (auto& cache : m_brushCache) {
         if (cache.brush) cache.brush->Release();
     }
@@ -452,6 +497,363 @@ void Renderer::PopBlurLayer() {
     }
 }
 
+// ===========================================================================
+// v5：绘制原语 —— 路径几何 / 线型 / 画刷 / 形状×画刷 / 富文本 /
+//      合成效果层 / 离屏面 / 图片精控
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// 路径构建器：sink 打开期间逐段写入；fill/stroke/查询前自动收尾 sink。
+// 坐标系与 vg_draw_* 完全一致（ABI 层负责画布偏移）。
+// ---------------------------------------------------------------------------
+void Renderer::ClosePathSink() {
+    if (!m_pathSink) return;
+    if (m_pathFigureOpen) {
+        m_pathSink->EndFigure(D2D1_FIGURE_END_OPEN);   // 未显式 close 的子路径保持开放
+        m_pathFigureOpen = false;
+    }
+    m_pathSink->Close();
+    m_pathSink->Release();
+    m_pathSink = nullptr;
+}
+
+void Renderer::EnsurePathFigure() {
+    if (m_pathSink && !m_pathFigureOpen) {
+        m_pathSink->BeginFigure(D2D1::Point2F(m_pathCurX, m_pathCurY), D2D1_FIGURE_BEGIN_FILLED);
+        m_pathFigureOpen = true;
+    }
+}
+
+bool Renderer::PathReset() {
+    ClosePathSink();
+    if (m_path) { m_path->Release(); m_path = nullptr; }
+    if (!m_d2dFactory) return false;
+    if (FAILED(m_d2dFactory->CreatePathGeometry(&m_path))) return false;
+    if (FAILED(m_path->Open(&m_pathSink))) {
+        m_path->Release();
+        m_path = nullptr;
+        return false;
+    }
+    m_pathFigureOpen = false;
+    m_pathCurX = m_pathCurY = 0.0f;
+    return true;
+}
+
+void Renderer::PathMoveTo(float x, float y) {
+    if (!m_pathSink) return;
+    if (m_pathFigureOpen) {
+        m_pathSink->EndFigure(D2D1_FIGURE_END_OPEN);
+        m_pathFigureOpen = false;
+    }
+    m_pathCurX = x;
+    m_pathCurY = y;
+}
+
+void Renderer::PathLineTo(float x, float y) {
+    if (!m_pathSink) return;
+    EnsurePathFigure();
+    m_pathSink->AddLine(D2D1::Point2F(x, y));
+    m_pathCurX = x;
+    m_pathCurY = y;
+}
+
+void Renderer::PathQuadTo(float cx, float cy, float x, float y) {
+    if (!m_pathSink) return;
+    EnsurePathFigure();
+    // 二次 → 三次提升（控制点 1/3 处）
+    float c1x = m_pathCurX + 2.0f * (cx - m_pathCurX) / 3.0f;
+    float c1y = m_pathCurY + 2.0f * (cy - m_pathCurY) / 3.0f;
+    float c2x = x + 2.0f * (cx - x) / 3.0f;
+    float c2y = y + 2.0f * (cy - y) / 3.0f;
+    m_pathSink->AddBezier(D2D1::BezierSegment(
+        D2D1::Point2F(c1x, c1y), D2D1::Point2F(c2x, c2y), D2D1::Point2F(x, y)));
+    m_pathCurX = x;
+    m_pathCurY = y;
+}
+
+void Renderer::PathBezierTo(float c1x, float c1y, float c2x, float c2y, float x, float y) {
+    if (!m_pathSink) return;
+    EnsurePathFigure();
+    m_pathSink->AddBezier(D2D1::BezierSegment(
+        D2D1::Point2F(c1x, c1y), D2D1::Point2F(c2x, c2y), D2D1::Point2F(x, y)));
+    m_pathCurX = x;
+    m_pathCurY = y;
+}
+
+void Renderer::PathArcTo(float cx, float cy, float rx, float ry, float startRad, float sweepRad) {
+    if (!m_pathSink) return;
+    if (rx <= 0.0f || ry <= 0.0f || sweepRad == 0.0f) return;
+    // 中心角式 → 端点参数化：拆成 |sweep| ≤ π 的段序列（D2D 单弧限制）
+    const float kTwoPi = 6.28318530718f;
+    const float kPi = 3.14159265359f;
+    float s = startRad;
+    float remaining = sweepRad;
+    while (remaining > kTwoPi) {   // 多圈逐圈吃掉
+        PathArcTo(cx, cy, rx, ry, s, kTwoPi);
+        s += kTwoPi;
+        remaining -= kTwoPi;
+    }
+    while (remaining < -kTwoPi) {
+        PathArcTo(cx, cy, rx, ry, s, -kTwoPi);
+        s -= kTwoPi;
+        remaining += kTwoPi;
+    }
+    while (remaining != 0.0f) {
+        float seg = remaining;
+        if (seg > kPi) seg = kPi;
+        else if (seg < -kPi) seg = -kPi;
+        float ex = cx + rx * static_cast<float>(std::cos(s + seg));
+        float ey = cy + ry * static_cast<float>(std::sin(s + seg));
+        if (!m_pathFigureOpen) {
+            m_pathCurX = cx + rx * static_cast<float>(std::cos(s));
+            m_pathCurY = cy + ry * static_cast<float>(std::sin(s));
+        }
+        EnsurePathFigure();
+        m_pathSink->AddArc(D2D1::ArcSegment(
+            D2D1::Point2F(ex, ey),
+            D2D1::SizeF(rx, ry),
+            0.0f,
+            seg > 0.0f ? D2D1_SWEEP_DIRECTION_CLOCKWISE : D2D1_SWEEP_DIRECTION_COUNTER_CLOCKWISE,
+            static_cast<float>(std::fabs(seg)) > kPi ? D2D1_ARC_SIZE_LARGE : D2D1_ARC_SIZE_SMALL));
+        m_pathCurX = ex;
+        m_pathCurY = ey;
+        s += seg;
+        remaining -= seg;
+    }
+}
+
+void Renderer::PathSvgArcTo(float rx, float ry, float rotationRad, bool largeArc, bool sweep, float x, float y) {
+    if (!m_pathSink) return;
+    if (rx <= 0.0f || ry <= 0.0f) {   // 退化直线（SVG 规范行为）
+        PathLineTo(x, y);
+        return;
+    }
+    // W3C SVG 1.1 附录 F：端点参数化 → 中心参数化
+    float x1 = m_pathCurX, y1 = m_pathCurY;
+    float phi = rotationRad;
+    float cosp = static_cast<float>(std::cos(phi)), sinp = static_cast<float>(std::sin(phi));
+    float dx2 = (x1 - x) / 2.0f, dy2 = (y1 - y) / 2.0f;
+    float x1p = cosp * dx2 + sinp * dy2;
+    float y1p = -sinp * dx2 + cosp * dy2;
+    float rxp = rx, ryp = ry;
+    float lambda = (x1p * x1p) / (rxp * rxp) + (y1p * y1p) / (ryp * ryp);
+    if (lambda > 1.0f) {
+        float s = static_cast<float>(std::sqrt(lambda));
+        rxp *= s;
+        ryp *= s;
+    }
+    float num = rxp * rxp * ryp * ryp - rxp * rxp * y1p * y1p - ryp * ryp * x1p * x1p;
+    float den = rxp * rxp * y1p * y1p + ryp * ryp * x1p * x1p;
+    if (den <= 0.0f) { PathLineTo(x, y); return; }
+    float co = static_cast<float>(std::sqrt(num > 0.0f ? num / den : 0.0));
+    if (largeArc == sweep) co = -co;
+    float cxp = co * rxp * y1p / ryp;
+    float cyp = -co * ryp * x1p / rxp;
+    // 中心/角度仅用于大弧标志与方向的等价推导（AddArc 只需端点参数化）
+    EnsurePathFigure();
+    m_pathSink->AddArc(D2D1::ArcSegment(
+        D2D1::Point2F(x, y),
+        D2D1::SizeF(rxp, ryp),
+        phi * 57.2957795131f,   // D2D 旋转角单位是度
+        sweep ? D2D1_SWEEP_DIRECTION_CLOCKWISE : D2D1_SWEEP_DIRECTION_COUNTER_CLOCKWISE,
+        largeArc ? D2D1_ARC_SIZE_LARGE : D2D1_ARC_SIZE_SMALL));
+    m_pathCurX = x;
+    m_pathCurY = y;
+    (void)cxp; (void)cyp;
+}
+
+void Renderer::PathAddRect(float x, float y, float w, float h) {
+    if (!m_pathSink) return;
+    if (m_pathFigureOpen) {
+        m_pathSink->EndFigure(D2D1_FIGURE_END_OPEN);
+        m_pathFigureOpen = false;
+    }
+    m_pathSink->BeginFigure(D2D1::Point2F(x, y), D2D1_FIGURE_BEGIN_FILLED);
+    m_pathSink->AddLine(D2D1::Point2F(x + w, y));
+    m_pathSink->AddLine(D2D1::Point2F(x + w, y + h));
+    m_pathSink->AddLine(D2D1::Point2F(x, y + h));
+    m_pathSink->EndFigure(D2D1_FIGURE_END_CLOSED);
+    m_pathCurX = x;
+    m_pathCurY = y;
+}
+
+void Renderer::PathAddRoundRect(float x, float y, float w, float h, float rx, float ry) {
+    if (!m_pathSink) return;
+    if (rx < 0.0f) rx = 0.0f;
+    if (ry < 0.0f) ry = 0.0f;
+    if (rx * 2.0f > w) rx = w / 2.0f;
+    if (ry * 2.0f > h) ry = h / 2.0f;
+    if (rx <= 0.0f || ry <= 0.0f) { PathAddRect(x, y, w, h); return; }
+    if (m_pathFigureOpen) {
+        m_pathSink->EndFigure(D2D1_FIGURE_END_OPEN);
+        m_pathFigureOpen = false;
+    }
+    // 从左上圆角起点顺时针绕行（AddArc 走小弧、顺时针）
+    m_pathSink->BeginFigure(D2D1::Point2F(x, y + ry), D2D1_FIGURE_BEGIN_FILLED);
+    m_pathSink->AddLine(D2D1::Point2F(x, y + h - ry));
+    m_pathSink->AddArc(D2D1::ArcSegment(
+        D2D1::Point2F(x + rx, y + h), D2D1::SizeF(rx, ry), 0.0f,
+        D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
+    m_pathSink->AddLine(D2D1::Point2F(x + w - rx, y + h));
+    m_pathSink->AddArc(D2D1::ArcSegment(
+        D2D1::Point2F(x + w, y + h - ry), D2D1::SizeF(rx, ry), 0.0f,
+        D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
+    m_pathSink->AddLine(D2D1::Point2F(x + w, y + ry));
+    m_pathSink->AddArc(D2D1::ArcSegment(
+        D2D1::Point2F(x + w - rx, y), D2D1::SizeF(rx, ry), 0.0f,
+        D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
+    m_pathSink->AddLine(D2D1::Point2F(x + rx, y));
+    m_pathSink->AddArc(D2D1::ArcSegment(
+        D2D1::Point2F(x, y + ry), D2D1::SizeF(rx, ry), 0.0f,
+        D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
+    m_pathSink->EndFigure(D2D1_FIGURE_END_CLOSED);
+    m_pathCurX = x;
+    m_pathCurY = y + ry;
+}
+
+void Renderer::PathAddEllipse(float cx, float cy, float rx, float ry) {
+    if (!m_pathSink) return;
+    if (rx <= 0.0f || ry <= 0.0f) return;
+    // 老版 w32api 无 sink->AddEllipse —— 手绘四段 90° 弧（等价精确）
+    if (m_pathFigureOpen) {
+        m_pathSink->EndFigure(D2D1_FIGURE_END_OPEN);
+        m_pathFigureOpen = false;
+    }
+    const float kPi2 = 1.57079632679f;   // π/2
+    // 从 (cx+rx, cy) 起顺时针四段
+    float px[5] = {cx + rx, cx, cx - rx, cx, cx + rx};
+    float py[5] = {cy, cy + ry, cy, cy - ry, cy};
+    m_pathSink->BeginFigure(D2D1::Point2F(px[0], py[0]), D2D1_FIGURE_BEGIN_FILLED);
+    for (int i = 0; i < 4; ++i) {
+        m_pathSink->AddArc(D2D1::ArcSegment(
+            D2D1::Point2F(px[i + 1], py[i + 1]),
+            D2D1::SizeF(rx, ry),
+            0.0f,
+            D2D1_SWEEP_DIRECTION_CLOCKWISE,
+            D2D1_ARC_SIZE_SMALL));
+        (void)kPi2;
+    }
+    m_pathSink->EndFigure(D2D1_FIGURE_END_CLOSED);
+    m_pathCurX = cx + rx;
+    m_pathCurY = cy;
+}
+
+void Renderer::PathClose() {
+    if (!m_pathSink || !m_pathFigureOpen) return;
+    m_pathSink->EndFigure(D2D1_FIGURE_END_CLOSED);
+    m_pathFigureOpen = false;
+}
+
+void Renderer::FillPath(const Color &color) {
+    FillPathBrush(GetBrush(color));
+}
+
+void Renderer::FillPathBrush(ID2D1Brush *brush) {
+    ClosePathSink();   // fill 前收尾（未闭合子路径按开放图形填充）
+    if (!m_renderTarget || !m_path || !brush) return;
+    m_renderTarget->FillGeometry(m_path, brush);
+}
+
+void Renderer::StrokePath(const Color &color, float width) {
+    StrokePathBrush(GetBrush(color), width);
+}
+
+void Renderer::StrokePathBrush(ID2D1Brush *brush, float width) {
+    ClosePathSink();
+    if (!m_renderTarget || !m_path || !brush) return;
+    m_renderTarget->DrawGeometry(m_path, brush, width, GetStrokeStyle());
+}
+
+bool Renderer::PathBounds(Rect *out) {
+    ClosePathSink();
+    if (!m_path || !out) return false;
+    D2D1_RECT_F b = {};
+    if (FAILED(m_path->GetBounds(nullptr, &b))) return false;   // 参数序：transform 在前
+    *out = Rect(b.left, b.top, b.right, b.bottom);
+    return true;
+}
+
+bool Renderer::PathHitTest(float x, float y, bool *out) {
+    ClosePathSink();
+    if (!m_path || !out) return false;
+    BOOL hit = FALSE;
+    if (FAILED(m_path->FillContainsPoint(D2D1::Point2F(x, y), nullptr, 1e-3f, &hit))) return false;
+    *out = (hit != FALSE);
+    return true;
+}
+
+bool Renderer::PathStrokeHitTest(float x, float y, float width, bool *out) {
+    ClosePathSink();
+    if (!m_path || !out) return false;
+    BOOL hit = FALSE;
+    if (FAILED(m_path->StrokeContainsPoint(D2D1::Point2F(x, y), width, GetStrokeStyle(),
+                                            nullptr, 1e-3f, &hit)))
+        return false;
+    *out = (hit != FALSE);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// 线型状态：所有描边原语共享（默认值 = flat/miter/10/实线，与旧版逐位一致）
+// ---------------------------------------------------------------------------
+void Renderer::SetLineCap(int cap) {
+    if (cap < 0 || cap > 2) cap = 0;
+    if (cap != m_lineCap) { m_lineCap = cap; m_strokeStyleDirty = true; }
+}
+
+void Renderer::SetLineJoin(int join) {
+    if (join < 0 || join > 3) join = 0;
+    if (join != m_lineJoin) { m_lineJoin = join; m_strokeStyleDirty = true; }
+}
+
+void Renderer::SetMiterLimit(float limit) {
+    if (limit < 1.0f) limit = 1.0f;
+    if (limit != m_miterLimit) { m_miterLimit = limit; m_strokeStyleDirty = true; }
+}
+
+void Renderer::SetDash(const float *dashes, int count, float phase) {
+    std::vector<float> d(dashes, dashes + (count > 0 ? count : 0));
+    // D2D 要求正偶数组；奇数组补齐末段（SVG 规范行为）
+    std::vector<float> clean;
+    for (float v : d) if (v > 0.0f) clean.push_back(v);
+    if (!clean.empty() && (clean.size() & 1)) clean.push_back(clean.back());
+    bool changed = (clean != m_dash) || (phase != m_dashPhase);
+    m_dash = clean;
+    m_dashPhase = phase;
+    if (changed) m_strokeStyleDirty = true;
+}
+
+ID2D1StrokeStyle *Renderer::GetStrokeStyle() {
+    bool needCustom = (m_lineCap != 0) || (m_lineJoin != 0) ||
+                      (m_miterLimit != 10.0f) || !m_dash.empty() || (m_dashPhase != 0.0f);
+    if (!needCustom) {
+        if (m_strokeStyle) { m_strokeStyle->Release(); m_strokeStyle = nullptr; }
+        m_strokeStyleDirty = false;
+        return nullptr;   // nullptr = D2D 内建默认（与旧版行为一致）
+    }
+    if (!m_strokeStyleDirty && m_strokeStyle) return m_strokeStyle;
+    if (m_strokeStyle) { m_strokeStyle->Release(); m_strokeStyle = nullptr; }
+    if (!m_d2dFactory) return nullptr;
+
+    D2D1_STROKE_STYLE_PROPERTIES props = {};
+    props.startCap = static_cast<D2D1_CAP_STYLE>(m_lineCap);
+    props.endCap = static_cast<D2D1_CAP_STYLE>(m_lineCap);
+    props.dashCap = static_cast<D2D1_CAP_STYLE>(m_lineCap);
+    props.lineJoin = static_cast<D2D1_LINE_JOIN>(m_lineJoin);
+    props.miterLimit = m_miterLimit;
+    props.dashStyle = m_dash.empty() ? D2D1_DASH_STYLE_SOLID : D2D1_DASH_STYLE_CUSTOM;
+    props.dashOffset = m_dashPhase;
+
+    HRESULT hr = m_d2dFactory->CreateStrokeStyle(
+        props,
+        m_dash.empty() ? nullptr : m_dash.data(),
+        static_cast<UINT32>(m_dash.size()),
+        &m_strokeStyle);
+    if (FAILED(hr)) m_strokeStyle = nullptr;
+    m_strokeStyleDirty = false;
+    return m_strokeStyle;
+}
+
 ID2D1SolidColorBrush* Renderer::GetBrush(const Color& color) {
 
     for (auto& cache : m_brushCache) {
@@ -492,7 +894,7 @@ void Renderer::DrawRect(const Rect& rect, const Color& color, float strokeWidth)
     if (m_renderTarget) {
         ID2D1SolidColorBrush* brush = GetBrush(color);
         if (brush) {
-            m_renderTarget->DrawRectangle(rect.ToD2D(), brush, strokeWidth);
+            m_renderTarget->DrawRectangle(rect.ToD2D(), brush, strokeWidth, GetStrokeStyle());
         }
     }
 }
@@ -510,7 +912,7 @@ void Renderer::DrawRoundedRect(const RoundedRect& rect, const Color& color, floa
     if (m_renderTarget) {
         ID2D1SolidColorBrush* brush = GetBrush(color);
         if (brush) {
-            m_renderTarget->DrawRoundedRectangle(rect.ToD2D(), brush, strokeWidth);
+            m_renderTarget->DrawRoundedRectangle(rect.ToD2D(), brush, strokeWidth, GetStrokeStyle());
         }
     }
 }
@@ -527,7 +929,7 @@ void Renderer::DrawEllipse(const Ellipse& ellipse, const Color& color, float str
     if (m_renderTarget) {
         ID2D1SolidColorBrush* brush = GetBrush(color);
         if (brush) {
-            m_renderTarget->DrawEllipse(ellipse.ToD2D(), brush, strokeWidth);
+            m_renderTarget->DrawEllipse(ellipse.ToD2D(), brush, strokeWidth, GetStrokeStyle());
         }
     }
 }
@@ -538,9 +940,136 @@ void Renderer::DrawLine(const Point& p1, const Point& p2, const Color& color, fl
             m_renderTarget->DrawLine(
                 D2D1::Point2F(p1.x, p1.y),
                 D2D1::Point2F(p2.x, p2.y),
-                brush, strokeWidth);
+                brush, strokeWidth, GetStrokeStyle());
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// 画刷创建（渐变停靠点由调用方装填；句柄/id 生命周期归 ABI 层，
+// 设备重建后失效 —— 与图片位图同一先例）
+// ---------------------------------------------------------------------------
+ID2D1Brush *Renderer::CreateSolidBrushObj(const Color &c) {
+    if (!m_renderTarget) return nullptr;
+    ID2D1SolidColorBrush *b = nullptr;
+    if (FAILED(m_renderTarget->CreateSolidColorBrush(c.ToD2D(), &b))) return nullptr;
+    return b;
+}
+
+ID2D1Brush *Renderer::CreateLinearBrushObj(float x0, float y0, float x1, float y1,
+                                           const float *positions, const Color *colors, int count) {
+    if (!m_renderTarget || count < 2 || !positions || !colors) return nullptr;
+    std::vector<D2D1_GRADIENT_STOP> stops;
+    stops.reserve(count);
+    for (int i = 0; i < count; ++i) {
+        float p = positions[i];
+        if (p < 0.0f) p = 0.0f;
+        if (p > 1.0f) p = 1.0f;
+        stops.push_back(D2D1_GRADIENT_STOP{p, colors[i].ToD2D()});
+    }
+    ID2D1GradientStopCollection *coll = nullptr;
+    if (FAILED(m_renderTarget->CreateGradientStopCollection(stops.data(),
+                                                            static_cast<UINT32>(stops.size()),
+                                                            &coll)))
+        return nullptr;
+    ID2D1LinearGradientBrush *b = nullptr;
+    HRESULT hr = m_renderTarget->CreateLinearGradientBrush(
+        D2D1::LinearGradientBrushProperties(D2D1::Point2F(x0, y0), D2D1::Point2F(x1, y1)),
+        coll, &b);
+    coll->Release();
+    return SUCCEEDED(hr) ? b : nullptr;
+}
+
+ID2D1Brush *Renderer::CreateRadialBrushObj(float cx, float cy, float fx, float fy,
+                                           float rx, float ry,
+                                           const float *positions, const Color *colors, int count) {
+    if (!m_renderTarget || count < 2 || !positions || !colors) return nullptr;
+    if (rx < 0.0f) rx = 0.0f;
+    if (ry < 0.0f) ry = 0.0f;
+    std::vector<D2D1_GRADIENT_STOP> stops;
+    stops.reserve(count);
+    for (int i = 0; i < count; ++i) {
+        float p = positions[i];
+        if (p < 0.0f) p = 0.0f;
+        if (p > 1.0f) p = 1.0f;
+        stops.push_back(D2D1_GRADIENT_STOP{p, colors[i].ToD2D()});
+    }
+    ID2D1GradientStopCollection *coll = nullptr;
+    if (FAILED(m_renderTarget->CreateGradientStopCollection(stops.data(),
+                                                            static_cast<UINT32>(stops.size()),
+                                                            &coll)))
+        return nullptr;
+    // 焦点偏移 = (fx,fy) 相对中心（WinUI RadialGradientBrush GradientOrigin 同语义）
+    ID2D1RadialGradientBrush *b = nullptr;
+    HRESULT hr = m_renderTarget->CreateRadialGradientBrush(
+        D2D1::RadialGradientBrushProperties(
+            D2D1::Point2F(cx, cy),
+            D2D1::Point2F(fx - cx, fy - cy),
+            rx, ry),
+        coll, &b);
+    coll->Release();
+    return SUCCEEDED(hr) ? b : nullptr;
+}
+
+ID2D1BitmapBrush *Renderer::CreateBitmapBrushObj(ID2D1Bitmap *bmp) {
+    if (!m_renderTarget || !bmp) return nullptr;
+    ID2D1BitmapBrush *b = nullptr;
+    if (FAILED(m_renderTarget->CreateBitmapBrush(bmp, &b))) return nullptr;
+    return b;
+}
+
+bool Renderer::BrushSetExtend(ID2D1Brush *brush, int modeX, int modeY) {
+    if (!brush) return false;
+    ID2D1BitmapBrush *bb = nullptr;
+    if (FAILED(brush->QueryInterface(__uuidof(ID2D1BitmapBrush),
+                                     reinterpret_cast<void **>(&bb))))
+        return false;   // 渐变/纯色画刷无平铺语义（D2D 限制，如实返回）
+    D2D1_EXTEND_MODE mx = modeX <= 0 ? D2D1_EXTEND_MODE_CLAMP
+                        : (modeX == 1 ? D2D1_EXTEND_MODE_WRAP : D2D1_EXTEND_MODE_MIRROR);
+    D2D1_EXTEND_MODE my = modeY <= 0 ? D2D1_EXTEND_MODE_CLAMP
+                        : (modeY == 1 ? D2D1_EXTEND_MODE_WRAP : D2D1_EXTEND_MODE_MIRROR);
+    bb->SetExtendModeX(mx);
+    bb->SetExtendModeY(my);
+    bb->Release();
+    return true;
+}
+
+bool Renderer::BrushSetTransform(ID2D1Brush *brush,
+                                 float m11, float m12, float m21, float m22,
+                                 float dx, float dy) {
+    if (!brush) return false;
+    brush->SetTransform(D2D1::Matrix3x2F(m11, m12, m21, m22, dx, dy));
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// 形状 × 画刷（渐变/位图画刷直接作用于常规形状）
+// ---------------------------------------------------------------------------
+void Renderer::FillRectBrush(const Rect &rect, ID2D1Brush *brush) {
+    if (m_renderTarget && brush) m_renderTarget->FillRectangle(rect.ToD2D(), brush);
+}
+
+void Renderer::DrawRectBrush(const Rect &rect, ID2D1Brush *brush, float width) {
+    if (m_renderTarget && brush)
+        m_renderTarget->DrawRectangle(rect.ToD2D(), brush, width, GetStrokeStyle());
+}
+
+void Renderer::FillRoundedRectBrush(const RoundedRect &rect, ID2D1Brush *brush) {
+    if (m_renderTarget && brush) m_renderTarget->FillRoundedRectangle(rect.ToD2D(), brush);
+}
+
+void Renderer::DrawRoundedRectBrush(const RoundedRect &rect, ID2D1Brush *brush, float width) {
+    if (m_renderTarget && brush)
+        m_renderTarget->DrawRoundedRectangle(rect.ToD2D(), brush, width, GetStrokeStyle());
+}
+
+void Renderer::FillEllipseBrush(const Ellipse &ellipse, ID2D1Brush *brush) {
+    if (m_renderTarget && brush) m_renderTarget->FillEllipse(ellipse.ToD2D(), brush);
+}
+
+void Renderer::DrawEllipseBrush(const Ellipse &ellipse, ID2D1Brush *brush, float width) {
+    if (m_renderTarget && brush)
+        m_renderTarget->DrawEllipse(ellipse.ToD2D(), brush, width, GetStrokeStyle());
 }
 
 void Renderer::FillRectGradient(const Rect& rect, const Color& startColor, const Color& endColor, bool vertical) {
@@ -602,29 +1131,122 @@ void Renderer::FillRoundedRectGradient(const RoundedRect& rect, const Color& sta
 }
 
 IDWriteTextFormat* Renderer::GetTextFormat(float fontSize, bool bold) {
+    // v6：统一走全参数版（weight/italic/family 是 size+bold 的超集，行为不变）
+    return GetTextFormatEx(fontSize, bold ? 700 : 400, false, m_fontFamily);
+}
+
+IDWriteTextFormat* Renderer::GetTextFormatEx(float size, int weight, bool italic,
+                                              const std::wstring &family) {
+    const std::wstring &fam = family.empty() ? m_fontFamily : family;
     for (auto& cache : m_textFormatCache) {
-        if (cache.fontSize == fontSize && cache.bold == bold) {
+        if (cache.fontSize == size && cache.weight == weight &&
+            cache.italic == italic && cache.family == fam) {
             return cache.format;
         }
     }
-
     IDWriteTextFormat* format = nullptr;
     if (m_writeFactory) {
         m_writeFactory->CreateTextFormat(
-            m_fontFamily.c_str(),
+            fam.c_str(),
             nullptr,
-            bold ? DWRITE_FONT_WEIGHT_BOLD : DWRITE_FONT_WEIGHT_NORMAL,
-            DWRITE_FONT_STYLE_NORMAL,
+            (DWRITE_FONT_WEIGHT)weight,
+            italic ? DWRITE_FONT_STYLE_ITALIC : DWRITE_FONT_STYLE_NORMAL,
             DWRITE_FONT_STRETCH_NORMAL,
-            fontSize,
+            size,
             L"en-us",
             &format);
-
         if (format) {
-            m_textFormatCache.push_back({fontSize, bold, format});
+            TextFormatCache c;
+            c.fontSize = size;
+            c.bold = weight >= 600;
+            c.weight = weight;
+            c.italic = italic;
+            c.family = fam;
+            c.format = format;
+            m_textFormatCache.push_back(c);
         }
     }
     return format;
+}
+
+void Renderer::DrawTextStyled(const std::wstring &text, const Rect &rect, const Color &color,
+                              float size, int weight, bool italic, const std::wstring &family,
+                              int halign, int valign, bool wrap, bool ellipsis) {
+    if (!m_renderTarget || text.empty()) return;
+    IDWriteTextFormat* format = GetTextFormatEx(size, weight, italic, family);
+    ID2D1SolidColorBrush* brush = GetBrush(color);
+    if (!format || !brush) return;
+
+    format->SetTextAlignment(halign == 0 ? DWRITE_TEXT_ALIGNMENT_LEADING
+                          : (halign == 1 ? DWRITE_TEXT_ALIGNMENT_CENTER
+                                         : DWRITE_TEXT_ALIGNMENT_TRAILING));
+    format->SetParagraphAlignment(valign == 0 ? DWRITE_PARAGRAPH_ALIGNMENT_NEAR
+                              : (valign == 1 ? DWRITE_PARAGRAPH_ALIGNMENT_CENTER
+                                             : DWRITE_PARAGRAPH_ALIGNMENT_FAR));
+    format->SetWordWrapping(wrap ? DWRITE_WORD_WRAPPING_WRAP : DWRITE_WORD_WRAPPING_NO_WRAP);
+
+    DWRITE_TRIMMING trim = {DWRITE_TRIMMING_GRANULARITY_NONE, 0, 0};
+    if (ellipsis && rect.Width() > 0.0f) {
+        trim.granularity = DWRITE_TRIMMING_GRANULARITY_CHARACTER;
+    }
+    format->SetTrimming(&trim, nullptr);
+
+    m_renderTarget->DrawText(text.c_str(), static_cast<UINT32>(text.length()),
+                              format, rect.ToD2D(), brush);
+}
+
+// ===========================================================================
+// v6：句柄几何（path store 的渲染对应物；几何挂 factory，跨设备安全）
+// ===========================================================================
+
+ID2D1PathGeometry* Renderer::PathTakeRef() {
+    ClosePathSink();
+    if (!m_path) return nullptr;
+    m_path->AddRef();   // 表持有一个引用；构建器 PathReset 只释放自己的
+    return m_path;
+}
+
+void Renderer::FillGeometryBrush(ID2D1Geometry* geo, ID2D1Brush* brush) {
+    if (!m_renderTarget || !geo || !brush) return;
+    m_renderTarget->FillGeometry(geo, brush);
+}
+
+void Renderer::FillGeometry(ID2D1Geometry* geo, const Color& color) {
+    FillGeometryBrush(geo, GetBrush(color));
+}
+
+void Renderer::StrokeGeometryBrush(ID2D1Geometry* geo, ID2D1Brush* brush, float width) {
+    if (!m_renderTarget || !geo || !brush) return;
+    m_renderTarget->DrawGeometry(geo, brush, width, GetStrokeStyle());
+}
+
+void Renderer::StrokeGeometry(ID2D1Geometry* geo, const Color& color, float width) {
+    StrokeGeometryBrush(geo, GetBrush(color), width);
+}
+
+bool Renderer::GeometryHitTest(ID2D1Geometry* geo, float x, float y, bool* out) {
+    if (!geo || !out) return false;
+    BOOL hit = FALSE;
+    if (FAILED(geo->FillContainsPoint(D2D1::Point2F(x, y), nullptr, 1e-3f, &hit))) return false;
+    *out = (hit != FALSE);
+    return true;
+}
+
+bool Renderer::PushClipGeometry(ID2D1Geometry* geo) {
+    if (!m_renderTarget || !geo) return false;
+    D2D1_RECT_F b = {};
+    geo->GetBounds(nullptr, &b);
+    D2D1_LAYER_PARAMETERS lp = D2D1::LayerParameters(
+        D2D1::RectF(b.left, b.top, b.right, b.bottom),
+        geo,
+        D2D1_ANTIALIAS_MODE_PER_PRIMITIVE,
+        D2D1::IdentityMatrix(),
+        1.0f,
+        nullptr,
+        D2D1_LAYER_OPTIONS_NONE);
+    m_renderTarget->PushLayer(&lp, nullptr);
+    m_clipStack.push_back(1);
+    return true;
 }
 
 void Renderer::DrawText(const std::wstring& text, const Rect& rect, const Color& color, float fontSize, bool bold, bool center) {
@@ -827,6 +1449,661 @@ ID2D1Bitmap *Renderer::LoadImageFile(const std::wstring &path, UINT *outW, UINT 
     if (frame) frame->Release();
     dec->Release();
     return bitmap;
+}
+
+// ===========================================================================
+// v5：富文本（inline 混排）
+//   机制：span → 全文 TextLayout（逐区间覆盖字号/字重/斜体/下划线/删除线，
+//   颜色经 SetDrawingEffect 携带 RichEffect）→ IDWriteTextLayout::Draw +
+//   自定义 ID2D1SimplifiedTextRenderer 逐 run 绘制（多色/渐变画刷文字）。
+// ===========================================================================
+
+namespace {
+
+// SetDrawingEffect 携带的绘制效果（颜色或画刷；生命周期归 RichDraw 栈帧）
+struct RichEffect : public IUnknown {
+    ULONG refs = 1;
+    gui::Color color;
+    ID2D1Brush *brush = nullptr;   // 非空优先（渐变/位图文字）
+
+    ULONG STDMETHODCALLTYPE AddRef() override { return ++refs; }
+    ULONG STDMETHODCALLTYPE Release() override {
+        ULONG r = --refs;
+        if (r == 0) delete this;
+        return r;
+    }
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void **ppv) override {
+        if (!ppv) return E_POINTER;
+        if (riid == __uuidof(IUnknown) || riid == __uuidof(IDWriteTextRenderer)) {
+            *ppv = static_cast<IUnknown *>(this);
+            AddRef();
+            return S_OK;
+        }
+        *ppv = nullptr;
+        return E_NOINTERFACE;
+    }
+};
+
+// 自定义文本渲染器：每 run 从 RichEffect 取笔刷绘制字形/下划线/删除线。
+// 直接实现 IDWriteTextRenderer（dwrite.h 完整定义；D2D 的 Simplified 版
+// 在部分老版 w32api 头中缺失，而两者虚表签名一致——baselineOriginX/Y 版）。
+class RichTextRenderer : public IDWriteTextRenderer {
+public:
+    explicit RichTextRenderer(ID2D1RenderTarget *target) : m_target(target), m_refs(1) {}
+
+    ULONG STDMETHODCALLTYPE AddRef() override { return ++m_refs; }
+    ULONG STDMETHODCALLTYPE Release() override {
+        ULONG r = --m_refs;
+        if (r == 0) delete this;
+        return r;
+    }
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void **ppv) override {
+        if (!ppv) return E_POINTER;
+        if (riid == __uuidof(IUnknown) || riid == __uuidof(IDWriteTextRenderer)) {
+            *ppv = static_cast<IUnknown *>(static_cast<IDWriteTextRenderer *>(this));
+            AddRef();
+            return S_OK;
+        }
+        *ppv = nullptr;
+        return E_NOINTERFACE;
+    }
+
+    // ---- IDWritePixelSnapping ----
+    HRESULT STDMETHODCALLTYPE IsPixelSnappingDisabled(void *, BOOL *disabled) override {
+        if (!disabled) return E_POINTER;
+        *disabled = FALSE;   // 跟随 D2D 抗锯齿管线（不强制像素对齐）
+        return S_OK;
+    }
+    HRESULT STDMETHODCALLTYPE GetCurrentTransform(void *, DWRITE_MATRIX *m) override {
+        if (!m) return E_POINTER;
+        D2D1_MATRIX_3X2_F t = D2D1::IdentityMatrix();
+        if (m_target) m_target->GetTransform(&t);
+        m->m11 = t.m11; m->m12 = t.m12;
+        m->m21 = t.m21; m->m22 = t.m22;
+        m->dx = t.dx;   m->dy = t.dy;
+        return S_OK;
+    }
+    HRESULT STDMETHODCALLTYPE GetPixelsPerDip(void *, FLOAT *ppd) override {
+        if (!ppd) return E_POINTER;
+        *ppd = 1.0f;
+        return S_OK;
+    }
+
+    // ---- IDWriteTextRenderer ----
+    HRESULT STDMETHODCALLTYPE DrawGlyphRun(
+        void *, FLOAT baselineOriginX, FLOAT baselineOriginY,
+        DWRITE_MEASURING_MODE measuringMode,
+        const DWRITE_GLYPH_RUN *glyphRun,
+        const DWRITE_GLYPH_RUN_DESCRIPTION *,
+        IUnknown *clientDrawingEffect) override {
+        ID2D1Brush *br = BrushOf(clientDrawingEffect);
+        if (!br || !glyphRun) return S_OK;
+        m_target->DrawGlyphRun(D2D1::Point2F(baselineOriginX, baselineOriginY),
+                               glyphRun, br, measuringMode);
+        return S_OK;
+    }
+    HRESULT STDMETHODCALLTYPE DrawUnderline(
+        void *, FLOAT x, FLOAT y,
+        const DWRITE_UNDERLINE *underline,
+        IUnknown *clientDrawingEffect) override {
+        ID2D1Brush *br = BrushOf(clientDrawingEffect);
+        if (!br || !underline) return S_OK;
+        m_target->FillRectangle(
+            D2D1::RectF(x, y + underline->offset,
+                        x + underline->width, y + underline->offset + underline->thickness),
+            br);
+        return S_OK;
+    }
+    HRESULT STDMETHODCALLTYPE DrawStrikethrough(
+        void *, FLOAT x, FLOAT y,
+        const DWRITE_STRIKETHROUGH *strikethrough,
+        IUnknown *clientDrawingEffect) override {
+        ID2D1Brush *br = BrushOf(clientDrawingEffect);
+        if (!br || !strikethrough) return S_OK;
+        m_target->FillRectangle(
+            D2D1::RectF(x, y + strikethrough->offset,
+                        x + strikethrough->width, y + strikethrough->offset + strikethrough->thickness),
+            br);
+        return S_OK;
+    }
+    HRESULT STDMETHODCALLTYPE DrawInlineObject(
+        void *, FLOAT, FLOAT, IDWriteInlineObject *, BOOL, BOOL, IUnknown *) override {
+        return S_OK;   // 未启用 inline 对象（不触发即无副作用）
+    }
+
+private:
+    ID2D1Brush *BrushOf(IUnknown *effect) {
+        if (!m_target) return nullptr;
+        if (effect) {
+            RichEffect *re = static_cast<RichEffect *>(effect);   // 单继承无偏移
+            if (re->brush) return re->brush;
+            m_colorScratch = re->color;
+        } else {
+            m_colorScratch = gui::Color(0, 0, 0, 1);
+        }
+        if (!m_scratchBrush) {
+            if (FAILED(m_target->CreateSolidColorBrush(m_colorScratch.ToD2D(), &m_scratchBrush)))
+                return nullptr;
+        }
+        m_scratchBrush->SetColor(m_colorScratch.ToD2D());
+        return m_scratchBrush;
+    }
+
+    ID2D1RenderTarget *m_target;
+    ID2D1SolidColorBrush *m_scratchBrush = nullptr;
+    gui::Color m_colorScratch;
+    ULONG m_refs;
+};
+
+}  // namespace
+
+void Renderer::RichReset() {
+    m_richSpans.clear();
+}
+
+void Renderer::RichAdd(const RichSpan &span) {
+    m_richSpans.push_back(span);
+}
+
+void Renderer::RichSetLineHeight(float lineH, float baseline) {
+    m_richLineH = lineH;
+    m_richBaseline = baseline;
+}
+
+void Renderer::RichSetSpacing(float leading, float trailing, float advance, float minAdvance) {
+    m_richLeadSpacing = leading;
+    m_richTrailSpacing = trailing;
+    m_richAdvanceSpacing = advance;
+    m_richMinAdvance = minAdvance;
+    m_richSpacingSet = true;
+}
+
+bool Renderer::BuildRichLayout(const Rect &rect, int halign, int valign, bool wrap,
+                               IDWriteTextLayout **outLayout,
+                               std::vector<std::pair<UINT32, UINT32>> *outRanges) {
+    *outLayout = nullptr;
+    if (outRanges) outRanges->clear();
+    if (!m_writeFactory || m_richSpans.empty()) return false;
+
+    // 全文拼接 + span 区间表
+    std::wstring full;
+    std::vector<std::pair<UINT32, UINT32>> ranges;
+    ranges.reserve(m_richSpans.size());
+    for (auto &s : m_richSpans) {
+        ranges.emplace_back(static_cast<UINT32>(full.size()),
+                            static_cast<UINT32>(s.text.size()));
+        full += s.text;
+    }
+    if (full.empty()) return false;
+
+    // 基础格式取首个 span（其余逐区间覆盖）
+    IDWriteTextFormat *fmt = GetTextFormat(m_richSpans[0].size,
+                                           m_richSpans[0].weight >= 700);
+    if (!fmt) return false;
+    fmt->SetTextAlignment(halign == 0 ? DWRITE_TEXT_ALIGNMENT_LEADING
+                          : (halign == 1 ? DWRITE_TEXT_ALIGNMENT_CENTER
+                                         : DWRITE_TEXT_ALIGNMENT_TRAILING));
+    fmt->SetParagraphAlignment(valign == 0 ? DWRITE_PARAGRAPH_ALIGNMENT_NEAR
+                              : (valign == 1 ? DWRITE_PARAGRAPH_ALIGNMENT_CENTER
+                                             : DWRITE_PARAGRAPH_ALIGNMENT_FAR));
+    fmt->SetWordWrapping(wrap ? DWRITE_WORD_WRAPPING_WRAP : DWRITE_WORD_WRAPPING_NO_WRAP);
+
+    float layoutW = (wrap && rect.Width() > 0.0f) ? rect.Width() : 10000.0f;
+    IDWriteTextLayout *layout = nullptr;
+    if (FAILED(m_writeFactory->CreateTextLayout(full.c_str(),
+                                                static_cast<UINT32>(full.size()),
+                                                fmt, layoutW, 10000.0f, &layout)))
+        return false;
+
+    for (size_t i = 0; i < ranges.size(); ++i) {
+        if (ranges[i].second == 0) continue;
+        const RichSpan &s = m_richSpans[i];
+        DWRITE_TEXT_RANGE tr{ranges[i].first, ranges[i].second};
+        layout->SetFontSize(s.size, tr);
+        layout->SetFontWeight(static_cast<DWRITE_FONT_WEIGHT>(s.weight), tr);
+        layout->SetFontStyle(s.italic ? DWRITE_FONT_STYLE_ITALIC : DWRITE_FONT_STYLE_NORMAL, tr);
+        layout->SetUnderline(s.underline ? TRUE : FALSE, tr);
+        layout->SetStrikethrough(s.strikethrough ? TRUE : FALSE, tr);
+    }
+
+    if (m_richLineH > 0.0f) {
+        layout->SetLineSpacing(DWRITE_LINE_SPACING_METHOD_UNIFORM, m_richLineH,
+                               m_richBaseline > 0.0f ? m_richBaseline : m_richLineH * 0.8f);
+    }
+    if (m_richSpacingSet) {
+// 字距（IDWriteTextLayout1，DWrite2/Win8.1+；老版 w32api 头无此接口定义，
+// 宏探测编译期跳过 —— 运行时如实返回不支持（RichSpacing 返回 0）
+#if defined(__IDWriteTextLayout1_INTERFACE_DEFINED__)
+        IDWriteTextLayout1 *l1 = nullptr;
+        if (SUCCEEDED(layout->QueryInterface(__uuidof(IDWriteTextLayout1),
+                                             reinterpret_cast<void **>(&l1)))) {
+            DWRITE_TEXT_RANGE all{0, static_cast<UINT32>(full.size())};
+            l1->SetCharacterSpacing(m_richLeadSpacing, m_richTrailSpacing,
+                                    m_richAdvanceSpacing, m_richMinAdvance, all);
+            l1->Release();
+        }
+#endif
+    }
+
+    *outLayout = layout;
+    if (outRanges) *outRanges = ranges;
+    return true;
+}
+
+bool Renderer::RichDraw(const Rect &rect, int halign, int valign, bool wrap) {
+    if (!m_renderTarget) return false;
+    IDWriteTextLayout *layout = nullptr;
+    std::vector<std::pair<UINT32, UINT32>> ranges;
+    if (!BuildRichLayout(rect, halign, valign, wrap, &layout, &ranges)) return false;
+
+    // 每 span 挂绘制效果（颜色/画刷），随绘制栈帧释放
+    std::vector<RichEffect *> effects(m_richSpans.size(), nullptr);
+    for (size_t i = 0; i < ranges.size() && i < m_richSpans.size(); ++i) {
+        if (ranges[i].second == 0) continue;
+        RichEffect *e = new RichEffect();
+        e->color = m_richSpans[i].color;
+        e->brush = m_richSpans[i].brush;
+        layout->SetDrawingEffect(e, DWRITE_TEXT_RANGE{ranges[i].first, ranges[i].second});
+        effects[i] = e;
+    }
+
+    RichTextRenderer renderer(m_renderTarget);
+    // 裁剪到布局矩形（wrap 排版的忠实呈现）
+    bool clipped = false;
+    if (rect.Width() > 0.0f && rect.Height() > 0.0f) {
+        PushClip(rect);
+        clipped = true;
+    }
+    layout->Draw(nullptr, &renderer, rect.left, rect.top);
+    if (clipped) PopClip();
+
+    layout->Release();
+    for (RichEffect *e : effects)
+        if (e) e->Release();
+    return true;
+}
+
+bool Renderer::RichMeasure(bool wrap, float maxWidth, Size *out) {
+    if (!out) return false;
+    *out = Size(0, 0);
+    Rect r(0, 0, maxWidth > 0.0f ? maxWidth : 0.0f, 0);
+    IDWriteTextLayout *layout = nullptr;
+    if (!BuildRichLayout(r, 0, 0, wrap, &layout, nullptr)) return false;
+    DWRITE_TEXT_METRICS metrics = {};
+    layout->GetMetrics(&metrics);
+    layout->Release();
+    *out = Size(metrics.width, metrics.height);
+    return true;
+}
+
+// ===========================================================================
+// v5：合成效果层（混合 / 真阴影 / 蒙版 / 几何裁剪）
+//   * blend：dest 快照 + D2D1Composite 效果（16 种模式）；
+//   * shadow：D2D1Shadow 效果（GPU 高斯）平移绘制后叠内容本体 —— WinUI
+//     DropShadow 语义，任意内容（路径/文字/位图）真软阴影；
+//   * mask/clip：PushLayer 原生（画刷 alpha 蒙版 / 几何蒙版），全路径可用。
+//   回贴时强制 identity 变换（捕获内容已含各自变换）。
+// ===========================================================================
+bool Renderer::PushBlendLayer(int compositeMode, const Rect &bounds) {
+    if (!m_useDComp || !m_ctx) return false;
+
+    // dest 快照（composite 的 destination 输入）
+    ID2D1Bitmap1 *snap = nullptr;
+    D2D1_BITMAP_PROPERTIES1 bp = D2D1::BitmapProperties1(
+        D2D1_BITMAP_OPTIONS_NONE,
+        D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED));
+    D2D1_SIZE_U sz = m_ctx->GetPixelSize();
+    if (sz.width == 0 || sz.height == 0) return false;
+    if (FAILED(m_ctx->CreateBitmap(sz, nullptr, 0, &bp, &snap))) return false;
+    if (FAILED(snap->CopyFromBitmap(nullptr, m_targetBitmap, nullptr))) {
+        snap->Release();
+        return false;
+    }
+
+    // 捕获新绘制
+    ID2D1CommandList *cmd = nullptr;
+    if (FAILED(m_ctx->CreateCommandList(&cmd))) {
+        snap->Release();
+        return false;
+    }
+    ID2D1Image *old = nullptr;
+    m_ctx->GetTarget(&old);
+    m_ctx->SetTarget(cmd);
+
+    EffectLayer L{};
+    L.kind = 1;
+    L.cmd = cmd;
+    L.oldTarget = old;
+    L.snap = snap;
+    L.blendMode = compositeMode;
+    L.bounds = bounds;
+    m_effectStack.push_back(L);
+    return true;
+}
+
+void Renderer::PopBlendLayer() {
+    if (m_effectStack.empty() || m_effectStack.back().kind != 1) return;
+    EffectLayer L = m_effectStack.back();
+    m_effectStack.pop_back();
+    if (!L.cmd || !m_ctx) return;
+
+    m_ctx->SetTarget(L.oldTarget);
+    L.cmd->Close();
+
+    ID2D1Effect *fx = nullptr;
+    if (SUCCEEDED(m_ctx->CreateEffect(CLSID_D2D1Composite, &fx))) {
+        fx->SetInput(0, L.snap);   // destination
+        fx->SetInput(1, L.cmd);    // source
+        int mode = L.blendMode;
+        if (mode < 0 || mode > 12) mode = 0;
+        fx->SetValue(D2D1_COMPOSITE_PROP_MODE, static_cast<D2D1_COMPOSITE_MODE>(mode));
+
+        PushTransform();
+        m_ctx->SetTransform(D2D1::IdentityMatrix());   // 捕获内容已含各自变换
+        bool clipped = false;
+        if (L.bounds.Width() > 0.0f && L.bounds.Height() > 0.0f) {
+            PushClip(L.bounds);
+            clipped = true;
+        }
+        m_ctx->DrawImage(fx);
+        if (clipped) PopClip();
+        PopTransform();
+        fx->Release();
+    }
+
+    L.cmd->Release();
+    if (L.oldTarget) L.oldTarget->Release();
+    if (L.snap) L.snap->Release();
+}
+
+bool Renderer::PushShadowLayer(const Color &color, float blur, float dx, float dy,
+                               const Rect &bounds) {
+    if (!m_useDComp || !m_ctx) return false;
+    ID2D1CommandList *cmd = nullptr;
+    if (FAILED(m_ctx->CreateCommandList(&cmd))) return false;
+    ID2D1Image *old = nullptr;
+    m_ctx->GetTarget(&old);
+    m_ctx->SetTarget(cmd);
+
+    EffectLayer L{};
+    L.kind = 2;
+    L.cmd = cmd;
+    L.oldTarget = old;
+    L.shadowColor = color;
+    L.shadowBlur = blur;
+    L.shadowDx = dx;
+    L.shadowDy = dy;
+    L.bounds = bounds;
+    m_effectStack.push_back(L);
+    return true;
+}
+
+void Renderer::PopShadowLayer() {
+    if (m_effectStack.empty() || m_effectStack.back().kind != 2) return;
+    EffectLayer L = m_effectStack.back();
+    m_effectStack.pop_back();
+    if (!L.cmd || !m_ctx) return;
+
+    m_ctx->SetTarget(L.oldTarget);
+    L.cmd->Close();
+
+    ID2D1Effect *fx = nullptr;
+    if (SUCCEEDED(m_ctx->CreateEffect(CLSID_D2D1Shadow, &fx))) {
+        fx->SetInput(0, L.cmd);
+        fx->SetValue(D2D1_SHADOW_PROP_COLOR, L.shadowColor.ToD2D());
+        float sd = L.shadowBlur / 3.0f;
+        fx->SetValue(D2D1_SHADOW_PROP_BLUR_STANDARD_DEVIATION, sd > 0.5f ? sd : 0.5f);
+
+        PushTransform();
+        // 1) 阴影：identity + 平移（阴影本体）
+        m_ctx->SetTransform(D2D1::Matrix3x2F::Translation(L.shadowDx, L.shadowDy));
+        m_ctx->DrawImage(fx);
+        // 2) 内容本体：identity 原位
+        m_ctx->SetTransform(D2D1::IdentityMatrix());
+        bool clipped = false;
+        if (L.bounds.Width() > 0.0f && L.bounds.Height() > 0.0f) {
+            PushClip(L.bounds);
+            clipped = true;
+        }
+        m_ctx->DrawImage(L.cmd);
+        if (clipped) PopClip();
+        PopTransform();
+        fx->Release();
+    }
+
+    L.cmd->Release();
+    if (L.oldTarget) L.oldTarget->Release();
+}
+
+bool Renderer::PushMaskLayerBrush(ID2D1Brush *brush, const Rect &bounds, float opacity) {
+    if (!m_renderTarget || !brush) return false;
+    if (opacity < 0.0f) opacity = 0.0f;
+    if (opacity > 1.0f) opacity = 1.0f;
+    D2D1_LAYER_PARAMETERS lp = D2D1::LayerParameters(
+        bounds.ToD2D(),
+        nullptr,                                // 几何蒙版（无）
+        D2D1_ANTIALIAS_MODE_PER_PRIMITIVE,
+        D2D1::IdentityMatrix(),
+        opacity,
+        brush,                                  // opacity mask（画刷 alpha）
+        D2D1_LAYER_OPTIONS_NONE);
+    m_renderTarget->PushLayer(&lp, nullptr);
+    m_clipStack.push_back(1);
+    return true;
+}
+
+void Renderer::PopMaskLayer() {
+    PopClip();   // 统一经裁剪类型栈（layer 类）
+}
+
+bool Renderer::PushClipPath() {
+    ClosePathSink();
+    if (!m_renderTarget || !m_path) return false;
+    D2D1_RECT_F b = {};
+    m_path->GetBounds(nullptr, &b);
+    D2D1_LAYER_PARAMETERS lp = D2D1::LayerParameters(
+        D2D1::RectF(b.left, b.top, b.right, b.bottom),
+        m_path,                                // 几何蒙版（含 AA 边）
+        D2D1_ANTIALIAS_MODE_PER_PRIMITIVE,
+        D2D1::IdentityMatrix(),
+        1.0f,
+        nullptr,
+        D2D1_LAYER_OPTIONS_NONE);
+    m_renderTarget->PushLayer(&lp, nullptr);
+    m_clipStack.push_back(1);
+    return true;
+}
+
+bool Renderer::PushClipRoundRect(const Rect &rect, float rx, float ry) {
+    if (!m_renderTarget || !m_d2dFactory) return false;
+    if (rx < 0.0f) rx = 0.0f;
+    if (ry < 0.0f) ry = 0.0f;
+    if (rx * 2.0f > rect.Width()) rx = rect.Width() / 2.0f;
+    if (ry * 2.0f > rect.Height()) ry = rect.Height() / 2.0f;
+    if (rx <= 0.0f || ry <= 0.0f) {
+        PushClip(rect);   // 退化为轴对齐裁剪
+        return true;
+    }
+    // 圆角矩形几何（独立于构建器路径，手绘四弧——sink 无 AddRoundedRect）
+    ID2D1PathGeometry *g = nullptr;
+    if (FAILED(m_d2dFactory->CreatePathGeometry(&g))) return false;
+    ID2D1GeometrySink *sink = nullptr;
+    if (FAILED(g->Open(&sink))) {
+        g->Release();
+        return false;
+    }
+    float x = rect.left, y = rect.top, w = rect.Width(), h = rect.Height();
+    sink->BeginFigure(D2D1::Point2F(x, y + ry), D2D1_FIGURE_BEGIN_FILLED);
+    sink->AddLine(D2D1::Point2F(x, y + h - ry));
+    sink->AddArc(D2D1::ArcSegment(
+        D2D1::Point2F(x + rx, y + h), D2D1::SizeF(rx, ry), 0.0f,
+        D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
+    sink->AddLine(D2D1::Point2F(x + w - rx, y + h));
+    sink->AddArc(D2D1::ArcSegment(
+        D2D1::Point2F(x + w, y + h - ry), D2D1::SizeF(rx, ry), 0.0f,
+        D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
+    sink->AddLine(D2D1::Point2F(x + w, y + ry));
+    sink->AddArc(D2D1::ArcSegment(
+        D2D1::Point2F(x + w - rx, y), D2D1::SizeF(rx, ry), 0.0f,
+        D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
+    sink->AddLine(D2D1::Point2F(x + rx, y));
+    sink->AddArc(D2D1::ArcSegment(
+        D2D1::Point2F(x, y + ry), D2D1::SizeF(rx, ry), 0.0f,
+        D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
+    sink->EndFigure(D2D1_FIGURE_END_CLOSED);
+    sink->Close();
+    sink->Release();
+    D2D1_LAYER_PARAMETERS lp = D2D1::LayerParameters(
+        rect.ToD2D(), g, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE,
+        D2D1::IdentityMatrix(), 1.0f, nullptr, D2D1_LAYER_OPTIONS_NONE);
+    m_renderTarget->PushLayer(&lp, nullptr);
+    g->Release();
+    m_clipStack.push_back(1);
+    return true;
+}
+
+// ===========================================================================
+// v5：离屏面（位图缓存层）+ 图片精控
+// ===========================================================================
+ID2D1Bitmap *Renderer::CreateSurfaceBitmap(UINT w, UINT h, ID2D1BitmapRenderTarget **outRT) {
+    if (outRT) *outRT = nullptr;
+    if (w == 0 || h == 0) return nullptr;
+
+    if (m_useDComp && m_ctx) {
+        // 仅 TARGET（可绘制、可贴回作 DrawBitmap 输入）；
+        // 像素读回经临时 CPU_READ 位图拷贝（CPU_READ 与 TARGET 不能组合）
+        D2D1_BITMAP_PROPERTIES1 bp = D2D1::BitmapProperties1(
+            D2D1_BITMAP_OPTIONS_TARGET,
+            D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED));
+        ID2D1Bitmap1 *bmp = nullptr;
+        if (FAILED(m_ctx->CreateBitmap(D2D1::SizeU(w, h), nullptr, 0, &bp, &bmp)))
+            return nullptr;
+        return bmp;
+    }
+
+    // HwndRT 回退：兼容渲染目标（位图 + RT 成对，RT 归 ABI 层持有）
+    if (!m_hwndRT) return nullptr;
+    ID2D1BitmapRenderTarget *brt = nullptr;
+    if (FAILED(m_hwndRT->CreateCompatibleRenderTarget(
+            D2D1::SizeF(static_cast<FLOAT>(w), static_cast<FLOAT>(h)), &brt)))
+        return nullptr;
+    ID2D1Bitmap *bmp = nullptr;
+    brt->GetBitmap(&bmp);
+    if (!bmp) {
+        brt->Release();
+        return nullptr;
+    }
+    if (outRT) {
+        *outRT = brt;
+    } else {
+        brt->Release();   // 调用方不持 RT（位图贴回仍可用，但不能再重绘）
+    }
+    return bmp;
+}
+
+bool Renderer::BeginSurface(ID2D1Bitmap *bmp, ID2D1BitmapRenderTarget *rt) {
+    if (!bmp) return false;
+    if (m_useDComp && m_ctx) {
+        if (m_surfaceOldImage) return false;   // 不嵌套（与模糊层同纪律）
+        ID2D1Image *old = nullptr;
+        m_ctx->GetTarget(&old);
+        m_ctx->SetTarget(bmp);
+        m_surfaceOldImage = old;
+        m_ctx->Clear(D2D1::ColorF(0, 0, 0, 0));   // 清为透明（缓存层语义）
+        return true;
+    }
+    // HwndRT 路径：绘制路由切到兼容 RT（自带 Begin/EndDraw 纪律）
+    if (!rt || !m_renderTarget) return false;
+    if (m_surfaceOldRT) return false;
+    m_surfaceOldRT = m_renderTarget;
+    m_renderTarget = rt;
+    rt->BeginDraw();
+    rt->Clear(D2D1::ColorF(0, 0, 0, 0));
+    return true;
+}
+
+void Renderer::EndSurface() {
+    if (m_useDComp && m_ctx) {
+        if (!m_surfaceOldImage) return;
+        m_ctx->SetTarget(m_surfaceOldImage);
+        m_surfaceOldImage->Release();
+        m_surfaceOldImage = nullptr;
+        return;
+    }
+    if (!m_surfaceOldRT) return;
+    if (m_renderTarget)
+        m_renderTarget->EndDraw();   // 兼容 RT 收帧
+    m_renderTarget = m_surfaceOldRT;
+    m_surfaceOldRT = nullptr;
+}
+
+bool Renderer::DrawSurfaceBitmap(ID2D1Bitmap *bmp, const Rect &dst, float alpha, int interp) {
+    if (!m_renderTarget || !bmp) return false;
+    if (alpha < 0.0f) alpha = 0.0f;
+    if (alpha > 1.0f) alpha = 1.0f;
+    D2D1_RECT_F d = dst.ToD2D();
+    m_renderTarget->DrawBitmap(
+        bmp, &d, alpha,
+        interp == 0 ? D2D1_BITMAP_INTERPOLATION_MODE_NEAREST_NEIGHBOR
+                    : D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
+        nullptr);
+    return true;
+}
+
+bool Renderer::ReadSurfacePixel(ID2D1Bitmap *bmp, UINT x, UINT y, Color *out) {
+    if (!out) return false;
+    *out = Color(0, 0, 0, 0);
+    if (!bmp) return false;
+    if (!m_useDComp || !m_ctx) return false;   // 仅 DComp 路径（HwndRT 无读回）
+
+    // CPU_READ 临时位图拷贝再 Map（CPU_READ 不能与 TARGET 组合，须借桥）
+    ID2D1Bitmap1 *src = nullptr;
+    if (FAILED(bmp->QueryInterface(__uuidof(ID2D1Bitmap1),
+                                   reinterpret_cast<void **>(&src))))
+        return false;
+    D2D1_SIZE_U sz = src->GetPixelSize();
+    bool ok = false;
+    if (x < sz.width && y < sz.height) {
+        ID2D1Bitmap1 *tmp = nullptr;
+        D2D1_BITMAP_PROPERTIES1 bp = D2D1::BitmapProperties1(
+            D2D1_BITMAP_OPTIONS_CPU_READ | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
+            D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED));
+        if (SUCCEEDED(m_ctx->CreateBitmap(sz, nullptr, 0, &bp, &tmp))) {
+            m_ctx->Flush();   // 绘制命令队列强制提交（CopyFromBitmap 立即执行，须先同步）
+            if (SUCCEEDED(tmp->CopyFromBitmap(nullptr, src, nullptr))) {
+                D2D1_MAPPED_RECT mr = {};
+                if (SUCCEEDED(tmp->Map(D2D1_MAP_OPTIONS_READ, &mr))) {
+                    const unsigned char *p = mr.bits + static_cast<SIZE_T>(y) * mr.pitch +
+                                             static_cast<SIZE_T>(x) * 4;
+                    // BGRA（premultiplied alpha）→ 直 alpha（便于脚本断言纯色）
+                    float b = p[0] / 255.0f, g = p[1] / 255.0f, rr = p[2] / 255.0f, a = p[3] / 255.0f;
+                    if (a > 0.0001f) { b /= a; g /= a; rr /= a; }
+                    else { b = g = rr = 0.0f; }
+                    *out = Color(rr, g, b, a);
+                    ok = true;
+                    tmp->Unmap();
+                }
+            }
+            tmp->Release();
+        }
+    }
+    src->Release();
+    return ok;
+}
+
+void Renderer::DrawImageEx(ID2D1Bitmap *bmp, const Rect &dst, const Rect *src,
+                           float alpha, int interp) {
+    if (!m_renderTarget || !bmp) return;
+    if (alpha < 0.0f) alpha = 0.0f;
+    if (alpha > 1.0f) alpha = 1.0f;
+    D2D1_RECT_F d = dst.ToD2D();
+    D2D1_RECT_F s{};
+    if (src) s = src->ToD2D();
+    m_renderTarget->DrawBitmap(
+        bmp, &d, alpha,
+        interp == 0 ? D2D1_BITMAP_INTERPOLATION_MODE_NEAREST_NEIGHBOR
+                    : D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
+        src ? &s : nullptr);
 }
 
 }

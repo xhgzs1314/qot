@@ -4,6 +4,7 @@
 #include "ui_component.h"
 #include "renderer.h"
 #include "animation.h"
+#include "visual_template.h"
 #include <functional>
 #include <vector>
 #include <string>
@@ -74,7 +75,24 @@ public:
     void SetItemHeight(float height) { m_itemHeight = height; }
     void SetMaxVisibleItems(int max) { m_maxItems = max; }
     void OnSelectionChanged(SelectionCallback callback) { m_callback = callback; }
-    
+
+    // v6：状态位（open = 下拉展开态，高位追加）
+    unsigned StyleFlags() const override {
+        unsigned f = UIComponent::StyleFlags();
+        if (m_isExpanded) f |= 0x20;
+        return f;
+    }
+
+    // ---- v6：模板通道（主框的文本槽；下拉列表保留代码绘制）----
+    std::wstring TplText() const override {
+        return m_selectedIndex >= 0 && m_selectedIndex < (int)m_items.size()
+            ? m_items[m_selectedIndex].text : m_placeholder;
+    }
+    Color TplTextColor() const override {
+        return m_selectedIndex >= 0 ? m_textColor : Color(0.5f, 0.5f, 0.6f, 1.0f);
+    }
+    float TplFontSize() const override { return m_fontSize; }
+
     void Draw(Renderer* renderer) override {
         if (!m_visible || !renderer) return;
         // v4：owner-draw 接管（下拉列表展开态也交回调）
@@ -82,6 +100,10 @@ public:
             m_paintFn(renderer, m_bounds.Width(), m_bounds.Height(), StyleFlags());
             return;
         }
+        // v6：声明式视觉模板（主框 + 箭头 + 文本；下拉列表照旧）
+        if (m_tplId) {
+            RenderTemplate(this, renderer, StyleFlags());
+        } else {
         unsigned flags = StyleFlags();
 
         RoundedRect mainRect;
@@ -107,8 +129,9 @@ public:
         float arrowY = m_bounds.top + m_bounds.Height() / 2;
         renderer->DrawLine(Point(arrowX - 5, arrowY - 3), Point(arrowX, arrowY + 2), textColor, 1.5f);
         renderer->DrawLine(Point(arrowX + 5, arrowY - 3), Point(arrowX, arrowY + 2), textColor, 1.5f);
+        }   // v6：else（非模板）主框绘制结束
         
-        
+        // 下拉列表（动态 items 结构——保留代码绘制）
         if (m_isExpanded && m_animProgress > 0.01f) {
             float listHeight = std::min((int)m_items.size(), m_maxItems) * m_itemHeight;
             float expandedHeight = listHeight * m_animProgress;
@@ -467,49 +490,21 @@ public:
         if (m_paintFn) {
             m_paintFn(renderer, m_bounds.Width(), m_bounds.Height(), StyleFlags());
         }
+        else if (m_tplId) {
+            // v6：声明式视觉模板（内容区背景）；tab 头是动态重复结构，保留代码绘制
+            RenderTemplate(this, renderer, StyleFlags());
+            DrawTabHeaders(renderer);
+            DrawActivePage(renderer);
+        }
         else {
-        Rect contentRect = GetContentRect();
-        Color bg;
-        if (!ResolvedStateBg(StyleFlags(), bg)) bg = m_backgroundColor;
-        renderer->FillRect(contentRect, bg);
-        renderer->DrawRect(contentRect, m_style.borderSet ? m_style.borderColor : Color(0.25f, 0.25f, 0.35f, 1.0f),
-                           m_style.borderSet ? m_style.borderWidth : 1.0f);
-        
-        
-        float tabWidth = 120.0f;
-        for (size_t i = 0; i < m_pages.size(); ++i) {
-            float tabLeft = m_bounds.left + i * tabWidth;
-            float tabRight = tabLeft + tabWidth;
-            
-            bool isActive = (int)i == m_selectedIndex;
-            bool isHover = (int)i == m_hoverTab;
-            
-            
-            RoundedRect tabRect;
-            tabRect.rect = Rect(tabLeft, m_bounds.top, tabRight, m_bounds.top + m_tabHeight);
-            if (isActive) {
-                tabRect.radiusX = m_borderRadius;
-                tabRect.radiusY = m_borderRadius;
-                renderer->FillRoundedRect(tabRect, m_tabActiveColor);
-            } else {
-                tabRect.radiusX = m_borderRadius;
-                tabRect.radiusY = m_borderRadius;
-                Color bgColor = isHover ? Color::Lerp(m_tabInactiveColor, m_tabActiveColor, 0.3f) : m_tabInactiveColor;
-                renderer->FillRoundedRect(tabRect, bgColor);
-            }
-            
-            
-            Rect textRect = tabRect.rect;
-            Color textColor = isActive ? m_textActiveColor : m_textInactiveColor;
-            renderer->DrawText(m_pages[i].title, textRect, textColor, 14.0f, false, true);
-        }
-        
-        
-        if (m_selectedIndex >= 0 && m_selectedIndex < (int)m_pages.size()) {
-            for (auto& comp : m_pages[m_selectedIndex].components) {
-                comp->Draw(renderer);
-            }
-        }
+            Rect contentRect = GetContentRect();
+            Color bg;
+            if (!ResolvedStateBg(StyleFlags(), bg)) bg = m_backgroundColor;
+            renderer->FillRect(contentRect, bg);
+            renderer->DrawRect(contentRect, m_style.borderSet ? m_style.borderColor : Color(0.25f, 0.25f, 0.35f, 1.0f),
+                               m_style.borderSet ? m_style.borderWidth : 1.0f);
+            DrawTabHeaders(renderer);
+            DrawActivePage(renderer);
         }
     }
     
@@ -578,8 +573,46 @@ public:
     
 private:
     Rect GetContentRect() const {
-        return Rect(m_bounds.left, m_bounds.top + m_tabHeight + 1, 
+        return Rect(m_bounds.left, m_bounds.top + m_tabHeight + 1,
                     m_bounds.right, m_bounds.bottom);
+    }
+
+    // tab 头绘制（动态重复结构：模板/默认/paintFn 三通道共用）
+    void DrawTabHeaders(Renderer* renderer) {
+        float tabWidth = 120.0f;
+        for (size_t i = 0; i < m_pages.size(); ++i) {
+            float tabLeft = m_bounds.left + i * tabWidth;
+            float tabRight = tabLeft + tabWidth;
+
+            bool isActive = (int)i == m_selectedIndex;
+            bool isHover = (int)i == m_hoverTab;
+
+            RoundedRect tabRect;
+            tabRect.rect = Rect(tabLeft, m_bounds.top, tabRight, m_bounds.top + m_tabHeight);
+            if (isActive) {
+                tabRect.radiusX = m_borderRadius;
+                tabRect.radiusY = m_borderRadius;
+                renderer->FillRoundedRect(tabRect, m_tabActiveColor);
+            } else {
+                tabRect.radiusX = m_borderRadius;
+                tabRect.radiusY = m_borderRadius;
+                Color bgColor = isHover ? Color::Lerp(m_tabInactiveColor, m_tabActiveColor, 0.3f) : m_tabInactiveColor;
+                renderer->FillRoundedRect(tabRect, bgColor);
+            }
+
+            Rect textRect = tabRect.rect;
+            Color textColor = isActive ? m_textActiveColor : m_textInactiveColor;
+            renderer->DrawText(m_pages[i].title, textRect, textColor, 14.0f, false, true);
+        }
+    }
+
+    // 活动页子组件绘制
+    void DrawActivePage(Renderer* renderer) {
+        if (m_selectedIndex >= 0 && m_selectedIndex < (int)m_pages.size()) {
+            for (auto& comp : m_pages[m_selectedIndex].components) {
+                comp->Draw(renderer);
+            }
+        }
     }
     
     std::vector<TabPage> m_pages;

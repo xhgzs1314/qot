@@ -404,6 +404,15 @@ namespace gui
         {
             if (component->IsVisible())
             {
+                // v6：状态位差分 → QG_EVT_STATE（value = 新状态位全量；
+                // 绘制点对比——状态变化必然伴随重绘请求，此为最稳采样点）
+                unsigned sflags = component->StyleFlags();
+                if (!component->m_flagsInited || component->m_lastFlags != sflags)
+                {
+                    component->m_lastFlags = sflags;
+                    component->m_flagsInited = true;
+                    Emit(52, component->GetId(), (double)sflags, 0, 0);
+                }
                 // 组件级透明度（<1 时以透明度层呈现：淡入淡出/动画用）
                 bool layered = false;
                 if (component->GetOpacity() < 0.999f)

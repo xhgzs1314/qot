@@ -4,6 +4,7 @@
 #include "ui_component.h"
 #include "renderer.h"
 #include "animation.h"
+#include "visual_template.h"
 #include <functional>
 #include <vector>
 #include <set>
@@ -52,6 +53,11 @@ namespace gui
                 m_paintFn(renderer, m_bounds.Width(), m_bounds.Height(), StyleFlags());
                 return;
             }
+            // v6：声明式视觉模板
+            if (m_tplId) {
+                RenderTemplate(this, renderer, StyleFlags());
+                return;
+            }
             unsigned flags = StyleFlags();
 
             float boxX = m_bounds.left;
@@ -94,13 +100,24 @@ namespace gui
             renderer->DrawText(m_text, textRect, tc, m_fontSize, false, false);
         }
 
-        // v4：状态位（hover 补充基类 disabled）
+        // v4：状态位（hover 补充基类 disabled）；v6：checked 高位追加
         unsigned StyleFlags() const override
         {
             unsigned f = UIComponent::StyleFlags();
             if (m_isHovered) f |= 0x1;
+            if (m_checked) f |= 0x10;
             return f;
         }
+
+        // ---- v6：模板通道（勾动画进度/勾选态/文字）----
+        float TplValue(int src) const override
+        {
+            if (src == 1) return m_checkProgress;
+            return m_checked ? 1.0f : 0.0f;
+        }
+        std::wstring TplText() const override { return m_text; }
+        Color TplTextColor() const override { return m_textColor; }
+        float TplFontSize() const override { return m_fontSize; }
 
         void Update(float deltaTime) override
         {
@@ -322,6 +339,11 @@ namespace gui
                 m_paintFn(renderer, m_bounds.Width(), m_bounds.Height(), StyleFlags());
                 return;
             }
+            // v6：声明式视觉模板
+            if (m_tplId) {
+                RenderTemplate(this, renderer, StyleFlags());
+                return;
+            }
 
             float cx = m_bounds.left + m_width / 2;
             float cy = m_bounds.top + (m_bounds.Height() - m_height) / 2 + m_height / 2;
@@ -347,6 +369,21 @@ namespace gui
         {
             if (m_switchAnim && m_switchAnim->IsPlaying())
                 m_switchAnim->Update(deltaTime);
+        }
+
+        // v6：状态位（checked 高位追加；hover 位历史上未维护，不引入）
+        unsigned StyleFlags() const override
+        {
+            unsigned f = UIComponent::StyleFlags();
+            if (m_checked) f |= 0x10;
+            return f;
+        }
+
+        // ---- v6：模板通道（开关动画进度 = thumb 位移与底色插值共用）----
+        float TplValue(int src) const override
+        {
+            (void)src;
+            return m_thumbOffset;
         }
 
         bool HandleMouseDown(const Point &mousePos, int button) override

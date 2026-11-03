@@ -2923,7 +2923,7 @@ g = compute();       // 两边结果一致</code></pre>
     <h2 id="gui">22. 图形界面</h2>
 
     <div style="border-left:4px solid #f59e0b;background:#fffbeb;padding:0.9rem 1.1rem;margin:1rem 0;">
-        <p style="margin:0 0 .5rem 0"><strong>QOT 的官方图形界面是 <code>vg_*</code> 系列（约 180 个函数，DirectComposition + Direct2D
+        <p style="margin:0 0 .5rem 0"><strong>QOT 的官方图形界面是 <code>vg_*</code> 系列（约 270 个函数，DirectComposition + Direct2D
                 渲染），解释器与原生程序双实现</strong>
             ——同一份 C++ 源（<code>ot-asset/c/wingui</code>），解释器经 <code>build/qotgui.dll</code> 驱动，原生程序编译期直接链接。
             控件覆盖：窗口、标签、按钮、复选框、开关、输入框、滑块、进度条、卡片、下拉、列表、选项卡、加载指示、画布（自由绘制）、图片、
@@ -2948,7 +2948,7 @@ g = compute();       // 两边结果一致</code></pre>
             <tbody>
                 <tr>
                     <td><code>vg_*</code></td>
-                    <td>约 180</td>
+                    <td>约 270</td>
                     <td><strong>解释器 + 原生程序</strong></td>
                     <td>官方 GUI（wingui / DirectComposition），事件模型 = 回调为主 + 轮询兼容（见 22.1）</td>
                 </tr>
@@ -3004,7 +3004,9 @@ loop (running == 1) {
         滚轮·拖拽·编程滚动统一触发）/ 20 键按下 / 21 字符 / 22 文本实时改变 /
         30 关闭请求 / 31 尺寸 / 32 焦点 / 33 失焦 / 40 载入 / <strong>50 菜单命令</strong>（v3，
         value=选中项 id，0=取消）/ <strong>51 拖放文件</strong>（v3，value=文件数，x/y=落点客户坐标，
-        路径经 <code>vg_take_drop_file(i)</code> 在回调内立刻取）。</p>
+        路径经 <code>vg_take_drop_file(i)</code> 在回调内立刻取）/ <strong>52 状态位变化</strong>（v6，
+        value=新状态位全量：0x1 悬停 0x2 按下 0x4 禁用 0x8 焦点 0x10 勾选 0x20 展开，
+        绑定位 0x400000）。</p>
     <p><strong>生命周期与帧原语</strong>：<code>vg_on_load</code>（首次显示）、<code>vg_on_close</code>（关闭请求，配
         <code>vg_prevent_close</code> 可否决）、
         <code>vg_on_resize</code>；<code>vg_on_frame(fn)</code> + <code>vg_request_frame()</code>（rAF 模型：不请求即停帧、零空转）+
@@ -3109,6 +3111,156 @@ var cmd = vg_menu_popup(mid, w, x, y);   // 同步返回选中项 id（0=取消�
     <p>完整可运行示例：<code>testing/gui/style_demo.qot</code>（v4 样式 + owner-draw + 菜单样式，29 断言双跑）、
         <code>testing/gui/layout_demo.qot</code> / <code>scroll_demo.qot</code> / <code>dialog_demo.qot</code> /
         <code>text_demo.qot</code> / <code>integration_demo.qot</code>（v3 五任务各一，全部自动关窗可无人值守）。
+    </p>
+
+    <h3>22.1.3 v5 Fluent 级绘制原语：路径 / 画刷 / 富文本 / 合成效果层</h3>
+    <p>Canvas 回调期间可用；路径与画刷句柄跨帧复用（设备重建后失效需重建，free 显式回收）。
+        颜色一律 <code>[r,g,b,a]</code> 0~1。</p>
+    <table cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%; margin: 1rem 0;">
+        <thead style="background-color: #f0f0f0;">
+            <tr>
+                <th>类别</th>
+                <th>函数</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>路径几何</td>
+                <td><code>vg_path_begin()</code> → <code>vg_path_move_to / _line_to / _quad_to / _curve_to / _arc / _svg_arc / _rect / _round_rect / _ellipse / _close</code> → <code>vg_path_fill(color)</code> / <code>vg_path_fill_brush(id)</code> / <code>vg_path_stroke(color, w)</code> / <code>vg_path_stroke_brush</code>；查询 <code>vg_path_bounds()</code> → [x,y,w,h]、<code>vg_path_hit(x, y)</code> / <code>vg_path_stroke_hit</code>（真值命中）</td>
+            </tr>
+            <tr>
+                <td>线型</td>
+                <td><code>vg_path_line_cap</code>（0平 1方 2圆）/ <code>vg_path_line_join</code> / <code>vg_path_miter_limit</code> / <code>vg_path_dash([d1,d2...], phase)</code>——对全部描边生效</td>
+            </tr>
+            <tr>
+                <td>画刷</td>
+                <td><code>vg_brush_solid(color)</code> / <code>vg_brush_linear(x0,y0,x1,y1, stops)</code> / <code>vg_brush_radial / _radial_focus</code>（stops = [[pos, color], ...] 多停靠点）/ <code>vg_brush_bitmap(img)</code> + <code>vg_brush_extend</code>（平铺）/ <code>vg_brush_transform</code> / <code>vg_brush_free</code>；形状×画刷 <code>vg_draw_fill_rect_brush / _stroke_rect_brush / _fill_round_rect_brush / _stroke_round_rect_brush / _fill_ellipse_brush / _stroke_ellipse_brush</code></td>
+            </tr>
+            <tr>
+                <td>富文本</td>
+                <td><code>vg_rich_begin()</code> / <code>vg_rich_add(text, size, color, weight, italic, underline, strikethrough)</code> / <code>vg_rich_add_brush</code>（渐变文字）/ <code>vg_rich_line_height / _spacing</code> / <code>vg_rich_draw(x, y, w, h, halign, valign, wrap)</code> / <code>vg_rich_measure</code></td>
+            </tr>
+            <tr>
+                <td>合成效果层</td>
+                <td><code>vg_draw_push_blend(mode, x, y, w, h)</code>（13 种 D2D 混合，与 <code>vg_draw_pop_blend</code> 成对）/ <code>vg_draw_push_shadow(color, blur, dx, dy, bounds)</code>（GPU 高斯真阴影）/ <code>vg_draw_push_mask(brush, ...)</code>（画刷 alpha 蒙版）/ <code>vg_draw_push_clip_path()</code>（任意路径裁剪，pop 用 <code>vg_draw_pop_clip</code>）——后三者仅合成路径（<code>vg_backend()[0]==1</code>）</td>
+            </tr>
+            <tr>
+                <td>离屏面</td>
+                <td><code>vg_surface(w, h)</code> → id / <code>vg_surface_begin(id)</code>（后续绘制进面，清为透明）/ <code>vg_surface_end()</code> / <code>vg_surface_draw(id, x, y, w, h, alpha, interp)</code>（画一次贴多帧）/ <code>vg_surface_pixel(id, x, y)</code> → [r,g,b,a]（像素真值断言；仅合成路径）/ <code>vg_surface_free</code></td>
+            </tr>
+            <tr>
+                <td>图片精控 / 路径句柄</td>
+                <td><code>vg_draw_image_ex(img, x, y, w, h, alpha, interp, sx, sy, sw, sh)</code> / <code>vg_draw_image_round(..., radius)</code>；<code>vg_path_store()</code> 固化当前路径为几何句柄（部件形状/命中 <code>vg_geo_hit</code>/裁剪共用）+ <code>vg_path_free</code></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3>22.1.4 v6 声明式视觉模板：控件呈现 = 数据驱动的部件模板</h3>
+    <p><strong>ControlTemplate + VisualState + 声明式 Transition</strong>——模板是纯数据（句柄化、
+        跨控件共享），控件应用后默认绘制让位；<code>vg_on_paint</code> 代码通道与模板数据通道
+        长期并存（优先级：on_paint 接管 &gt; 模板 &gt; 控件默认）。最短路径：从默认模板起步渐进定制：</p>
+    <pre><code class="code-highlight">var tpl = vg_tpl_default(0);                       // 0按钮 1勾选 2开关 3滑块 4进度 5下拉 6选项卡
+vg_tpl_part(tpl, "bg", 1, 12, 0, 0, 0,             // 名叫 bg 的部件：圆角(a=12)
+    1, [0.12, 0.50, 0.35, 1], 0,                   //   填充 = 纯色
+    [[0.5, 1.0, 0.75, 0.8], 1.5],                  //   描边 = [色, 宽]
+    null, 0, 0);                                   //   inset / textslot / anchor
+vg_tpl_state(tpl, 1, "bg", 0, [0.95, 0.45, 0.20, 1]);   // 悬停(掩码1)：填充变色
+vg_tpl_state(tpl, 2, "bg", 4, [0, -2]);                 // 按下(掩码2)：上移 2px
+vg_tpl_transition(tpl, 3, 250, 2);                      // 状态切换 250ms 缓动2 自动插值
+vg_apply_tpl(btn, tpl);                                 // 应用；vg_clear_tpl(btn) 恢复默认</code></pre>
+    <table cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%; margin: 1rem 0;">
+        <thead style="background-color: #f0f0f0;">
+            <tr>
+                <th>概念</th>
+                <th>说明</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code>vg_tpl_create() / vg_tpl_free(id)</code></td>
+                <td>模板句柄生命周期；跨控件共享，动画状态挂控件实例</td>
+            </tr>
+            <tr>
+                <td><code>vg_tpl_part(tpl, name, shape, a, b, c, path_id, fill_kind, fill色, fill_brush, stroke, inset, textslot, anchor)</code></td>
+                <td><strong>部件</strong>。shape：0 矩形 1 圆角(a=半径) 2 椭圆 3 路径(path_id 来自 <code>vg_path_store</code>，a&gt;0 定尺寸框内适配) 4 定尺寸圆角(a=w b=h c=r，垂直居中) 5 定尺寸椭圆 6 水平条(a=高 b=半径)；anchor 0左 1中 2右；fill_kind：0 无 1 纯色 2 画刷句柄 3 双色垂直渐变（尾色经 <code>vg_tpl_part_dyn</code> 的 c2）；textslot=1 画控件文本</td>
+            </tr>
+            <tr>
+                <td><code>vg_tpl_part_text(tpl, part, ts, halign, valign, margin, color)</code></td>
+                <td>文字槽精调；ts 来自 <code>vg_textstyle(size, weight, italic, halign, wrap, family)</code></td>
+            </tr>
+            <tr>
+                <td><code>vg_tpl_state(tpl, mask, part, prop, 值)</code></td>
+                <td><strong>状态覆盖</strong>。掩码 1悬停 2按下 4禁用 8焦点 <strong>16勾选</strong> <strong>32展开</strong>（全命中才生效）；prop 0填充色 1填充刷 2描边色 3描边宽 4平移 5缩放 6旋转 7透明 8圆角</td>
+            </tr>
+            <tr>
+                <td><code>vg_tpl_transition(tpl, mask, ms, easing)</code></td>
+                <td><strong>声明式过渡</strong>：状态位变化的切换自动插值（12 缓动同 <code>vg_easing</code>）；过渡期自动续帧，结束自然停帧零空转</td>
+            </tr>
+            <tr>
+                <td><code>vg_tpl_part_dyn(tpl, part, mode, src, range, c2)</code></td>
+                <td><strong>值驱动几何</strong>。mode：0 无 1 宽按值 2 x 位移(range&lt;0 自动行程) 3 缩放(c2[0]=最小比例) 4 透明 5 高按值(锚底) 6 填充色按值 lerp；src 0 主值(滑块/进度/勾选) 1 检查动画进度——滑块的滑块、进度条的填充条、开关的推钮都由它驱动</td>
+            </tr>
+            <tr>
+                <td>路径/文字资源</td>
+                <td><code>vg_path_store()</code> 把当前构建路径固化为几何句柄（异形部件/命中 <code>vg_geo_hit</code>/裁剪共用）；<code>vg_textstyle(...)</code> 文字样式块</td>
+            </tr>
+        </tbody>
+    </table>
+    <p>勾选/展开态进状态位（<code>vg_style_flags</code> 高位 0x10 / 0x20），状态位变化实时发
+        <strong>kind=52</strong>（value = 新状态位全量，绑定位 0x400000）。完整示范
+        <code>testing/gui/tpl_v6.qot</code>（同一按钮套 5 种模板 + 默认模板全家桶，64 断言双侧可跑）。
+    </p>
+
+    <h3>22.1.5 v6 配套：表格 / 颜色选择器 / 日期选择器</h3>
+    <pre><code class="code-highlight">// 表格：列(width&lt;=0 均分剩余) + 行(';'-分隔单元格)，单击行选中
+var tbl = vg_create_table(w, 20, 20, 420, 220);
+vg_table_add_column(tbl, "名称", 140);
+vg_table_add_row(tbl, "机械键盘;7;199.0");
+vg_table_set_cell(tbl, 2, 2, "99.0");
+vg_bind(tbl, 4, func(id, v, x, y) -&gt; output("行" + str(v) + " 列" + str(x)));   // kind=3
+
+// 颜色选择器：SV 方块 + 色相条，拖拽实时 CHANGE（value = 0xRRGGBB 打包）
+var cp = vg_create_colorpicker(w, 470, 20, 240, 200);
+vg_bind(cp, 2, func(id, v, x, y) -&gt; output("0x" + str(v)));
+vg_colorpicker_set_rgb(cp, [1.0, 0.6, 0.2]);
+
+// 日期选择器：月历翻月点选，CHANGE（value = YYYYMMDD 打包）
+var dp = vg_create_datepicker(w, 470, 240, 260, 260);
+vg_bind(dp, 2, func(id, v, x, y) -&gt; output(str(v)));
+vg_datepicker_set_date(dp, 2026, 11, 3);</code></pre>
+    <table cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%; margin: 1rem 0;">
+        <thead style="background-color: #f0f0f0;">
+            <tr>
+                <th>函数</th>
+                <th>说明</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code>vg_create_table(win, x, y, w, h)</code></td>
+                <td>表格；列宽 width≤0 均分剩余空间；表头 + 网格 + hover/选中高亮 + 滚轮滚动</td>
+            </tr>
+            <tr>
+                <td><code>vg_table_add_column(id, title, width)</code> / <code>vg_table_add_row(id, "a;b;c")</code> / <code>vg_table_set_cell(id, row, col, text)</code></td>
+                <td>列定义 / 行数据（';' 分隔）/ 单元格精修</td>
+            </tr>
+            <tr>
+                <td><code>vg_table_get_selected(id)</code> → [row, col] / <code>vg_table_set_selected(id, row, col)</code></td>
+                <td>选中读写（程序化选中同样发 kind=3，越界防呆忽略）</td>
+            </tr>
+            <tr>
+                <td><code>vg_create_colorpicker(win, x, y, w, h)</code> / <code>vg_colorpicker_set_rgb(id, [r,g,b])</code> / <code>vg_colorpicker_get_rgb(id)</code> → [r,g,b]</td>
+                <td>SV 方块（横饱和度/纵明度）+ 色相条 + 当前色预览；拖拽实时发 kind=2（value = 0xRRGGBB 打包，double 精确）；分量自动钳制</td>
+            </tr>
+            <tr>
+                <td><code>vg_create_datepicker(win, x, y, w, h)</code> / <code>vg_datepicker_set_date(id, y, m, d)</code> / <code>vg_datepicker_get_date(id)</code> → [y,m,d]</td>
+                <td>月历（头部翻月 + 星期行 + 6×7 日格，今天描边、选中填充、非本月灰显）；点选发 kind=2（value = YYYYMMDD 打包）；非法日期（如 2 月 30 日）拒收</td>
+            </tr>
+        </tbody>
+    </table>
+    <p>三控件同样吃模板红利（容器框可 <code>vg_apply_tpl</code> 换肤，动态内容代码绘制）。注意颜色/日期的
+        CHANGE 在<strong>程序化设置时同样触发</strong>，拖拽高频路径已按「绑定过才入队」节流。验收
+        <code>testing/gui/pickers_table.qot</code>（38 断言双侧可跑）。
     </p>
 
     <h3>22.2 window_*（解释器可用，轻量替代）</h3>
@@ -3693,7 +3845,9 @@ vg_combobox_on_selected(cb, pick);
             </tr>
         </tbody>
     </table>
-    <p>⚠ <code>vg_tabcontrol</code> <strong>没有</strong>切换事件回调，也没有 <code>get_selected</code>。</p>
+    <p>⚠ 本行<strong>已过时</strong>：现行 wingui 的 <code>vg_tabcontrol</code> 有切换事件（kind=3 SELECT，
+        <code>vg_bind(id, 4, fn)</code> 接收）与 <code>vg_tabcontrol_set_selected(id, index)</code> /
+        <code>vg_tabcontrol_get_selected(id)</code>。</p>
 
     <h3>22.7 附录 C：一个完整例子（旧版形态，事件部分需按 22.1 改写）</h3>
     <pre><code class="code-highlight">var win;
@@ -3751,7 +3905,7 @@ vg_uninit();</code></pre>
         <li><strong>回调里被 GUI 用到的变量请声明成全局</strong>（顶层 <code>var</code>）。解释器里函数内写全局变量不生效，见 <a
                 href="#runtime-diff">§21.2</a></li>
         <li><strong>回调形参个数照 §22.2 的表写全</strong>，多余实参从前面丢，写少了拿到的是后面的参数</li>
-        <li><strong>没有 <code>vg_create_label</code></strong>；要显示静态文字，可以用禁用的按钮或卡片标题代替</li>
+        <li><strong>「没有 <code>vg_create_label</code>」已过时</strong>——现行 wingui 有 <code>vg_create_label</code> 及 <code>vg_label_set_text</code>（旧 VM 口径的历史条目，勿再绕道）</li>
         <li><strong>坐标是绝对像素</strong>，没有自动布局，窗口缩放不会跟着变</li>
         <li><strong>现行实现 = wingui（双引擎同源）</strong>；旧字节码 VM 里的那份已随弃管作废，本节条目以现行 wingui 行为为准</li>
     </ul>

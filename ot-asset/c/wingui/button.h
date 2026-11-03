@@ -2,6 +2,7 @@
 #include "ui_component.h"
 #include "renderer.h"
 #include "animation.h"
+#include "visual_template.h"
 #include <functional>
 
 namespace gui {
@@ -34,6 +35,12 @@ public:
         if (m_state == State::Pressed) f |= 0x2;
         return f;
     }
+
+    // ---- v6：模板通道（文字槽的控件侧默认）----
+    std::wstring TplText() const override { return m_text; }
+    Color TplTextColor() const override { return m_textColor; }
+    float TplFontSize() const override { return FontSize(); }
+    bool TplBold() const override { return FontBold(); }
     
 private:
     enum class State {
@@ -118,6 +125,11 @@ inline void Button::Draw(Renderer* renderer) {
     // v4：owner-draw 接管 —— 默认绘制整体让位，回调里自由作画
     if (m_paintFn) {
         m_paintFn(renderer, m_bounds.Width(), m_bounds.Height(), StyleFlags());
+        return;
+    }
+    // v6：声明式视觉模板（数据通道；on_paint 代码通道优先级最高）
+    if (m_tplId) {
+        RenderTemplate(this, renderer, StyleFlags());
         return;
     }
     unsigned flags = StyleFlags();

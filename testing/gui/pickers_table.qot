@@ -1,0 +1,186 @@
+// ===========================================================================
+// pickers_table.qot
+//
+// 覆盖：
+//   1. 表格：列定义（width<=0 均分）/ 加行（';' 分隔）/ set_cell 改值 /
+//      程序化选中 + SELECT 事件（value=行，x=列）/ 越界选中防呆；
+//   2. 颜色选择器：set_rgb → get_rgb 往返真值 / CHANGE 事件
+//      （value = 0xRRGGBB 打包）/ 分量钳制；
+//   3. 日期选择器：set_date → get_date 往返 / CHANGE 事件
+//      （value = YYYYMMDD 打包）/ 非法日期（2月30日）拒收；
+//   4. 模板红利：三控件 apply 自定义模板（bg part）渲染不回归；
+//   5. 错误路径：坏句柄如实返回。
+// 帧计数自动关窗（无人值守可跑）。
+// ===========================================================================
+
+var w = vg_create_window("v6 配套 · 表格/颜色/日期", 880, 620);
+vg_set_window_bg_gradient(w, [0.04, 0.04, 0.09, 1], [0.07, 0.05, 0.14, 1]);
+
+var cnt = [0, 0, 0];        // [帧数, 失败数, 总断言]
+var selEvt = [0, -1, -1];   // 表格 SELECT：[次数, 行, 列]
+var colorEvt = [0, 0.0];    // 颜色 CHANGE：[次数, packed]
+var dateEvt = [0, 0.0];     // 日期 CHANGE：[次数, yyyymmdd]
+
+any_t func check(cond, tag) {
+    cnt[2] = cnt[2] + 1;
+    if (!cond) {
+        cnt[1] = cnt[1] + 1;
+        output("FAIL " + tag);
+    }
+}
+
+any_t func near(a, b) {
+    var d = a - b;
+    if (d < 0) { d = -d; }
+    return d < 0.02;
+}
+
+// 数组元素相等断言（中间变量规避语义器 array_known 警告）
+any_t func aeq(a, i, v) {
+    var x = a[i] + 0;
+    return x == v;
+}
+
+// ---- 事件回调（前置定义：vg_bind 引用须已定义）----
+// 首个事件定格（后续清除/钳制调用也会发事件，只验首个）
+any_t func on_table_select(id, v, x) {
+    var n = selEvt[0] + 0;
+    if (n == 0) {
+        selEvt[1] = v + 0;
+        selEvt[2] = x + 0;
+    }
+    selEvt[0] = selEvt[0] + 1;
+}
+any_t func on_color(id, v) {
+    var n = colorEvt[0] + 0;
+    if (n == 0) {
+        colorEvt[1] = v + 0.0;
+    }
+    colorEvt[0] = colorEvt[0] + 1;
+}
+any_t func on_date(id, v) {
+    var n = dateEvt[0] + 0;
+    if (n == 0) {
+        dateEvt[1] = v + 0.0;
+    }
+    dateEvt[0] = dateEvt[0] + 1;
+}
+
+// ================= 1. 表格 =================
+var tbl = vg_create_table(w, 20, 20, 420, 220);
+check(tbl > 0, "table create");
+check(vg_table_add_column(tbl, "名称", 140) == true, "table col 1");
+check(vg_table_add_column(tbl, "数量", 0) == true, "table col 2 (flex)");
+check(vg_table_add_column(tbl, "单价", 0) == true, "table col 3 (flex)");
+check(vg_table_add_row(tbl, "自定义键盘;3;329.0") == true, "table row 1");
+check(vg_table_add_row(tbl, "机械键盘;7;199.0") == true, "table row 2");
+check(vg_table_add_row(tbl, "青轴键盘;12;89.0") == true, "table row 3");
+check(vg_table_set_cell(tbl, 2, 2, "99.0") == true, "table set cell");
+check(vg_table_set_cell(tbl, 99, 0, "越界") == true, "table set cell oob tolerated");
+
+// 程序化选中 → SELECT 事件（延迟一跳，帧回调断言）+ get_selected 真值
+vg_bind(tbl, 4, func(id, v, x, y) -> on_table_select(id, v, x));
+var sel0 = vg_table_get_selected(tbl);
+check(aeq(sel0, 0, -1) && aeq(sel0, 1, -1), "table initial no selection");
+check(vg_table_set_selected(tbl, 1, 2) == true, "table set selected");
+check(vg_table_set_selected(tbl, 99, 99) == true, "table set selected oob tolerated");
+var sel1 = vg_table_get_selected(tbl);
+check(aeq(sel1, 0, 1) && aeq(sel1, 1, 2), "table selected readback");
+check(vg_table_set_selected(tbl, -1, -1) == true, "table clear selection");
+var sel2 = vg_table_get_selected(tbl);
+check(aeq(sel2, 0, -1) && aeq(sel2, 1, -1), "table cleared");
+
+// ================= 2. 颜色选择器 =================
+var cp = vg_create_colorpicker(w, 470, 20, 240, 200);
+check(cp > 0, "colorpicker create");
+vg_bind(cp, 2, func(id, v, x, y) -> on_color(id, v));
+check(vg_colorpicker_set_rgb(cp, [1.0, 0.6, 0.2]) == true, "colorpicker set rgb");
+var c0 = vg_colorpicker_get_rgb(cp);
+check(c0 != null && near(c0[0], 1.0) && near(c0[1], 0.6) && near(c0[2], 0.2),
+      "colorpicker rgb readback");
+// 越界分量钳制（2.5 → 255）
+check(vg_colorpicker_set_rgb(cp, [0.2, 2.5, -0.5]) == true, "colorpicker clamp set");
+
+// ================= 3. 日期选择器 =================
+var dp = vg_create_datepicker(w, 470, 240, 260, 260);
+check(dp > 0, "datepicker create");
+vg_bind(dp, 2, func(id, v, x, y) -> on_date(id, v));
+var d0 = vg_datepicker_get_date(dp);
+check(d0 != null && aeq(d0, 0, d0[0]) && d0[0] + 0 > 2020 && d0[1] + 0 >= 1 && d0[1] + 0 <= 12,
+      "datepicker defaults to today");
+check(vg_datepicker_set_date(dp, 2026, 11, 3) == true, "datepicker set 2026-11-03");
+var d1 = vg_datepicker_get_date(dp);
+check(aeq(d1, 0, 2026) && aeq(d1, 1, 11) && aeq(d1, 2, 3), "datepicker readback");
+// 非法日期（2月30日）拒收：读回不变
+var before = vg_datepicker_get_date(dp);
+check(vg_datepicker_set_date(dp, 2026, 2, 30) == true, "datepicker set invalid tolerated");
+var after = vg_datepicker_get_date(dp);
+check(aeq(after, 1, before[1] + 0) && aeq(after, 2, before[2] + 0), "datepicker invalid rejected");
+
+// ================= 4. 模板红利（三控件换肤渲染不回归） =================
+var tplPanel = vg_tpl_create();
+check(vg_tpl_part(tplPanel, "bg", 1, 10, 0, 0, 0, 1, [0.10, 0.14, 0.24, 1], 0,
+                  [[0.30, 0.60, 1.0, 0.6], 1.5], [0, 0, 0, 0], 0, 0) == true,
+      "tpl part for pickers");
+check(vg_apply_tpl(tbl, tplPanel) == true, "apply tpl to table");
+check(vg_apply_tpl(cp, tplPanel) == true, "apply tpl to colorpicker");
+check(vg_apply_tpl(dp, tplPanel) == true, "apply tpl to datepicker");
+
+// 状态标签
+var status = vg_create_label(w, "表格 SELECT / 颜色 CHANGE / 日期 CHANGE", 20, 260, 420, 24);
+vg_label_set_text(status, "三控件运行中（120 帧自动关闭）");
+
+// ================= 5. 错误路径 =================
+check(vg_table_add_column(99999, "x", 0) == false, "table col bad handle");
+check(vg_colorpicker_set_rgb(99999, [0, 0, 0]) == false, "colorpicker set bad handle");
+check(vg_datepicker_set_date(99999, 2026, 1, 1) == false, "datepicker set bad handle");
+
+any_t func on_frame(dt) {
+    cnt[0] = cnt[0] + 1;
+    var frame = cnt[0] + 0;
+    // 帧 30：事件经消息泵延迟一跳派发后断言（同步段读不到）
+    if (frame == 30) {
+        var nSel = selEvt[0] + 0;
+        check(nSel >= 1, "table SELECT event received");
+        if (nSel >= 1) {
+            var selR = selEvt[1] + 0;
+            var selC = selEvt[2] + 0;
+            check(selR == 1 && selC == 2, "table SELECT row=1 col=2");
+        }
+        var nCol = colorEvt[0] + 0;
+        check(nCol >= 1, "colorpicker CHANGE event received");
+        if (nCol >= 1) {
+            // 首个事件 = set_rgb(1.0, 0.6, 0.2) → 0xFF9933 = 16750899
+            var packed = colorEvt[1] + 0.0;
+            check(packed == 16750899.0, "colorpicker packed 0xFF9933");
+        }
+        var nDate = dateEvt[0] + 0;
+        check(nDate >= 1, "datepicker CHANGE event received");
+        if (nDate >= 1) {
+            var dPack = dateEvt[1] + 0.0;
+            check(dPack == 20261103.0, "datepicker packed 20261103");
+        }
+    }
+    if (frame >= 120) {
+        vg_close_window(w);
+    } else {
+        vg_request_frame();
+    }
+}
+
+vg_on_frame(func(dt) -> on_frame(dt));
+vg_show_window(w);
+vg_run();
+
+// ================= 收尾 =================
+vg_tpl_free(tplPanel);
+
+var failsN = cnt[1] + 0;
+if (failsN == 0) {
+    output("pickers-table-ok checks=" + str(cnt[2]) +
+           " fails=0 selEvts=" + str(selEvt[0]) +
+           " colorEvts=" + str(colorEvt[0]) +
+           " dateEvts=" + str(dateEvt[0]));
+} else {
+    output("pickers-table-FAIL checks=" + str(cnt[2]) + " fails=" + str(cnt[1]));
+}

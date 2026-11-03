@@ -9,6 +9,27 @@ namespace gui {
 class Renderer;   // 前向声明（ui_component 只用其指针；完整定义在 renderer.h）
 
 // ---------------------------------------------------------------------------
+// v6：模板 part 动画状态（参数集布局与 visual_template.h 的 TplParams 一致）。
+//   参数集 19 标量：0-3 fill rgba / 4 fillKind / 5 fillBrush /
+//   6-9 stroke rgba / 10 strokeWidth / 11 strokeSet /
+//   12 tx / 13 ty / 14 sx / 15 sy / 16 rot / 17 opacity / 18 radius。
+//   模板跨控件共享，动画状态挂控件实例（每 part 一项）。
+// ---------------------------------------------------------------------------
+constexpr int kTplParamCount = 19;
+struct TplPartAnim {
+    bool hasLast = false;                 // 已有上次参数集（首帧不过渡）
+    bool active = false;                  // 过渡进行中
+    double t0 = 0.0;                      // 过渡起点（steady_clock 秒）
+    float ms = 0.0f;
+    int easing = 0;
+    float from[kTplParamCount] = {0};
+    float to[kTplParamCount] = {0};
+    float last[kTplParamCount] = {0};     // 上次目标参数集
+    float lastRender[kTplParamCount] = {0}; // 上次渲染值（重启过渡的起点）
+    unsigned lastFlags = 0;
+};
+
+// ---------------------------------------------------------------------------
 // UIComponent —— 一切控件的基类。
 //
 // v4 样式系统（原语哲学贯彻到组件层）：
@@ -70,6 +91,25 @@ public:
 
     // 组件当前状态位（子类重写补充自身知道的状态；基类只知 disabled）
     virtual unsigned StyleFlags() const { return m_enabled ? 0u : 0x4u; }
+
+    // ---- v6：声明式视觉模板通道（渲染主体 RenderTemplate 在 visual_template.h）----
+    // 应用模板后控件默认绘制让位（owner-draw 接管优先级最高，模板次之）。
+    void SetTemplateId(int tplId) { m_tplId = tplId; m_tplAnim.clear(); }
+    int GetTemplateId() const { return m_tplId; }
+    // 模板动态值：src 0 主值（滑块/进度归一值、勾选态）1 检查动画进度
+    virtual float TplValue(int src) const { (void)src; return 0.0f; }
+    // 模板文字槽的控件侧默认（无 ts 句柄时生效）
+    virtual std::wstring TplText() const { return L""; }
+    virtual Color TplTextColor() const { return Color(0.9f, 0.9f, 0.95f, 1.0f); }
+    virtual float TplFontSize() const { return 14.0f; }
+    virtual bool TplBold() const { return false; }
+
+    // ---- v6：模板动画状态（RenderTemplate 读写；public 供自由函数访问）----
+    int m_tplId = 0;
+    std::vector<TplPartAnim> m_tplAnim;
+    // v6：状态位缓存（窗口绘制循环差分 → QG_EVT_STATE 事件）
+    unsigned m_lastFlags = 0;
+    bool m_flagsInited = false;
 
     // ---- 状态色解析：命中优先级 disabled > pressed > focused > hover ----
     // 返回 true = out 已填（调用方直接用）；false = 无覆盖，走组件默认。

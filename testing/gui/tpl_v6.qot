@@ -1,0 +1,261 @@
+// ===========================================================================
+// tpl_v6.qot
+//
+// 覆盖：
+//   1. 路径句柄：path_store 固化几何 + geo_hit 命中真值 + free；
+//   2. 文字样式块：textstyle 创建/参数/回收；
+//   3. 模板数据层：tpl_create / tpl_part（椭圆/定尺寸圆角/路径异形/文字槽）/
+//      tpl_part_text / tpl_part_dyn / tpl_state（hover/pressed/disabled 覆盖）/
+//      tpl_transition（状态切换自动插值）；
+//   4. 同一 button 套 N 种模板：圆形图标钮 / 渐变胶囊 / 路径异形（五边形）/
+//      状态过渡动效（hover 位移+缩放+变色）/ 禁用态变体（opacity）；
+//   5. 默认模板全家桶：7 类控件（button/checkbox/toggle/slider/progressbar/
+//      combobox/tabcontrol）apply 默认模板渲染 + 渐进定制（同名 part 更新）；
+//   6. 状态位扩展：checked(0x10)/open(0x20) 进 style_flags；
+//      QG_EVT_STATE(52) 事件 + 0x400000 绑定位；
+//   7. 错误处理路径：坏句柄/坏模板/坏控件/坏 type 均如实返回。
+// 帧计数自动关窗（无人值守可跑）。
+// ===========================================================================
+
+var w = vg_create_window("tpl v6 · 声明式视觉模板", 880, 660);
+vg_set_window_bg_gradient(w, [0.04, 0.04, 0.09, 1], [0.07, 0.05, 0.14, 1]);
+
+var cnt = [0, 0, 0];        // [帧数, 失败数, 总断言]
+var stateEvents = [0];      // QG_EVT_STATE 收到次数
+var stateSeen = [0];        // 最近一次事件的状态位
+
+any_t func check(cond, tag) {
+    cnt[2] = cnt[2] + 1;
+    if (!cond) {
+        cnt[1] = cnt[1] + 1;
+        output("FAIL " + tag);
+    }
+}
+
+// ================= 1. 路径句柄（固化几何 + 命中） =================
+// 五边形（异形按钮用；局部坐标 0..100 x 0..100）
+vg_path_begin();
+vg_path_move_to(50, 2);
+vg_path_line_to(98, 38);
+vg_path_line_to(80, 96);
+vg_path_line_to(20, 96);
+vg_path_line_to(2, 38);
+vg_path_close();
+var penta = vg_path_store();
+check(penta > 0, "path store pentagon");
+
+// 小对勾（圆形图标钮的标记；18x18 局部坐标）
+vg_path_begin();
+vg_path_move_to(4, 9);
+vg_path_line_to(8, 13);
+vg_path_line_to(14, 5);
+var checkMark = vg_path_store();
+check(checkMark > 0, "path store checkmark");
+
+check(vg_geo_hit(penta, 50, 50) == true, "geo hit inside");
+check(vg_geo_hit(penta, 2, 96) == false, "geo miss corner");
+check(vg_geo_hit(99999, 50, 50) == false, "geo hit bad handle");
+
+// ================= 2. 文字样式块 =================
+var ts16 = vg_textstyle(16, 600, 0, 1, 0, "");
+check(ts16 > 0, "textstyle create");
+var ts13 = vg_textstyle(13, 400, 1, 0, 1, "Consolas");
+check(ts13 > 0, "textstyle italic family");
+
+// ================= 3. 画刷（渐变胶囊用） =================
+var brGrad = vg_brush_linear(0, 0, 200, 0, [
+    [0.0, [0.20, 0.55, 1.0, 1]],
+    [1.0, [0.85, 0.30, 0.90, 1]]
+]);
+check(brGrad > 0, "gradient brush");
+
+// ================= 4. 模板数据层 =================
+// ---- 模板 A：圆形图标钮（ellipse 底 + path 勾标记 + hover 放大过渡）----
+var tplCircle = vg_tpl_create();
+check(tplCircle > 0, "tpl create");
+// vg_tpl_part(tpl, name, shape, a, b, c, path_id, fill_kind, fill色, fill_brush, stroke, inset, textslot, anchor)
+check(vg_tpl_part(tplCircle, "bg", 2, 0, 0, 0, 0, 1, [0.16, 0.16, 0.27, 1], 0, [[0.45, 0.50, 0.70, 0.5], 1], null, 0, 0) == true, "tpl part ellipse bg");
+check(vg_tpl_part(tplCircle, "mark", 3, 18, 18, 0, checkMark, 0, null, 0, [[0.30, 0.90, 0.60, 1], 2.5], null, 0, 1) == true, "tpl part path mark anchor-center");
+check(vg_tpl_state(tplCircle, 1, "bg", 0, [0.26, 0.30, 0.45, 1]) == true, "tpl state hover fill");
+check(vg_tpl_state(tplCircle, 1, "mark", 5, [1.15, 1.15]) == true, "tpl state hover scale");
+check(vg_tpl_state(tplCircle, 2, "bg", 0, [0.10, 0.12, 0.20, 1]) == true, "tpl state pressed fill");
+check(vg_tpl_transition(tplCircle, 3, 250, 2) == true, "tpl transition hover+pressed");
+
+// ---- 模板 B：渐变胶囊（定尺寸圆角 + 画刷填充 + hover 上浮）----
+var tplPill = vg_tpl_create();
+check(vg_tpl_part(tplPill, "bg", 4, 150, 40, 20, 0, 2, null, brGrad, [[1, 1, 1, 0.35], 1], null, 0, 0) == true, "tpl part pill brush fill");
+check(vg_tpl_part(tplPill, "text", 0, 0, 0, 0, 0, 0, null, 0, null, [12, 0, 12, 0], 1, 0) == true, "tpl part text slot");
+check(vg_tpl_part_text(tplPill, "text", ts16, 1, 1, [0, 0, 0, 0], [1, 1, 1, 1]) == true, "tpl part text styled");
+check(vg_tpl_state(tplPill, 1, "bg", 4, [0, -3]) == true, "tpl state hover translate");
+check(vg_tpl_transition(tplPill, 1, 200, 2) == true, "tpl transition pill hover");
+
+// ---- 模板 C：路径异形（五边形 + 值驱动演示 + 按下缩放）----
+var tplPenta = vg_tpl_create();
+check(vg_tpl_part(tplPenta, "body", 3, 100, 100, 0, penta, 1, [0.55, 0.25, 0.85, 0.9], 0, [[0.85, 0.70, 1.0, 0.6], 1.5], null, 0, 1) == true, "tpl part penta path");
+check(vg_tpl_part(tplPenta, "text", 0, 0, 0, 0, 0, 0, null, 0, null, [0, 4, 0, 0], 1, 0) == true, "tpl part penta text");
+check(vg_tpl_state(tplPenta, 2, "body", 5, [0.92, 0.92]) == true, "tpl state pressed scale");
+check(vg_tpl_transition(tplPenta, 2, 120, 2) == true, "tpl transition penta press");
+
+// ---- 模板 D：状态过渡动效（多属性缓动）----
+var tplMorph = vg_tpl_create();
+check(vg_tpl_part(tplMorph, "bg", 1, 10, 0, 0, 0, 1, [0.15, 0.45, 0.85, 1], 0, null, null, 0, 0) == true, "tpl part morph bg");
+check(vg_tpl_part(tplMorph, "text", 0, 0, 0, 0, 0, 0, null, 0, null, null, 1, 0) == true, "tpl part morph text");
+check(vg_tpl_state(tplMorph, 1, "bg", 0, [0.95, 0.45, 0.20, 1]) == true, "tpl state morph hover color");
+check(vg_tpl_state(tplMorph, 1, "bg", 4, [0, -2]) == true, "tpl state morph hover lift");
+check(vg_tpl_state(tplMorph, 1, "bg", 5, [1.04, 1.08]) == true, "tpl state morph hover scale");
+check(vg_tpl_state(tplMorph, 1, "bg", 8, 14) == true, "tpl state morph hover radius");
+check(vg_tpl_transition(tplMorph, 3, 350, 9) == true, "tpl transition morph sine");
+
+// ---- 模板 E：禁用态变体（opacity 覆盖）----
+var tplDis = vg_tpl_create();
+check(vg_tpl_part(tplDis, "bg", 1, 6, 0, 0, 0, 1, [0.35, 0.35, 0.45, 1], 0, null, null, 0, 0) == true, "tpl part dis bg");
+check(vg_tpl_part(tplDis, "text", 0, 0, 0, 0, 0, 0, null, 0, null, null, 1, 0) == true, "tpl part dis text");
+check(vg_tpl_state(tplDis, 4, "bg", 7, 0.35) == true, "tpl state disabled opacity");
+check(vg_tpl_part_dyn(tplDis, "bg", 0, 0, 0, null) == true, "tpl part dyn no-op");
+
+// ================= 5. 默认模板全家桶 =================
+var dBtn = vg_tpl_default(0);
+var dChk = vg_tpl_default(1);
+var dTgl = vg_tpl_default(2);
+var dSld = vg_tpl_default(3);
+var dPrg = vg_tpl_default(4);
+var dCbx = vg_tpl_default(5);
+var dTab = vg_tpl_default(6);
+check(dBtn > 0 && dChk > 0 && dTgl > 0, "tpl default btn/chk/tgl");
+check(dSld > 0 && dPrg > 0 && dCbx > 0 && dTab > 0, "tpl default sld/prg/cbx/tab");
+
+// 渐进定制：默认模板同名 part 更新（bg 换绿色描边）
+check(vg_tpl_part(dBtn, "bg", 1, 12, 0, 0, 0, 1, [0.12, 0.50, 0.35, 1], 0, [[0.5, 1.0, 0.75, 0.8], 1.5], null, 0, 0) == true, "tpl default customize part");
+
+// ================= 6. 错误路径 =================
+check(vg_tpl_part(99999, "x", 0, 0, 0, 0, 0, 0, null, 0, null, null, 0, 0) == false, "tpl part bad tpl");
+check(vg_tpl_part(dBtn, "x", 99, 0, 0, 0, 0, 0, null, 0, null, null, 0, 0) == false, "tpl part bad shape");
+check(vg_tpl_state(dBtn, 1, "nosuchpart", 0, [0, 0, 0, 1]) == false, "tpl state bad part");
+check(vg_tpl_state(dBtn, 1, "bg", 99, [0, 0, 0, 1]) == false, "tpl state bad prop");
+check(vg_tpl_part_dyn(dBtn, "nosuchpart", 1, 0, 0, null) == false, "tpl dyn bad part");
+check(vg_apply_tpl(99999, dBtn) == false, "apply bad control");
+check(vg_tpl_default(99) == null, "tpl default bad type");
+
+// ================= 7. 控件 + 模板应用 =================
+// 顶部：按钮矩阵（同一 button 形态 × 5 种模板 + 1 个无模板对照）
+var bRef = vg_create_button(w, "默认(对照)", 20, 18, 120, 40);
+var bCircle = vg_create_button(w, "", 150, 8, 96, 96);
+var bPill = vg_create_button(w, "渐变胶囊", 260, 18, 150, 40);
+var bPenta = vg_create_button(w, "异形", 430, 8, 110, 110);
+var bMorph = vg_create_button(w, "悬停变形", 560, 18, 130, 40);
+var bDis = vg_create_button(w, "禁用态", 710, 18, 130, 40);
+
+check(vg_apply_tpl(bCircle, tplCircle) == true, "apply circle tpl");
+check(vg_apply_tpl(bPill, tplPill) == true, "apply pill tpl");
+check(vg_apply_tpl(bPenta, tplPenta) == true, "apply penta tpl");
+check(vg_apply_tpl(bMorph, tplMorph) == true, "apply morph tpl");
+check(vg_apply_tpl(bDis, tplDis) == true, "apply disabled tpl");
+check(vg_apply_tpl(bRef, dBtn) == true, "apply default btn tpl");
+vg_set_enabled(bDis, 0);
+check(vg_style_flags(bDis) == 4, "disabled flags");
+
+// 中部：默认模板全家桶
+var chk = vg_create_checkbox(w, "勾选（默认模板）", 30, 130, 200, 28);
+var tgl = vg_create_toggle(w, "", 250, 130, 90, 28);
+var sld = vg_create_slider(w, 370, 132, 220, 24);
+var prg = vg_create_progressbar(w, 30, 180, 300, 12);
+var cbx = vg_create_combobox(w, 370, 170, 200, 34);
+var tab = vg_create_tabcontrol(w, 30, 220, 540, 200);
+
+vg_combobox_add_item(cbx, "苹果");
+vg_combobox_add_item(cbx, "香蕉");
+vg_combobox_add_item(cbx, "樱桃");
+vg_tabcontrol_add_tab(tab, "页一");
+vg_tabcontrol_add_tab(tab, "页二");
+vg_tabcontrol_add_tab(tab, "页三");
+
+check(vg_apply_tpl(chk, dChk) == true, "apply default chk tpl");
+check(vg_apply_tpl(tgl, dTgl) == true, "apply default tgl tpl");
+check(vg_apply_tpl(sld, dSld) == true, "apply default sld tpl");
+check(vg_apply_tpl(prg, dPrg) == true, "apply default prg tpl");
+check(vg_apply_tpl(cbx, dCbx) == true, "apply default cbx tpl");
+check(vg_apply_tpl(tab, dTab) == true, "apply default tab tpl");
+
+vg_slider_set_value(sld, 40);
+vg_progressbar_set_value(prg, 0.65);
+
+// ================= 8. 状态位扩展 + QG_EVT_STATE =================
+check(vg_style_flags(chk) == 0, "checkbox flags initial");
+vg_checkbox_set_checked(chk, 1);
+var f1 = vg_style_flags(chk);
+check(f1 == 16, "checkbox checked flag 0x10");     // 16 = 0x10
+vg_toggle_set_checked(tgl, 1);
+check(vg_style_flags(tgl) == 16, "toggle checked flag 0x10");
+
+// 事件绑定（0x400000 = QG_BIT_STATE）：切 checkbox 收状态事件
+var stateLbl = vg_create_label(w, "状态事件：等待", 620, 130, 240, 60);
+any_t func on_state(id, v) {
+    stateEvents[0] = stateEvents[0] + 1;
+    stateSeen[0] = v;
+    vg_label_set_text(stateLbl, "状态事件 x" + str(stateEvents[0]) + " flags=" + str(v));
+}
+vg_bind(chk, 4194304, func(id, v, x, y) -> on_state(id, v));
+
+// 值驱动演示：进度条模板的填充宽度（vg_tpl_part_dyn 已在默认模板内置）
+
+// 状态栏
+var status = vg_create_label(w, "模板渲染运行中…", 20, 620, 600, 24);
+vg_label_set_text(status, "按钮矩阵 + 默认模板全家桶（150 帧自动关闭）");
+
+any_t func on_frame(dt) {
+    cnt[0] = cnt[0] + 1;
+    var frame = cnt[0] + 0;      // 数组元素先落成数字（语义器对数组保守）
+    // 帧驱动值动画：进度条往复
+    var ph = frame % 100;
+    if (ph < 50) {
+        vg_progressbar_set_value(prg, ph / 50.0);
+    } else {
+        vg_progressbar_set_value(prg, (100 - ph) / 50.0);
+    }
+    // 帧中断言（等状态事件到账）
+    if (frame == 30) {
+        var ev = stateEvents[0] + 0;
+        check(ev >= 1, "QG_EVT_STATE received");
+        if (ev >= 1) {
+            var sv = stateSeen[0] + 0;
+            check(sv == 16, "state event value = checked bit 0x10");
+        }
+    }
+    if (frame >= 150) {
+        vg_close_window(w);
+    } else {
+        vg_request_frame();
+    }
+}
+
+vg_on_frame(func(dt) -> on_frame(dt));
+vg_show_window(w);
+vg_run();
+
+// ================= 收尾 =================
+vg_tpl_free(tplCircle);
+vg_tpl_free(tplPill);
+vg_tpl_free(tplPenta);
+vg_tpl_free(tplMorph);
+vg_tpl_free(tplDis);
+vg_tpl_free(dBtn);
+vg_tpl_free(dChk);
+vg_tpl_free(dTgl);
+vg_tpl_free(dSld);
+vg_tpl_free(dPrg);
+vg_tpl_free(dCbx);
+vg_tpl_free(dTab);
+vg_textstyle_free(ts16);
+vg_textstyle_free(ts13);
+vg_path_free(penta);
+vg_path_free(checkMark);
+vg_brush_free(brGrad);
+
+check(vg_apply_tpl(bRef, 99999) == false, "apply bad tpl after run");
+
+var failsN = cnt[1] + 0;
+if (failsN == 0) {
+    output("tpl-v6-ok checks=" + str(cnt[2]) + " fails=0 stateEvents=" + str(stateEvents[0]));
+} else {
+    output("tpl-v6-FAIL checks=" + str(cnt[2]) + " fails=" + str(cnt[1]));
+}

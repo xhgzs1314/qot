@@ -1,0 +1,293 @@
+// ===========================================================================
+// paint_v5.qot
+//
+// 覆盖：
+//   1. 能力探测 vg_backend（合成路径 + DPI）；
+//   2. 路径几何：折线/贝塞尔/极坐标弧/SVG 弧/子形状（rect/round/ellipse）/
+//      填充/描边 + 边界真值断言 + 填充命中 + 描边命中；
+//   3. 线型：线帽/拐角/斜接/虚线数组（对全部描边生效）；
+//   4. 画刷系统：solid / 多停靠点线性 / 径向 / 带焦点径向 / extend 语义 /
+//      transform / free + 形状×画刷 + 路径×画刷；
+//   5. 富文本：多 span 混排（字重/斜体/下划线/删除线/渐变画刷文字）+
+//      行高 + 测量真值断言；
+//   6. 合成效果层：混合模式（PLUS 发光叠加）/ 真阴影（GPU 高斯）/
+//      画刷蒙版 / 任意路径几何裁剪；
+//   7. 离屏面：创建/离屏绘制/像素级真值断言（红色矩形、蓝色椭圆、透明区）/
+//      贴回/回收；
+//   8. 错误处理路径：坏句柄返回 false。
+// 帧计数自动关窗（无人值守可跑）。
+// ===========================================================================
+
+var w = vg_create_window("paint v5 · Fluent 级绘制原语", 760, 580);
+vg_set_window_bg_gradient(w, [0.04, 0.04, 0.09, 1], [0.07, 0.05, 0.14, 1]);
+
+var cnt = [0, 0, 0];        // [帧数, 失败数, 总断言]
+var checked = [false];      // 绘制断言只跑一次
+var composed = [0];
+
+any_t func check(cond, tag) {
+    cnt[2] = cnt[2] + 1;
+    if (!cond) {
+        cnt[1] = cnt[1] + 1;
+        output("FAIL " + tag);
+    }
+}
+
+any_t func near(a, b) {
+    var d = a - b;
+    if (d < 0) { d = -d; }
+    return d < 0.03;
+}
+
+// ---- 1. 能力探测 ----
+var be = vg_backend();
+check(be != null, "backend info");
+if (be != null) {
+    composed[0] = be[0];
+    output("backend composed=" + str(be[0]) + " dpi=" + str(be[1]));
+}
+
+// ---- 画刷资源（跨帧复用：句柄化）----
+var brGrad = vg_brush_linear(30, 0, 300, 0, [
+    [0.0, [0.20, 0.55, 1.0, 1]],
+    [0.5, [0.55, 0.30, 0.95, 1]],
+    [1.0, [1.0, 0.45, 0.30, 1]]
+]);
+check(brGrad != null && brGrad > 0, "linear gradient brush");
+
+var brRadial = vg_brush_radial(200, 120, 90, [
+    [0.0, [1.0, 0.95, 0.80, 1]],
+    [0.55, [0.90, 0.45, 0.20, 1]],
+    [1.0, [0.35, 0.10, 0.45, 1]]
+]);
+check(brRadial != null && brRadial > 0, "radial gradient brush");
+
+var brFocus = vg_brush_radial_focus(200, 120, 160, 100, 90, 90, [
+    [0.0, [1.0, 1.0, 0.95, 1]],
+    [1.0, [0.30, 0.20, 0.60, 1]]
+]);
+check(brFocus != null && brFocus > 0, "radial focus brush");
+
+var brSolid = vg_brush_solid([0.95, 0.95, 1.0, 1]);
+check(brSolid != null && brSolid > 0, "solid brush");
+
+check(vg_brush_transform(brGrad, 1, 0, 0, 1, 0, 0) == true, "brush transform identity");
+check(vg_brush_extend(brSolid, 1, 1) == false, "extend on non-bitmap = false");
+
+// ---- 画布（全部绘制/断言的宿主）----
+var cv = vg_create_canvas(w, 0, 0, 760, 580);
+
+any_t func paint(cw, ch) {
+    var phase = (cnt[0] % 120) / 120.0 * 6.2831853;
+
+    // ================= 一次断言（首帧） =================
+    if (checked[0] == false) {
+        checked[0] = true;
+
+        // ---- 2. 路径几何：椭圆边界真值 ----
+        check(vg_path_begin() == true, "path begin");
+        check(vg_path_ellipse(60, 60, 40, 30) == true, "path ellipse");
+        var bb = vg_path_bounds();
+        check(bb != null, "ellipse bounds non-null");
+        if (bb != null) {
+            check(near(bb[0], 20) && near(bb[1], 30) &&
+                  near(bb[2], 80) && near(bb[3], 60), "ellipse bounds values");
+        }
+        check(vg_path_hit(60, 60) == true, "ellipse hit center");
+        check(vg_path_hit(60, 160) == false, "ellipse miss outside");
+        check(vg_path_fill([0.25, 0.65, 1.0, 0.9]) == true, "path fill");
+
+        // ---- 描边命中：水平直线 ----
+        check(vg_path_begin() == true, "path begin 2");
+        check(vg_path_move_to(10, 200) == true, "move to");
+        check(vg_path_line_to(220, 200) == true, "line to");
+        check(vg_path_quad_to(260, 200, 260, 240) == true, "quad to");
+        check(vg_path_curve_to(260, 280, 300, 280, 300, 220) == true, "curve to");
+        check(vg_path_svg_arc(40, 40, 0, 0, 1, 360, 220) == true, "svg arc");
+        check(vg_path_close() == true, "path close");
+        check(vg_path_stroke([0.7, 0.85, 1.0, 0.8], 2) == true, "path stroke");
+
+        check(vg_path_begin() == true, "path begin 3");
+        check(vg_path_move_to(10, 260) == true, "move to stroke hit");
+        check(vg_path_line_to(220, 260) == true, "line to stroke hit");
+        check(vg_path_stroke_hit(100, 260, 6) == true, "stroke hit on line");
+        check(vg_path_stroke_hit(100, 276, 6) == false, "stroke miss off line");
+
+        // ---- 子形状族 ----
+        check(vg_path_begin() == true, "path begin 4");
+        check(vg_path_rect(10, 300, 60, 40) == true, "path rect");
+        check(vg_path_round_rect(80, 300, 60, 40, 10) == true, "path round rect");
+        check(vg_path_ellipse(40, 320, 25, 18) == true, "path ellipse 2");
+        check(vg_path_fill([0.55, 0.30, 0.95, 0.5]) == true, "multi subpath fill");
+
+        // ---- 3. 线型 ----
+        check(vg_path_line_cap(2) == true, "line cap round");
+        check(vg_path_line_join(2) == true, "line join round");
+        check(vg_path_miter_limit(4) == true, "miter limit");
+        check(vg_path_dash([4, 3], 0) == true, "dash array");
+        check(vg_path_dash([], 0) == true, "dash reset");
+        vg_path_line_cap(0);
+        vg_path_line_join(0);
+        vg_path_miter_limit(10);
+
+        // ---- 4. 形状 × 画刷 ----
+        check(vg_draw_fill_round_rect_brush(brGrad, 340, 40, 180, 64, 16) == true, "fill round rect brush");
+        check(vg_draw_stroke_rect_brush(brSolid, 340, 120, 180, 50, 1.5) == true, "stroke rect brush");
+        check(vg_draw_fill_ellipse_brush(brRadial, 620, 120, 70, 70) == true, "fill ellipse brush");
+        check(vg_draw_stroke_ellipse_brush(brFocus, 620, 240, 80, 50, 3) == true, "stroke ellipse brush");
+        check(vg_draw_fill_rect_brush(brSolid, 340, 180, 100, 20) == true, "fill rect brush");
+
+        // ---- 5. 富文本 ----
+        check(vg_rich_begin() == true, "rich begin");
+        check(vg_rich_add("富文本 ", 15, [0.75, 0.80, 0.95, 1], true, false, false, false) == true, "rich add bold");
+        check(vg_rich_add_weight("混排", 24, [0.35, 0.80, 1.0, 1], 300, true, true, true) == true, "rich add weight 300 italic ul strike");
+        check(vg_rich_add_brush(" · 渐变文字", 17, brGrad, 700, false, false, false) == true, "rich add brush");
+        var rm = vg_rich_measure(false, 0);
+        check(rm != null && rm[0] > 10 && rm[1] > 10, "rich measure positive");
+        check(vg_rich_line_height(34, 27) == true, "rich line height");
+        check(vg_rich_draw(30, 340, 700, 60, 0, 0, false) == true, "rich draw");
+        vg_rich_line_height(0, 0);
+
+        // ---- 7. 离屏面：像素级真值断言 ----
+        var s = vg_surface(64, 48);
+        check(s != null && s > 0, "surface create");
+        if (s != null && s > 0) {
+            check(vg_surface_begin(s) == true, "surface begin");
+            vg_draw_fill_rect(4, 4, 20, 20, [1, 0, 0, 1]);
+            vg_draw_fill_ellipse(48, 24, 12, 12, [0, 0, 1, 1]);
+            check(vg_surface_end() == true, "surface end");
+
+            if (composed[0] == 1) {
+                var pRed = vg_surface_pixel(s, 10, 10);
+                check(pRed != null, "pixel red non-null");
+                if (pRed != null) {
+                    check(near(pRed[0], 1) && near(pRed[1], 0) &&
+                          near(pRed[2], 0) && near(pRed[3], 1), "pixel red values");
+                }
+                var pBlue = vg_surface_pixel(s, 48, 24);
+                check(pBlue != null, "pixel blue non-null");
+                if (pBlue != null) {
+                    check(near(pBlue[0], 0) && near(pBlue[1], 0) &&
+                          near(pBlue[2], 1) && near(pBlue[3], 1), "pixel blue values");
+                }
+                var pVoid = vg_surface_pixel(s, 62, 4);
+                check(pVoid != null, "pixel void non-null");
+                if (pVoid != null) {
+                    check(pVoid[3] < 0.05, "pixel void alpha ~ 0");
+                }
+            }
+            check(vg_surface_draw(s, 30, 420, 64, 48, 1, 1) == true, "surface draw");
+            check(vg_surface_free(s) == true, "surface free");
+        }
+
+        // ---- 8. 错误处理路径 ----
+        check(vg_draw_image_ex(9999, 0, 0, 10, 10, 1, 1, 0, 0, 0, 0) == false, "image ex bad id");
+        check(vg_draw_image_round(9999, 0, 0, 10, 10, 1, 1, 4) == false, "image round bad id");
+        check(vg_path_fill_brush(9999) == false, "path fill bad brush");
+        check(vg_brush_extend(9999, 1, 1) == false, "extend bad brush");
+        check(vg_surface_begin(9999) == false, "surface begin bad id");
+        check(vg_surface_pixel(9999, 0, 0) == null, "surface pixel bad id");
+    }
+
+    // ================= 每帧视觉（动效） =================
+
+    // 1) 波浪：贝塞尔链 + 渐变描边 + 圆角端帽 + 虚线
+    vg_path_line_cap(2);
+    vg_path_line_join(2);
+    vg_path_dash([6, 4], phase * 2);
+    vg_path_begin();
+    vg_path_move_to(30, 250 + 14 * sin(phase));
+    var j = 1;
+    for (j in 0..9) {
+        var x0 = 30 + j * 30;
+        vg_path_curve_to(x0 + 10, 250 + 14 * sin(phase + j * 0.6 + 0.3),
+                         x0 + 20, 250 + 14 * sin(phase + j * 0.6 + 0.6),
+                         x0 + 30, 250 + 14 * sin(phase + j * 0.6 + 0.9));
+    }
+    vg_path_stroke_brush(brGrad, 2.5);
+    vg_path_dash([], 0);
+    vg_path_line_cap(0);
+    vg_path_line_join(0);
+
+    // 2) 阴影卡片：真阴影（GPU 高斯）+ 渐变圆角矩形 + 渐变文字
+    if (vg_draw_push_shadow([0, 0, 0, 0.45], 16, 0, 6)) {
+        vg_draw_fill_round_rect_brush(brGrad, 340, 40, 180, 64, 16);
+        vg_draw_pop_shadow();
+    }
+    if (vg_draw_push_shadow([0.2, 0.1, 0.5, 0.6], 22, 6 * sin(phase), 8)) {
+        vg_draw_fill_ellipse_brush(brRadial, 620, 120, 70, 70);
+        vg_draw_pop_shadow();
+    }
+
+    // 3) 混合模式：PLUS 叠加发光（合成路径）
+    if (composed[0] == 1) {
+        if (vg_draw_push_blend(9, 560, 220, 180, 200)) {
+            vg_draw_fill_ellipse(600, 280, 40 + 8 * sin(phase), 40 + 8 * cos(phase), [0.4, 0.2, 1.0, 0.8]);
+            vg_draw_fill_ellipse(660, 320, 30 + 6 * cos(phase), 30 + 6 * sin(phase), [0.1, 0.5, 1.0, 0.8]);
+            vg_draw_pop_blend();
+        }
+    }
+
+    // 4) 蒙版：径向渐变 alpha 蒙版（内容只在画刷亮区显形）
+    if (vg_draw_push_mask(brRadial, 540, 20, 220, 180, 1)) {
+        vg_draw_fill_rect(540, 20, 220, 180, [1, 1, 1, 0.9]);
+        vg_draw_pop_mask();
+    }
+
+    // 5) 几何裁剪：路径（旋转八角星）内画满色块
+    vg_path_begin();
+    var m = 0;
+    for (m in 0..8) {
+        var a = phase + m * 0.785398;
+        var rr = (m % 2 == 0) ? 60 : 26;
+        var px = 170 + rr * cos(a);
+        var py = 470 + rr * sin(a);
+        if (m == 0) { vg_path_move_to(px, py); } else { vg_path_line_to(px, py); }
+    }
+    vg_path_close();
+    if (vg_draw_push_clip_path()) {
+        vg_draw_fill_rect(60, 360, 240, 240, [0.30, 0.50, 1.0, 0.5]);
+        vg_draw_pop_clip();
+    }
+    vg_path_stroke([0.85, 0.9, 1.0, 0.7], 1.5);
+
+    // 6) 富文本实时混排（标题字号呼吸）
+    vg_rich_begin();
+    vg_rich_add("fluent ", 15 + 3 * (0.5 + 0.5 * sin(phase)), [0.7, 0.75, 0.9, 1], true, false, false, false);
+    vg_rich_add_weight("paint", 22, [0.35, 0.80, 1.0, 1], 350, true, false, false);
+    vg_rich_add_brush(" v5", 18, brGrad, 700, false, true, false);
+    vg_rich_draw(30, 30, 300, 40, 0, 0, false);
+
+    // 7) 离屏面每帧重建贴回（自证缓存层可用性）
+    var sf = vg_surface(90, 26);
+    if (sf != null && sf > 0) {
+        if (vg_surface_begin(sf)) {
+            vg_draw_fill_round_rect(0, 0, 90, 26, 13, [0.2, 0.5, 1.0, 0.85]);
+            vg_draw_text("surface", 12, 5, 13, [1, 1, 1, 1]);
+            vg_surface_end();
+        }
+        vg_surface_draw(sf, 120, 500, 90, 26, 1, 1);
+        vg_surface_free(sf);
+    }
+}
+
+vg_canvas_on_draw(cv, func(cw, ch) -> paint(cw, ch));
+
+any_t func on_frame(dt) {
+    cnt[0] = cnt[0] + 1;
+    if (cnt[0] >= 150) {
+        vg_close_window(w);
+    } else {
+        vg_request_frame();
+    }
+}
+
+vg_on_frame(func(dt) -> on_frame(dt));
+vg_show_window(w);
+vg_run();
+
+if (cnt[1] == 0) {
+    output("paint-v5-ok checks=" + str(cnt[2]) + " fails=0 composed=" + str(composed[0]));
+} else {
+    output("paint-v5-FAILED checks=" + str(cnt[2]) + " fails=" + str(cnt[1]));
+}

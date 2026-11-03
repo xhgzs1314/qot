@@ -14,6 +14,10 @@
 #include "image.h"
 #include "scrollpane.h"      // v4：滚动条样式 / 容器接管检测
 #include "virtual_list.h"    // v4：容器接管检测
+#include "visual_template.h" // v6：声明式视觉模板
+#include "table_view.h"      // v6 配套：表格
+#include "color_picker.h"    // v6 配套：颜色选择器
+#include "date_picker.h"     // v6 配套：日期选择器
 
 #include <windows.h>
 #include <windowsx.h>   // GET_Y_LPARAM（v4 自绘菜单）
@@ -114,6 +118,7 @@ unsigned kind_bit(int kind) {
         case QG_EVT_LOAD:       return QG_BIT_LOAD;
         case QG_EVT_MENU:       return QG_BIT_MENU;
         case QG_EVT_DROP:       return QG_BIT_DROP;
+        case QG_EVT_STATE:      return QG_BIT_STATE;
         default:                return 0;
     }
 }
@@ -211,6 +216,19 @@ int reg_ctl(int win, gui::ModernWindow* w, gui::UIComponent* c) {
     ctl.comp = c;
     g_ctls[id] = ctl;
     return id;
+}
+
+// 控件查询/重绘请求（前移到此处：v6 配套控件的创建段在通用属性段之前
+// 也要用；与 reg_ctl 同级同性质）
+gui::UIComponent* comp_of(int id) {
+    auto it = g_ctls.find(id);
+    if (it == g_ctls.end()) return nullptr;
+    return it->second.comp;
+}
+
+void repaint_of(int id) {
+    auto it = g_ctls.find(id);
+    if (it != g_ctls.end() && it->second.window) it->second.window->RequestRepaint();
 }
 
 }  // namespace
@@ -589,6 +607,10 @@ QOTGUI_API int qg_create_listbox(int win, int x, int y, int w, int h) {
     int id = reg_ctl(win, wnd, l);
     l->SetId(id);
     l->OnSelectionChanged([id](int idx, const std::wstring&) { push_event(id, QG_EVT_SELECT, (double)idx); });
+    // 事件欠账补线：OnDoubleClick 回调一直存在但从未接 ABI（kind=15）
+    l->OnDoubleClick([id](int idx, const std::wstring&) {
+        push_event(id, QG_EVT_DBL_CLICK, (double)idx);
+    });
     wnd->AddComponent(std::unique_ptr<gui::UIComponent>(l));
     wnd->RequestRepaint();
     return id;
@@ -619,6 +641,157 @@ QOTGUI_API int qg_create_spinner(int win, int x, int y, int w, int h) {
     return id;
 }
 
+// ---- v6 配套：表格 / 颜色选择器 / 日期选择器 ----
+
+QOTGUI_API int qg_create_table(int win, int x, int y, int w, int h) {
+    gui::ModernWindow* wnd = win_of(win);
+    if (!wnd) return 0;
+    auto* t = new gui::TableView();
+    t->SetBounds(gui::Rect((float)x, (float)y, (float)(x + (w > 0 ? w : 320)), (float)(y + (h > 0 ? h : 200))));
+    int id = reg_ctl(win, wnd, t);
+    t->SetId(id);
+    t->OnSelection([id](int row, int col) {
+        push_event(id, QG_EVT_SELECT, (double)row, col, -1);
+    });
+    wnd->AddComponent(std::unique_ptr<gui::UIComponent>(t));
+    wnd->RequestRepaint();
+    return id;
+}
+
+QOTGUI_API int qg_table_add_column(int id, const char* title, float width) {
+    gui::UIComponent* c = comp_of(id);
+    if (!c || !title) return 0;
+    auto* t = dynamic_cast<gui::TableView*>(c);
+    if (!t) return 0;
+    t->AddColumn(to_w(title), width);
+    repaint_of(id);
+    return 1;
+}
+
+QOTGUI_API int qg_table_add_row(int id, const char* cells) {
+    gui::UIComponent* c = comp_of(id);
+    if (!c) return 0;
+    auto* t = dynamic_cast<gui::TableView*>(c);
+    if (!t) return 0;
+    // ';' 分隔的单元格串 → 逐列
+    std::vector<std::wstring> row;
+    std::wstring s = to_w(cells ? cells : "");
+    size_t pos = 0;
+    for (;;) {
+        size_t semi = s.find(L';', pos);
+        row.push_back((semi == std::wstring::npos) ? s.substr(pos)
+                                                   : s.substr(pos, semi - pos));
+        if (semi == std::wstring::npos) break;
+        pos = semi + 1;
+    }
+    t->AddRow(row);
+    repaint_of(id);
+    return 1;
+}
+
+QOTGUI_API int qg_table_set_cell(int id, int row, int col, const char* text) {
+    gui::UIComponent* c = comp_of(id);
+    if (!c) return 0;
+    auto* t = dynamic_cast<gui::TableView*>(c);
+    if (!t) return 0;
+    t->SetCell(row, col, to_w(text ? text : ""));
+    repaint_of(id);
+    return 1;
+}
+
+QOTGUI_API int qg_table_get_selected(int id, int* row, int* col) {
+    gui::UIComponent* c = comp_of(id);
+    if (!c) return 0;
+    auto* t = dynamic_cast<gui::TableView*>(c);
+    if (!t) return 0;
+    if (row) *row = t->GetSelectedRow();
+    if (col) *col = t->GetSelectedColumn();
+    return 1;
+}
+
+QOTGUI_API int qg_table_set_selected(int id, int row, int col) {
+    gui::UIComponent* c = comp_of(id);
+    if (!c) return 0;
+    auto* t = dynamic_cast<gui::TableView*>(c);
+    if (!t) return 0;
+    t->SetSelected(row, col);
+    repaint_of(id);
+    return 1;
+}
+
+QOTGUI_API int qg_create_colorpicker(int win, int x, int y, int w, int h) {
+    gui::ModernWindow* wnd = win_of(win);
+    if (!wnd) return 0;
+    auto* p = new gui::ColorPicker();
+    p->SetBounds(gui::Rect((float)x, (float)y, (float)(x + (w > 0 ? w : 240)), (float)(y + (h > 0 ? h : 200))));
+    int id = reg_ctl(win, wnd, p);
+    p->SetId(id);
+    p->OnColorChanged([id](float r, float g, float b) {
+        // 打包 0xRRGGBB 入 value（double 在 2^53 内精确表示 24 位色）
+        auto to8 = [](float v) { int n = (int)lround(v * 255.0f);
+                                 return n < 0 ? 0 : (n > 255 ? 255 : n); };
+        double packed = (double)(((unsigned)to8(r) << 16) |
+                                 ((unsigned)to8(g) << 8) | (unsigned)to8(b));
+        push_event_gated(id, QG_EVT_CHANGE, packed, -1, -1);
+    });
+    wnd->AddComponent(std::unique_ptr<gui::UIComponent>(p));
+    wnd->RequestRepaint();
+    return id;
+}
+
+QOTGUI_API int qg_colorpicker_set_rgb(int id, float r, float g, float b) {
+    gui::UIComponent* c = comp_of(id);
+    if (!c) return 0;
+    auto* p = dynamic_cast<gui::ColorPicker*>(c);
+    if (!p) return 0;
+    p->SetRgb(r, g, b);
+    repaint_of(id);
+    return 1;
+}
+
+QOTGUI_API int qg_colorpicker_get_rgb(int id, float* r, float* g, float* b) {
+    gui::UIComponent* c = comp_of(id);
+    if (!c) return 0;
+    auto* p = dynamic_cast<gui::ColorPicker*>(c);
+    if (!p) return 0;
+    p->GetRgb(r, g, b);
+    return 1;
+}
+
+QOTGUI_API int qg_create_datepicker(int win, int x, int y, int w, int h) {
+    gui::ModernWindow* wnd = win_of(win);
+    if (!wnd) return 0;
+    auto* p = new gui::DatePicker();
+    p->SetBounds(gui::Rect((float)x, (float)y, (float)(x + (w > 0 ? w : 260)), (float)(y + (h > 0 ? h : 260))));
+    int id = reg_ctl(win, wnd, p);
+    p->SetId(id);
+    p->OnDateChanged([id](int y, int m, int d) {
+        push_event(id, QG_EVT_CHANGE, (double)((long long)y * 10000L + m * 100L + d));
+    });
+    wnd->AddComponent(std::unique_ptr<gui::UIComponent>(p));
+    wnd->RequestRepaint();
+    return id;
+}
+
+QOTGUI_API int qg_datepicker_set_date(int id, int y, int m, int d) {
+    gui::UIComponent* c = comp_of(id);
+    if (!c) return 0;
+    auto* p = dynamic_cast<gui::DatePicker*>(c);
+    if (!p) return 0;
+    p->SetDate(y, m, d);
+    repaint_of(id);
+    return 1;
+}
+
+QOTGUI_API int qg_datepicker_get_date(int id, int* y, int* m, int* d) {
+    gui::UIComponent* c = comp_of(id);
+    if (!c) return 0;
+    auto* p = dynamic_cast<gui::DatePicker*>(c);
+    if (!p) return 0;
+    p->GetDate(y, m, d);
+    return 1;
+}
+
 QOTGUI_API int qg_create_canvas(int win, int x, int y, int w, int h) {
     gui::ModernWindow* wnd = win_of(win);
     if (!wnd) return 0;
@@ -645,21 +818,8 @@ QOTGUI_API int qg_create_image(int win, const char* path, int x, int y, int w, i
 }
 
 // ---- 通用属性 ----
-
-namespace {
-
-gui::UIComponent* comp_of(int id) {
-    auto it = g_ctls.find(id);
-    if (it == g_ctls.end()) return nullptr;
-    return it->second.comp;
-}
-
-void repaint_of(int id) {
-    auto it = g_ctls.find(id);
-    if (it != g_ctls.end() && it->second.window) it->second.window->RequestRepaint();
-}
-
-}  // namespace
+// （comp_of / repaint_of 已前移至文件头匿名 namespace——v6 配套控件创建段
+//   在本段之前就需要；同 TU 内部链接函数唯一）
 
 QOTGUI_API int qg_set_text(int id, const char* text) {
     gui::UIComponent* c = comp_of(id);
@@ -2301,6 +2461,937 @@ QOTGUI_API void qg_draw_measure_text_ex(const char *utf8, float size, int bold,
     gui::Size sz = r->MeasureTextEx(to_w(utf8), size, bold != 0, wrap != 0, maxw);
     if (out_w) *out_w = sz.width;
     if (out_h) *out_h = sz.height;
+}
+
+// ===========================================================================
+// 绘制原语 —— ABI 实现
+//   状态表：g_brushes（画刷句柄）/ g_surfaces（离屏面句柄）与 g_images
+//   同一先例（设备重建后失效；free 显式回收）。路径构建器与富文本 span
+//   挂在 g_drawRenderer（当前绘制上下文）上。
+// ===========================================================================
+
+namespace {
+
+std::unordered_map<int, ID2D1Brush *> g_brushes;
+int g_nextBrushId = 1;
+
+struct BrushBuilder {
+    bool active = false;
+    bool radial = false;
+    float p[8] = {0};                     // 线性 x0,y0,x1,y1 / 径向 cx,cy,fx,fy,rx,ry
+    std::vector<float> pos;
+    std::vector<gui::Color> colors;
+} g_brushBuilder;
+
+struct SurfaceEntry {
+    ID2D1Bitmap *bmp = nullptr;
+    ID2D1BitmapRenderTarget *rt = nullptr;   // HwndRT 回退路径持有
+};
+std::unordered_map<int, SurfaceEntry> g_surfaces;
+int g_nextSurfaceId = 1;
+int g_surfaceActive = 0;                // 当前 begin 的离屏面（0 = 无）
+
+ID2D1Brush *brush_of(int id) {
+    std::lock_guard<std::mutex> lk(g_mutex);
+    auto it = g_brushes.find(id);
+    return it == g_brushes.end() ? nullptr : it->second;
+}
+
+SurfaceEntry surface_of(int id) {
+    std::lock_guard<std::mutex> lk(g_mutex);
+    auto it = g_surfaces.find(id);
+    return it == g_surfaces.end() ? SurfaceEntry{} : it->second;
+}
+
+// v5 绘制上下文：canvas 回调内的 renderer + 画布偏移（与扁平原语同纪律）
+ID2D1Bitmap *image_bmp_of(int img) {
+    std::lock_guard<std::mutex> lk(g_mutex);
+    auto it = g_images.find(img);
+    return it == g_images.end() ? nullptr : it->second;
+}
+
+}  // namespace
+
+/* ---- 路径几何 ---- */
+
+// v6：路径构建器回落——无绘制上下文（vg_run 前/Canvas 外）时挂任一活窗口
+// 渲染器（几何挂 factory，构建不碰渲染目标；vg_path_store 固化后跨设备安全）。
+// 绘制类（fill/stroke）仍要求绘制上下文（语义不变）。
+static gui::Renderer *path_renderer() {
+    return g_drawRenderer ? g_drawRenderer : renderer_for_image();
+}
+
+QOTGUI_API int qg_path_reset(void) {
+    gui::Renderer *r = path_renderer();
+    if (!r) return 0;
+    return r->PathReset() ? 1 : 0;
+}
+
+QOTGUI_API int qg_path_move_to(float x, float y) {
+    gui::Renderer *r = path_renderer();
+    if (!r) return 0;
+    r->PathMoveTo(x + g_drawOffX, y + g_drawOffY);
+    return 1;
+}
+
+QOTGUI_API int qg_path_line_to(float x, float y) {
+    gui::Renderer *r = path_renderer();
+    if (!r) return 0;
+    r->PathLineTo(x + g_drawOffX, y + g_drawOffY);
+    return 1;
+}
+
+QOTGUI_API int qg_path_quad_to(float cx, float cy, float x, float y) {
+    gui::Renderer *r = path_renderer();
+    if (!r) return 0;
+    r->PathQuadTo(cx + g_drawOffX, cy + g_drawOffY,
+                  x + g_drawOffX, y + g_drawOffY);
+    return 1;
+}
+
+QOTGUI_API int qg_path_bezier_to(float c1x, float c1y, float c2x, float c2y, float x, float y) {
+    gui::Renderer *r = path_renderer();
+    if (!r) return 0;
+    r->PathBezierTo(c1x + g_drawOffX, c1y + g_drawOffY,
+                    c2x + g_drawOffX, c2y + g_drawOffY,
+                    x + g_drawOffX, y + g_drawOffY);
+    return 1;
+}
+
+QOTGUI_API int qg_path_arc(float cx, float cy, float rx, float ry, float startRad, float sweepRad) {
+    gui::Renderer *r = path_renderer();
+    if (!r) return 0;
+    r->PathArcTo(cx + g_drawOffX, cy + g_drawOffY, rx, ry, startRad, sweepRad);
+    return 1;
+}
+
+QOTGUI_API int qg_path_svg_arc(float rx, float ry, float rotationRad,
+                                int largeArc, int sweep, float x, float y) {
+    gui::Renderer *r = path_renderer();
+    if (!r) return 0;
+    r->PathSvgArcTo(rx, ry, rotationRad, largeArc != 0, sweep != 0,
+                    x + g_drawOffX, y + g_drawOffY);
+    return 1;
+}
+
+QOTGUI_API int qg_path_rect(float x, float y, float w, float h) {
+    gui::Renderer *r = path_renderer();
+    if (!r) return 0;
+    r->PathAddRect(x + g_drawOffX, y + g_drawOffY, w, h);
+    return 1;
+}
+
+QOTGUI_API int qg_path_round_rect(float x, float y, float w, float h, float rx, float ry) {
+    gui::Renderer *r = path_renderer();
+    if (!r) return 0;
+    r->PathAddRoundRect(x + g_drawOffX, y + g_drawOffY, w, h, rx, ry);
+    return 1;
+}
+
+QOTGUI_API int qg_path_ellipse(float cx, float cy, float rx, float ry) {
+    gui::Renderer *r = path_renderer();
+    if (!r) return 0;
+    r->PathAddEllipse(cx + g_drawOffX, cy + g_drawOffY, rx, ry);
+    return 1;
+}
+
+QOTGUI_API int qg_path_close(void) {
+    gui::Renderer *r = path_renderer();
+    if (!r) return 0;
+    r->PathClose();
+    return 1;
+}
+
+QOTGUI_API int qg_path_fill(float r, float g, float b, float a) {
+    if (!g_drawRenderer) return 0;
+    g_drawRenderer->FillPath(gui::Color(r, g, b, a));
+    return 1;
+}
+
+QOTGUI_API int qg_path_fill_brush(int brush) {
+    if (!g_drawRenderer) return 0;
+    ID2D1Brush *br = brush_of(brush);
+    if (!br) return 0;
+    g_drawRenderer->FillPathBrush(br);
+    return 1;
+}
+
+QOTGUI_API int qg_path_stroke(float r, float g, float b, float a, float width) {
+    if (!g_drawRenderer) return 0;
+    g_drawRenderer->StrokePath(gui::Color(r, g, b, a), width);
+    return 1;
+}
+
+QOTGUI_API int qg_path_stroke_brush(int brush, float width) {
+    if (!g_drawRenderer) return 0;
+    ID2D1Brush *br = brush_of(brush);
+    if (!br) return 0;
+    g_drawRenderer->StrokePathBrush(br, width);
+    return 1;
+}
+
+QOTGUI_API int qg_path_bounds(float *x, float *y, float *w, float *h) {
+    if (x) *x = 0;
+    if (y) *y = 0;
+    if (w) *w = 0;
+    if (h) *h = 0;
+    gui::Renderer *r = path_renderer();
+    if (!r) return 0;
+    gui::Rect b;
+    if (!r->PathBounds(&b)) return 0;
+    if (x) *x = b.left - g_drawOffX;    // 返回画布本地坐标（与输入同系）
+    if (y) *y = b.top - g_drawOffY;
+    if (w) *w = b.Width();
+    if (h) *h = b.Height();
+    return 1;
+}
+
+QOTGUI_API int qg_path_hit(float x, float y) {
+    gui::Renderer *r = path_renderer();
+    if (!r) return 0;
+    bool hit = false;
+    if (!r->PathHitTest(x + g_drawOffX, y + g_drawOffY, &hit)) return 0;
+    return hit ? 1 : 0;
+}
+
+QOTGUI_API int qg_path_stroke_hit(float x, float y, float width) {
+    gui::Renderer *r = path_renderer();
+    if (!r) return 0;
+    bool hit = false;
+    if (!r->PathStrokeHitTest(x + g_drawOffX, y + g_drawOffY, width, &hit)) return 0;
+    return hit ? 1 : 0;
+}
+
+QOTGUI_API int qg_path_line_cap(int cap) {
+    if (!g_drawRenderer) return 0;
+    g_drawRenderer->SetLineCap(cap);
+    return 1;
+}
+
+QOTGUI_API int qg_path_line_join(int join) {
+    if (!g_drawRenderer) return 0;
+    g_drawRenderer->SetLineJoin(join);
+    return 1;
+}
+
+QOTGUI_API int qg_path_miter_limit(float limit) {
+    if (!g_drawRenderer) return 0;
+    g_drawRenderer->SetMiterLimit(limit);
+    return 1;
+}
+
+QOTGUI_API int qg_path_dash(const float *dashes, int count, float phase) {
+    if (!g_drawRenderer) return 0;
+    g_drawRenderer->SetDash(dashes, count, phase);
+    return 1;
+}
+
+/* ---- 画刷系统 ---- */
+
+QOTGUI_API int qg_brush_solid(float r, float g, float b, float a) {
+    gui::Renderer *rend = g_drawRenderer ? g_drawRenderer : renderer_for_image();
+    if (!rend) return 0;
+    ID2D1Brush *br = rend->CreateSolidBrushObj(gui::Color(r, g, b, a));
+    if (!br) return 0;
+    std::lock_guard<std::mutex> lk(g_mutex);
+    int id = g_nextBrushId++;
+    g_brushes[id] = br;
+    return id;
+}
+
+QOTGUI_API int qg_brush_linear_begin(float x0, float y0, float x1, float y1) {
+    g_brushBuilder = BrushBuilder{};
+    g_brushBuilder.active = true;
+    g_brushBuilder.radial = false;
+    g_brushBuilder.p[0] = x0;
+    g_brushBuilder.p[1] = y0;
+    g_brushBuilder.p[2] = x1;
+    g_brushBuilder.p[3] = y1;
+    return 1;
+}
+
+QOTGUI_API int qg_brush_radial_begin(float cx, float cy, float fx, float fy,
+                                      float rx, float ry) {
+    g_brushBuilder = BrushBuilder{};
+    g_brushBuilder.active = true;
+    g_brushBuilder.radial = true;
+    g_brushBuilder.p[0] = cx;
+    g_brushBuilder.p[1] = cy;
+    g_brushBuilder.p[2] = fx;
+    g_brushBuilder.p[3] = fy;
+    g_brushBuilder.p[4] = rx;
+    g_brushBuilder.p[5] = ry;
+    return 1;
+}
+
+QOTGUI_API int qg_brush_add_stop(float pos, float r, float g, float b, float a) {
+    if (!g_brushBuilder.active) return 0;
+    g_brushBuilder.pos.push_back(pos);
+    g_brushBuilder.colors.push_back(gui::Color(r, g, b, a));
+    return 1;
+}
+
+QOTGUI_API int qg_brush_end(void) {
+    if (!g_brushBuilder.active) return 0;
+    gui::Renderer *rend = g_drawRenderer ? g_drawRenderer : renderer_for_image();
+    if (!rend || g_brushBuilder.pos.size() < 2) {
+        g_brushBuilder = BrushBuilder{};
+        return 0;
+    }
+    // 画布偏移：渐变几何随绘制上下文平移（与形状原语同坐标系）
+    float ox = g_drawRenderer ? g_drawOffX : 0.0f;
+    float oy = g_drawRenderer ? g_drawOffY : 0.0f;
+    ID2D1Brush *br = nullptr;
+    if (g_brushBuilder.radial) {
+        br = rend->CreateRadialBrushObj(
+            g_brushBuilder.p[0] + ox, g_brushBuilder.p[1] + oy,
+            g_brushBuilder.p[2] + ox, g_brushBuilder.p[3] + oy,
+            g_brushBuilder.p[4], g_brushBuilder.p[5],
+            g_brushBuilder.pos.data(), g_brushBuilder.colors.data(),
+            static_cast<int>(g_brushBuilder.pos.size()));
+    } else {
+        br = rend->CreateLinearBrushObj(
+            g_brushBuilder.p[0] + ox, g_brushBuilder.p[1] + oy,
+            g_brushBuilder.p[2] + ox, g_brushBuilder.p[3] + oy,
+            g_brushBuilder.pos.data(), g_brushBuilder.colors.data(),
+            static_cast<int>(g_brushBuilder.pos.size()));
+    }
+    g_brushBuilder = BrushBuilder{};
+    if (!br) return 0;
+    std::lock_guard<std::mutex> lk(g_mutex);
+    int id = g_nextBrushId++;
+    g_brushes[id] = br;
+    return id;
+}
+
+QOTGUI_API void qg_brush_free(int brush) {
+    ID2D1Brush *br = nullptr;
+    {
+        std::lock_guard<std::mutex> lk(g_mutex);
+        auto it = g_brushes.find(brush);
+        if (it == g_brushes.end()) return;
+        br = it->second;
+        g_brushes.erase(it);
+    }
+    if (br) br->Release();
+}
+
+QOTGUI_API int qg_brush_extend(int brush, int modeX, int modeY) {
+    ID2D1Brush *br = brush_of(brush);
+    if (!br) return 0;
+    return gui::Renderer::BrushSetExtend(br, modeX, modeY) ? 1 : 0;
+}
+
+QOTGUI_API int qg_brush_transform(int brush,
+                                   float m11, float m12, float m21, float m22,
+                                   float dx, float dy) {
+    ID2D1Brush *br = brush_of(brush);
+    if (!br) return 0;
+    return gui::Renderer::BrushSetTransform(br, m11, m12, m21, m22, dx, dy) ? 1 : 0;
+}
+
+QOTGUI_API int qg_brush_bitmap(int img) {
+    ID2D1Bitmap *bmp = image_bmp_of(img);
+    if (!bmp) return 0;
+    gui::Renderer *rend = g_drawRenderer ? g_drawRenderer : renderer_for_image();
+    if (!rend) return 0;
+    ID2D1Brush *br = rend->CreateBitmapBrushObj(bmp);
+    if (!br) return 0;
+    std::lock_guard<std::mutex> lk(g_mutex);
+    int id = g_nextBrushId++;
+    g_brushes[id] = br;
+    return id;
+}
+
+/* ---- 形状 × 画刷 ---- */
+
+QOTGUI_API int qg_draw_fill_rect_brush(int brush, float x, float y, float w, float h) {
+    if (!g_drawRenderer) return 0;
+    ID2D1Brush *br = brush_of(brush);
+    if (!br) return 0;
+    g_drawRenderer->FillRectBrush(
+        gui::Rect(x + g_drawOffX, y + g_drawOffY,
+                  x + g_drawOffX + w, y + g_drawOffY + h), br);
+    return 1;
+}
+
+QOTGUI_API int qg_draw_stroke_rect_brush(int brush, float x, float y, float w, float h, float width) {
+    if (!g_drawRenderer) return 0;
+    ID2D1Brush *br = brush_of(brush);
+    if (!br) return 0;
+    g_drawRenderer->DrawRectBrush(
+        gui::Rect(x + g_drawOffX, y + g_drawOffY,
+                  x + g_drawOffX + w, y + g_drawOffY + h), br, width);
+    return 1;
+}
+
+QOTGUI_API int qg_draw_fill_round_rect_brush(int brush, float x, float y, float w, float h, float radius) {
+    if (!g_drawRenderer) return 0;
+    ID2D1Brush *br = brush_of(brush);
+    if (!br) return 0;
+    gui::RoundedRect rr;
+    rr.rect = gui::Rect(x + g_drawOffX, y + g_drawOffY,
+                        x + g_drawOffX + w, y + g_drawOffY + h);
+    rr.radiusX = rr.radiusY = radius;
+    g_drawRenderer->FillRoundedRectBrush(rr, br);
+    return 1;
+}
+
+QOTGUI_API int qg_draw_stroke_round_rect_brush(int brush, float x, float y, float w, float h, float radius, float width) {
+    if (!g_drawRenderer) return 0;
+    ID2D1Brush *br = brush_of(brush);
+    if (!br) return 0;
+    gui::RoundedRect rr;
+    rr.rect = gui::Rect(x + g_drawOffX, y + g_drawOffY,
+                        x + g_drawOffX + w, y + g_drawOffY + h);
+    rr.radiusX = rr.radiusY = radius;
+    g_drawRenderer->DrawRoundedRectBrush(rr, br, width);
+    return 1;
+}
+
+QOTGUI_API int qg_draw_fill_ellipse_brush(int brush, float cx, float cy, float rx, float ry) {
+    if (!g_drawRenderer) return 0;
+    ID2D1Brush *br = brush_of(brush);
+    if (!br) return 0;
+    g_drawRenderer->FillEllipseBrush(
+        gui::Ellipse(gui::Point(cx + g_drawOffX, cy + g_drawOffY), rx, ry), br);
+    return 1;
+}
+
+QOTGUI_API int qg_draw_stroke_ellipse_brush(int brush, float cx, float cy, float rx, float ry, float width) {
+    if (!g_drawRenderer) return 0;
+    ID2D1Brush *br = brush_of(brush);
+    if (!br) return 0;
+    g_drawRenderer->DrawEllipseBrush(
+        gui::Ellipse(gui::Point(cx + g_drawOffX, cy + g_drawOffY), rx, ry), br, width);
+    return 1;
+}
+
+/* ---- 富文本（inline 混排） ---- */
+
+QOTGUI_API int qg_rich_begin(void) {
+    if (!g_drawRenderer) return 0;
+    g_drawRenderer->RichReset();
+    return 1;
+}
+
+QOTGUI_API int qg_rich_add(const char *utf8, float size,
+                            float r, float g, float b, float a,
+                            int weight, int italic, int underline, int strikethrough) {
+    if (!g_drawRenderer || !utf8) return 0;
+    gui::Renderer::RichSpan span;
+    span.text = to_w(utf8);
+    if (span.text.empty()) return 0;
+    span.size = size > 0.0f ? size : 16.0f;
+    span.color = gui::Color(r, g, b, a);
+    span.weight = (weight >= 100 && weight <= 900) ? weight : 400;
+    span.italic = italic != 0;
+    span.underline = underline != 0;
+    span.strikethrough = strikethrough != 0;
+    g_drawRenderer->RichAdd(span);
+    return 1;
+}
+
+QOTGUI_API int qg_rich_add_brush(const char *utf8, float size, int brush,
+                                  int weight, int italic, int underline, int strikethrough) {
+    if (!g_drawRenderer || !utf8) return 0;
+    ID2D1Brush *br = brush_of(brush);
+    if (!br) return 0;
+    gui::Renderer::RichSpan span;
+    span.text = to_w(utf8);
+    if (span.text.empty()) return 0;
+    span.size = size > 0.0f ? size : 16.0f;
+    span.weight = (weight >= 100 && weight <= 900) ? weight : 400;
+    span.italic = italic != 0;
+    span.underline = underline != 0;
+    span.strikethrough = strikethrough != 0;
+    span.brush = br;
+    g_drawRenderer->RichAdd(span);
+    return 1;
+}
+
+QOTGUI_API int qg_rich_line_height(float lineH, float baseline) {
+    if (!g_drawRenderer) return 0;
+    g_drawRenderer->RichSetLineHeight(lineH, baseline);
+    return 1;
+}
+
+QOTGUI_API int qg_rich_spacing(float leading, float trailing,
+                                float advance, float minAdvance) {
+    if (!g_drawRenderer) return 0;
+#if defined(__IDWriteTextLayout1_INTERFACE_DEFINED__)
+    g_drawRenderer->RichSetSpacing(leading, trailing, advance, minAdvance);
+    return 1;
+#else
+    // 当前构建环境的 SDK 头无 IDWriteTextLayout1（DWrite2）—— 如实返回不支持
+    (void)leading; (void)trailing; (void)advance; (void)minAdvance;
+    return 0;
+#endif
+}
+
+QOTGUI_API int qg_rich_draw(float x, float y, float w, float h,
+                             int halign, int valign, int wrap) {
+    if (!g_drawRenderer) return 0;
+    gui::Rect r(x + g_drawOffX, y + g_drawOffY,
+                x + g_drawOffX + (w > 0.0f ? w : 10000.0f),
+                y + g_drawOffY + (h > 0.0f ? h : 10000.0f));
+    return g_drawRenderer->RichDraw(r, halign, valign, wrap != 0) ? 1 : 0;
+}
+
+QOTGUI_API int qg_rich_measure(int wrap, float maxw, float *out_w, float *out_h) {
+    if (out_w) *out_w = 0;
+    if (out_h) *out_h = 0;
+    if (!g_drawRenderer) return 0;
+    gui::Size sz;
+    if (!g_drawRenderer->RichMeasure(wrap != 0, maxw, &sz)) return 0;
+    if (out_w) *out_w = sz.width;
+    if (out_h) *out_h = sz.height;
+    return 1;
+}
+
+/* ---- 合成效果层 ---- */
+
+QOTGUI_API int qg_draw_push_blend(int mode, float x, float y, float w, float h) {
+    if (!g_drawRenderer) return 0;
+    gui::Rect bounds(x + g_drawOffX, y + g_drawOffY,
+                     x + g_drawOffX + w, y + g_drawOffY + h);
+    return g_drawRenderer->PushBlendLayer(mode, bounds) ? 1 : 0;
+}
+
+QOTGUI_API int qg_draw_pop_blend(void) {
+    if (!g_drawRenderer) return 0;
+    g_drawRenderer->PopBlendLayer();
+    return 1;
+}
+
+QOTGUI_API int qg_draw_push_shadow(float r, float g, float b, float a,
+                                    float blur, float dx, float dy,
+                                    float x, float y, float w, float h) {
+    if (!g_drawRenderer) return 0;
+    gui::Rect bounds(x + g_drawOffX, y + g_drawOffY,
+                     x + g_drawOffX + w, y + g_drawOffY + h);
+    return g_drawRenderer->PushShadowLayer(gui::Color(r, g, b, a), blur, dx, dy, bounds) ? 1 : 0;
+}
+
+QOTGUI_API int qg_draw_pop_shadow(void) {
+    if (!g_drawRenderer) return 0;
+    g_drawRenderer->PopShadowLayer();
+    return 1;
+}
+
+QOTGUI_API int qg_draw_push_mask(int brush, float x, float y, float w, float h, float opacity) {
+    if (!g_drawRenderer) return 0;
+    ID2D1Brush *br = brush_of(brush);
+    if (!br) return 0;
+    gui::Rect bounds(x + g_drawOffX, y + g_drawOffY,
+                     x + g_drawOffX + w, y + g_drawOffY + h);
+    return g_drawRenderer->PushMaskLayerBrush(br, bounds, opacity) ? 1 : 0;
+}
+
+QOTGUI_API int qg_draw_pop_mask(void) {
+    if (!g_drawRenderer) return 0;
+    g_drawRenderer->PopMaskLayer();
+    return 1;
+}
+
+QOTGUI_API int qg_draw_push_clip_path(void) {
+    if (!g_drawRenderer) return 0;
+    return g_drawRenderer->PushClipPath() ? 1 : 0;
+}
+
+/* ---- 离屏面 ---- */
+
+QOTGUI_API int qg_surface_create(int w, int h) {
+    if (w <= 0 || h <= 0) return 0;
+    gui::Renderer *rend = g_drawRenderer ? g_drawRenderer : renderer_for_image();
+    if (!rend) return 0;
+    ID2D1BitmapRenderTarget *rt = nullptr;
+    ID2D1Bitmap *bmp = rend->CreateSurfaceBitmap(static_cast<UINT>(w), static_cast<UINT>(h), &rt);
+    if (!bmp) return 0;
+    std::lock_guard<std::mutex> lk(g_mutex);
+    int id = g_nextSurfaceId++;
+    g_surfaces[id] = SurfaceEntry{bmp, rt};
+    return id;
+}
+
+QOTGUI_API int qg_surface_begin(int id) {
+    if (g_surfaceActive != 0) return 0;   // 不嵌套
+    SurfaceEntry e = surface_of(id);
+    if (!e.bmp) return 0;
+    gui::Renderer *rend = g_drawRenderer ? g_drawRenderer : renderer_for_image();
+    if (!rend) return 0;
+    if (!rend->BeginSurface(e.bmp, e.rt)) return 0;
+    g_surfaceActive = id;
+    return 1;
+}
+
+QOTGUI_API int qg_surface_end(void) {
+    if (g_surfaceActive == 0) return 0;
+    gui::Renderer *rend = g_drawRenderer ? g_drawRenderer : renderer_for_image();
+    if (!rend) return 0;
+    rend->EndSurface();
+    g_surfaceActive = 0;
+    return 1;
+}
+
+QOTGUI_API int qg_surface_draw(int id, float x, float y, float w, float h,
+                                float alpha, int interp) {
+    if (!g_drawRenderer) return 0;
+    if (g_surfaceActive == id) return 0;   // 自己不能贴自己（正在绘制中）
+    SurfaceEntry e = surface_of(id);
+    if (!e.bmp) return 0;
+    gui::Rect dst(x + g_drawOffX, y + g_drawOffY,
+                  x + g_drawOffX + w, y + g_drawOffY + h);
+    return g_drawRenderer->DrawSurfaceBitmap(e.bmp, dst, alpha, interp) ? 1 : 0;
+}
+
+QOTGUI_API int qg_surface_pixel(int id, int x, int y,
+                                 float *r, float *g, float *b, float *a) {
+    if (r) *r = 0;
+    if (g) *g = 0;
+    if (b) *b = 0;
+    if (a) *a = 0;
+    SurfaceEntry e = surface_of(id);
+    if (!e.bmp) return 0;
+    // 像素读回需要 renderer 的 Map 通道（读回不依赖绘制上下文）
+    gui::Renderer *rend = g_drawRenderer ? g_drawRenderer : renderer_for_image();
+    if (!rend) return 0;
+    gui::Color c;
+    if (!rend->ReadSurfacePixel(e.bmp, static_cast<UINT>(x), static_cast<UINT>(y), &c))
+        return 0;
+    if (r) *r = c.r;
+    if (g) *g = c.g;
+    if (b) *b = c.b;
+    if (a) *a = c.a;
+    return 1;
+}
+
+QOTGUI_API void qg_surface_free(int id) {
+    SurfaceEntry e;
+    {
+        std::lock_guard<std::mutex> lk(g_mutex);
+        auto it = g_surfaces.find(id);
+        if (it == g_surfaces.end()) return;
+        e = it->second;
+        g_surfaces.erase(it);
+    }
+    if (e.bmp) e.bmp->Release();
+    if (e.rt) e.rt->Release();
+}
+
+/* ---- 图片精控 ---- */
+
+QOTGUI_API int qg_draw_image_ex(int img, float x, float y, float w, float h,
+                                 float alpha, int interp,
+                                 float srcX, float srcY, float srcW, float srcH) {
+    if (!g_drawRenderer) return 0;
+    ID2D1Bitmap *bmp = image_bmp_of(img);
+    if (!bmp) return 0;
+    D2D1_SIZE_U sz = bmp->GetPixelSize();
+    float sw = (srcW > 0.0f) ? srcW : static_cast<float>(sz.width);
+    float sh = (srcH > 0.0f) ? srcH : static_cast<float>(sz.height);
+    gui::Rect src(srcX, srcY, srcX + sw, srcY + sh);
+    gui::Rect dst(x + g_drawOffX, y + g_drawOffY,
+                  x + g_drawOffX + w, y + g_drawOffY + h);
+    g_drawRenderer->DrawImageEx(bmp, dst, &src, alpha, interp);
+    return 1;
+}
+
+QOTGUI_API int qg_draw_image_round(int img, float x, float y, float w, float h,
+                                    float alpha, int interp, float radius) {
+    if (!g_drawRenderer) return 0;
+    ID2D1Bitmap *bmp = image_bmp_of(img);
+    if (!bmp) return 0;
+    gui::Rect dst(x + g_drawOffX, y + g_drawOffY,
+                  x + g_drawOffX + w, y + g_drawOffY + h);
+    if (radius > 0.0f) {
+        if (!g_drawRenderer->PushClipRoundRect(dst, radius, radius)) return 0;
+        g_drawRenderer->DrawImageEx(bmp, dst, nullptr, alpha, interp);
+        g_drawRenderer->PopClip();
+    } else {
+        g_drawRenderer->DrawImageEx(bmp, dst, nullptr, alpha, interp);
+    }
+    return 1;
+}
+
+/* ---- 能力探测 ---- */
+
+QOTGUI_API int qg_backend_info(int *composed, int *dpi) {
+    gui::Renderer *rend = g_drawRenderer ? g_drawRenderer : renderer_for_image();
+    if (!rend) return 0;
+    if (composed) *composed = rend->IsComposed() ? 1 : 0;
+    if (dpi) {
+        // GetDpiForWindow（Win10 1607+）；老系统回落 GetDeviceCaps
+        HWND owner = nullptr;
+        for (auto &kv : g_windows) {
+            if (kv.second && kv.second->GetHwnd()) {
+                owner = kv.second->GetHwnd();
+                break;
+            }
+        }
+        UINT d = 96;
+        if (owner) {
+            HMODULE u32 = GetModuleHandleW(L"user32.dll");
+            using FnGetDpi = UINT(WINAPI *)(HWND);
+            auto pGetDpi = reinterpret_cast<FnGetDpi>(
+                u32 ? GetProcAddress(u32, "GetDpiForWindow") : nullptr);
+            if (pGetDpi) {
+                d = pGetDpi(owner);
+            } else {
+                HDC dc = GetDC(owner);
+                d = static_cast<UINT>(GetDeviceCaps(dc, LOGPIXELSX));
+                ReleaseDC(owner, dc);
+            }
+        }
+        *dpi = static_cast<int>(d);
+    }
+    return 1;
+}
+
+// ===========================================================================
+// v6：声明式视觉模板 —— ABI 实现
+//   * 句柄表：g_geometries（几何，挂 factory 跨设备安全）/
+//     g_textStyles（文字样式，纯参数）；模板本体表在 gui 层（visual_template.h）
+//   * TplEnv 延迟绑定：首个 v6 API 调用时注入（渲染前必然已 apply）
+// ===========================================================================
+
+namespace {
+
+std::unordered_map<int, ID2D1PathGeometry *> g_geometries;
+int g_nextGeoId = 1;
+
+std::unordered_map<int, gui::TplTsParams> g_textStyles;
+int g_nextTsId = 1;
+
+ID2D1PathGeometry *geo_of(int id) {
+    std::lock_guard<std::mutex> lk(g_mutex);
+    auto it = g_geometries.find(id);
+    return it == g_geometries.end() ? nullptr : it->second;
+}
+
+const gui::TplTsParams *ts_of(int id) {
+    std::lock_guard<std::mutex> lk(g_mutex);
+    auto it = g_textStyles.find(id);
+    return it == g_textStyles.end() ? nullptr : &it->second;
+}
+
+// 持走调用方的几何引用（PathTakeRef 已 AddRef），返回句柄
+int tpl_geo_store(ID2D1PathGeometry *geo) {
+    if (!geo) return 0;
+    std::lock_guard<std::mutex> lk(g_mutex);
+    int id = g_nextGeoId++;
+    g_geometries[id] = geo;
+    return id;
+}
+
+// TplEnv 注入（v6 API 入口统一调用；函数内 static 懒初始化）
+void ensure_tpl_env() {
+    static bool bound = false;
+    if (bound) return;
+    bound = true;
+    gui::g_tplEnv.brushOf = brush_of;
+    gui::g_tplEnv.geoOf = geo_of;
+    gui::g_tplEnv.geoStore = tpl_geo_store;
+    gui::g_tplEnv.tsOf = ts_of;
+    gui::g_tplEnv.requestFrame = qg_request_frame;
+}
+
+}  // namespace
+
+/* ---- 路径句柄化（几何固化：部件形状/命中/裁剪共用） ---- */
+
+QOTGUI_API int qg_path_store(void) {
+    ensure_tpl_env();
+    gui::Renderer *rend = g_drawRenderer ? g_drawRenderer : renderer_for_image();
+    if (!rend) return 0;
+    ID2D1PathGeometry *geo = rend->PathTakeRef();
+    if (!geo) return 0;
+    return tpl_geo_store(geo);
+}
+
+QOTGUI_API void qg_path_free(int path) {
+    ID2D1PathGeometry *geo;
+    {
+        std::lock_guard<std::mutex> lk(g_mutex);
+        auto it = g_geometries.find(path);
+        if (it == g_geometries.end()) return;
+        geo = it->second;
+        g_geometries.erase(it);
+    }
+    if (geo) geo->Release();
+}
+
+QOTGUI_API int qg_geo_hit(int path, float x, float y) {
+    ID2D1PathGeometry *geo = geo_of(path);
+    if (!geo) return 0;
+    BOOL hit = FALSE;
+    if (FAILED(geo->FillContainsPoint(D2D1::Point2F(x, y), nullptr, 1e-3f, &hit))) return 0;
+    return hit ? 1 : 0;
+}
+
+/* ---- 文字样式块 ---- */
+
+QOTGUI_API int qg_textstyle_create(float size, int weight, int italic,
+                                   int halign, int wrap, const char *family) {
+    ensure_tpl_env();
+    if (size <= 0.0f) return 0;
+    gui::TplTsParams ts;
+    ts.size = size;
+    ts.weight = (weight >= 100 && weight <= 900) ? weight : 400;
+    ts.italic = italic != 0;
+    ts.halign = (halign >= 0 && halign <= 2) ? halign : 1;
+    ts.valign = 1;
+    ts.wrap = wrap != 0;
+    ts.family = to_w(family ? family : "");
+    std::lock_guard<std::mutex> lk(g_mutex);
+    int id = g_nextTsId++;
+    g_textStyles[id] = ts;
+    return id;
+}
+
+QOTGUI_API void qg_textstyle_free(int ts) {
+    std::lock_guard<std::mutex> lk(g_mutex);
+    g_textStyles.erase(ts);
+}
+
+/* ---- 模板数据层 ---- */
+
+QOTGUI_API int qg_tpl_create(void) {
+    ensure_tpl_env();
+    return gui::tpl_create();
+}
+
+QOTGUI_API int qg_tpl_part(int tpl, const char *name, int shape,
+                           float shape_a, float shape_b, float shape_c, int path_id,
+                           int anchor, int fill_kind, float fr, float fg, float fb, float fa,
+                           int fill_brush,
+                           int stroke_set, float sr, float sg, float sb, float sa, float sw,
+                           float il, float it, float ir, float ib, int textslot) {
+    gui::VisualTemplate *t = gui::tpl_find(tpl);
+    if (!t || !name || !*name) return 0;
+    if (shape < 0 || shape > 6) return 0;
+    if (fill_kind < 0 || fill_kind > 3) return 0;
+
+    gui::TplPart p;
+    p.name = name;
+    p.shape = shape;
+    p.shapeA = shape_a; p.shapeB = shape_b; p.shapeC = shape_c;
+    p.pathId = path_id;
+    p.anchor = (anchor >= 0 && anchor <= 2) ? anchor : 0;
+    p.fillKind = fill_kind;
+    p.fillColor = gui::Color(fr, fg, fb, fa);
+    p.fillBrush = fill_brush;
+    p.strokeSet = stroke_set != 0;
+    p.strokeColor = gui::Color(sr, sg, sb, sa);
+    p.strokeWidth = sw > 0.0f ? sw : 1.0f;
+    p.inset[0] = il; p.inset[1] = it; p.inset[2] = ir; p.inset[3] = ib;
+    p.textSlot = textslot != 0;
+
+    // 同名 part = 更新（渐进定制默认模板部件）
+    gui::TplPart *dst = gui::tpl_part_find(t, p.name);
+    if (dst) *dst = p;
+    else t->parts.push_back(p);
+    return 1;
+}
+
+QOTGUI_API int qg_tpl_part_text(int tpl, const char *part, int ts_id,
+                                int halign, int valign,
+                                float ml, float mt, float mr, float mb,
+                                int color_set, float r, float g, float b, float a) {
+    gui::VisualTemplate *t = gui::tpl_find(tpl);
+    gui::TplPart *p = t ? gui::tpl_part_find(t, part ? part : "") : nullptr;
+    if (!p) return 0;
+    p->tsId = ts_id;
+    if (halign >= 0 && halign <= 2) p->halign = halign;
+    if (valign >= 0 && valign <= 2) p->valign = valign;
+    p->tmargin[0] = ml; p->tmargin[1] = mt;
+    p->tmargin[2] = mr; p->tmargin[3] = mb;
+    p->textColorSet = color_set != 0;
+    p->textColor = gui::Color(r, g, b, a);
+    return 1;
+}
+
+QOTGUI_API int qg_tpl_part_dyn(int tpl, const char *part, int value_mode, int value_src,
+                               float range, float c2r, float c2g, float c2b, float c2a) {
+    gui::VisualTemplate *t = gui::tpl_find(tpl);
+    gui::TplPart *p = t ? gui::tpl_part_find(t, part ? part : "") : nullptr;
+    if (!p) return 0;
+    if (value_mode < 0 || value_mode > 6) return 0;
+    p->valueMode = value_mode;
+    p->valueSrc = value_src;
+    p->valueRange = range;
+    p->c2[0] = c2r; p->c2[1] = c2g; p->c2[2] = c2b; p->c2[3] = c2a;
+    return 1;
+}
+
+QOTGUI_API int qg_tpl_state(int tpl, unsigned state_mask, const char *part, int prop,
+                            float v0, float v1, float v2, float v3) {
+    gui::VisualTemplate *t = gui::tpl_find(tpl);
+    if (!t) return 0;
+    // part 名非空时必须指向已登记部件（渐进定制防拼错名静默失效）
+    if (part && *part && !gui::tpl_part_find(t, part)) return 0;
+    gui::TplOverride ov;
+    ov.mask = state_mask;
+    ov.part = part ? part : "";
+    switch (prop) {
+        case 0: ov.fillColorSet = true;  ov.fillColor = gui::Color(v0, v1, v2, v3); break;
+        case 1: ov.fillBrushSet = true;  ov.fillBrush = (int)v0; break;
+        case 2: ov.strokeColorSet = true; ov.strokeColor = gui::Color(v0, v1, v2, v3); break;
+        case 3: ov.strokeWidthSet = true; ov.strokeWidth = v0; break;
+        case 4: ov.translateSet = true;  ov.tx = v0; ov.ty = v1; break;
+        case 5: ov.scaleSet = true;      ov.sx = v0; ov.sy = (v1 != 0.0f ? v1 : v0); break;
+        case 6: ov.rotateSet = true;     ov.rot = v0; break;
+        case 7: ov.opacitySet = true;    ov.opacity = v0; break;
+        case 8: ov.radiusSet = true;     ov.radius = v0; break;
+        default: return 0;
+    }
+    t->states.push_back(ov);
+    return 1;
+}
+
+QOTGUI_API int qg_tpl_transition(int tpl, unsigned state_mask, float ms, int easing) {
+    gui::VisualTemplate *t = gui::tpl_find(tpl);
+    if (!t) return 0;
+    gui::TplTransition tr;
+    tr.mask = state_mask;
+    tr.ms = ms;
+    tr.easing = easing;
+    t->transitions.push_back(tr);
+    return 1;
+}
+
+QOTGUI_API void qg_tpl_free(int tpl) {
+    gui::tpl_free(tpl);
+}
+
+/* ---- 应用与默认模板 ---- */
+
+QOTGUI_API int qg_apply_template(int id, int tpl) {
+    ensure_tpl_env();
+    gui::UIComponent *c = comp_of(id);
+    if (!c) return 0;
+    if (tpl <= 0 || !gui::tpl_find(tpl)) return 0;
+    c->SetTemplateId(tpl);
+    repaint_of(id);
+    return 1;
+}
+
+QOTGUI_API int qg_clear_template(int id) {
+    gui::UIComponent *c = comp_of(id);
+    if (!c) return 0;
+    c->SetTemplateId(0);
+    repaint_of(id);
+    return 1;
+}
+
+QOTGUI_API int qg_tpl_default(int type) {
+    ensure_tpl_env();
+    if (type < 0 || type > 6) return 0;
+    int id = gui::tpl_create();
+    gui::VisualTemplate *t = gui::tpl_find(id);
+    if (!t) return 0;
+    t->defaultType = type;   // 首次渲染时物化 parts（此时必有 Renderer，path 几何可建）
+    return id;
 }
 
 }  // extern "C"
