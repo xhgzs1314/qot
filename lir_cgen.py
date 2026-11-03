@@ -2422,12 +2422,8 @@ def _emit_obj_table(cg, E):
     E('int qotrt_ntypes = %d;' % len(meta['classes']))
 
 
-def generate(prog, source_file='', fast_snaps=None):
-    """LirProgram → 完整 C++ 源码字符串。抛 CgenError 表示程序含 AOT 不支持的构造。
-
-    fast_snaps：N-04 快照（lir_opt.snapshot_user_funcs 的产物）。None/缺省 =
-    不生成双体快速入口（单元测试与回归对照用）。
-    """
+def generate(prog, source_file='', fast_snaps=None, dll_exports=False):
+   
     cg = Cg(prog, fast_snaps=fast_snaps)
     cg.collect_calls()
     cg.plan_closures()
@@ -2501,14 +2497,50 @@ def generate(prog, source_file='', fast_snaps=None):
     # F1：闭包入口表已随前向声明提前（见上）。
     cg.emit_func(prog.main, 'qot_main', is_main=True)
     E('')
-    E('int main(int argc, char **argv) {')
-    E('  qotrt_init_args(argc, argv); // P0.2 args_get：脚本参数注册（argv[1..]）')
-    E('  qotrt_init_limits();')
-    E('  qotrt_init_consts();')
-    E('  V16 r;')
-    E('  qot_main(&r, (V16*)0, 0);')
-    E('  return 0;')
-    E('}')
+    if dll_exports:
+        # —— 宿主加载形态（AgrtEngine）：无 main，改发射 extern "C" 导出桥。
+        # 桥实现必须放在文件尾（qot_main / qot_clo_fns 已全部定义），
+        # 且复刻 qotrt_clo_call 的守卫链（not_callable / depth），语义零新增。
+        E('#ifdef __cplusplus')
+        E('extern "C" {')
+        E('#endif')
+        E('__declspec(dllexport) void qot_dll_init(int argc, char **argv);')
+        E('__declspec(dllexport) void qot_dll_run_main(void);')
+        E('__declspec(dllexport) int qot_dll_clo_count(void);')
+        E('__declspec(dllexport) void qot_dll_call(void *clov, void *args, int argc, void *ret);')
+        E('__declspec(dllexport) void **qot_dll_clo_table(void);')
+        E('#ifdef __cplusplus')
+        E('}')
+        E('#endif')
+        E('void qot_dll_init(int argc, char **argv) {')
+        E('  qotrt_init_args(argc, argv); // P0.2 args_get：脚本参数注册（argv[1..]）')
+        E('  qotrt_init_limits();')
+        E('  qotrt_init_consts();')
+        E('}')
+        E('void qot_dll_run_main(void) { V16 r; qot_main(&r, (V16 *)0, 0); }')
+        E('int qot_dll_clo_count(void) { return qotrt_clo_count; }')
+        E('void **qot_dll_clo_table(void) { return (void **)qot_clo_fns; }')
+        E('void qot_dll_call(void *clov_p, void *args_p, int argc, void *ret_p) {')
+        E('  V16 clov = *(V16 *)clov_p;')
+        E('  if (clov.t != VT_CLOSURE) qotrt_fail_not_callable(clov.t);')
+        E('  QClosure *c = (QClosure *)clov.u.p;')
+        E('  if (c->fn < 0 || c->fn >= qotrt_clo_count) qotrt_fail_not_callable(VT_CLOSURE);')
+        E('  if (qotrt_cb_depth + 1 > qotrt_max_depth) qotrt_fail_depth(qotrt_cb_depth + 1);')
+        E('  V16 r;')
+        E('  qotrt_cb_depth++;')
+        E('  qot_clo_fns[c->fn](&r, (V16 *)args_p, argc, qotrt_cb_depth + 1, c->env);')
+        E('  qotrt_cb_depth--;')
+        E('  if (ret_p) *(V16 *)ret_p = r;')
+        E('}')
+    else:
+        E('int main(int argc, char **argv) {')
+        E('  qotrt_init_args(argc, argv); // P0.2 args_get：脚本参数注册（argv[1..]）')
+        E('  qotrt_init_limits();')
+        E('  qotrt_init_consts();')
+        E('  V16 r;')
+        E('  qot_main(&r, (V16*)0, 0);')
+        E('  return 0;')
+        E('}')
     return '\n'.join(cg.lines) + '\n'
 
 

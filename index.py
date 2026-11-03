@@ -2198,7 +2198,8 @@ def _find_cl_direct():
 
 def _aot_compile(source_file: str, out_exe: str, enable_opt: bool,
                  keep_c: bool = False, emit_c: str = None,
-                 split_tu: bool = None, jobs: int = None) -> str:
+                 split_tu: bool = None, jobs: int = None,
+                 dll_out: str = None) -> str:
     """后端 A：.qot → LIR →（内联 + F64 特化）→ C 源码 → g++ -O2 → exe。返回 C 源路径。
 
     F0（S-15 根治，0）：native 支持 require —— 编译期把被 require
@@ -2323,16 +2324,22 @@ def _aot_compile(source_file: str, out_exe: str, enable_opt: bool,
             if split_tu:
                 return generate_split(prog, source_file, fast_snaps=_snaps,
                                       module_of=module_of)
-            return generate(prog, source_file, fast_snaps=_snaps)
+            return generate(prog, source_file, fast_snaps=_snaps,
+                            dll_exports=bool(dll_out))
         except (LowerError, CgenError) as e:
             record_exception(ErrorCode.ERR_COMPILE_QTC_FAILED, f"AOT 编译失败: {e}")
         except Exception as e:
             record_exception(ErrorCode.ERR_COMPILE_QTC_FAILED, f"AOT 编译异常: {e}")
 
     try:
-        payload, _fe_hit = _qcb.frontend_bundle(merged_text, source_file,
-                                                split_tu, enable_opt,
-                                                _compute_frontend)
+        if dll_out:
+            # dll 形态的 C 文本含导出桥（与 exe 产物不同）：绕开 L2 前端缓存，
+            # 防止同源 exe/dll 先后编译时命中对方的 C 文本（缓存毒化）。
+            payload = _compute_frontend()
+        else:
+            payload, _fe_hit = _qcb.frontend_bundle(merged_text, source_file,
+                                                    split_tu, enable_opt,
+                                                    _compute_frontend)
     finally:
         if temp_src and os.path.exists(temp_src):
             try:
@@ -2378,6 +2385,21 @@ def _aot_compile(source_file: str, out_exe: str, enable_opt: bool,
         # MSVC 兜底：既有 bat 路径（M-PACK 决策：gcc 首选，MSVC 回退；
         # CI 线的缓存/PCH/确定性面不覆盖此形态）
         return _aot_compile_msvc(c_path, out_exe, keep_c)
+
+    if dll_out:
+        gxx = _qcc.compiler_id().get('path') or shutil.which('g++') or 'g++'
+        cmd = [gxx, '-std=c++17', '-O2', '-finput-charset=utf-8', '-shared',
+               '-static-libgcc', '-static-libstdc++',
+               '-I' + os.path.dirname(rt_src),  # runtime 头（compile_exe 的 PCH 面不覆盖此形态）
+               os.path.abspath(c_path), '-o', os.path.abspath(dll_out)]
+        cmd += list(netlibs)
+        import subprocess as _sp
+        proc = _sp.run(cmd, capture_output=True, text=True, encoding='utf-8',
+                       errors='replace')
+        if proc.returncode != 0:
+            record_exception(ErrorCode.ERR_COMPILE_QTC_FAILED,
+                             f"dll 链接失败:\n{proc.stderr[-4000:]}")
+        return c_path
 
     _qcc.compile_exe(c_path, out_exe, rt_src=rt_src, netlibs=netlibs,
                      slot='aot:%s' % os.path.abspath(out_exe).replace('\\', '/'))
@@ -2626,10 +2648,14 @@ def main() -> int:
             os.environ['QOT_STATIC'] = '1'
         aot_emit_c = None
         aot_jobs = None
+        aot_dll = None
         i = 4
         while i < len(sys.argv):
             arg = sys.argv[i]
-            if arg == '--emit-c' and i + 1 < len(sys.argv):
+            if arg == '--dll' and i + 1 < len(sys.argv):
+                aot_dll = sys.argv[i + 1]
+                i += 2
+            elif arg == '--emit-c' and i + 1 < len(sys.argv):
                 aot_emit_c = sys.argv[i + 1]
                 i += 2
             elif arg in ('-j', '--jobs') and i + 1 < len(sys.argv):
@@ -2649,8 +2675,12 @@ def main() -> int:
         try:
             csrc = _aot_compile(input_file, output_file, aot_opt,
                                 keep_c=aot_keep_c, emit_c=aot_emit_c,
-                                split_tu=aot_split, jobs=aot_jobs)
-            print(f"AOT 编译成功: {output_file} (C 源: {csrc})")
+                                split_tu=aot_split, jobs=aot_jobs,
+                                dll_out=aot_dll)
+            if aot_dll:
+                print(f"AOT 编译成功: {aot_dll} (C 源: {csrc})")
+            else:
+                print(f"AOT 编译成功: {output_file} (C 源: {csrc})")
             if aot_determinism:
                 # K3 自测：全冷连编两次，产物必须字节级一致（确定性是缓存的
                 # 前置证，不是后置假设 —— §9.3-K3）
