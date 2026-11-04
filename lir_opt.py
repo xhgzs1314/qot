@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-"""LIR 优化 pass ——  7.4 机器码 P4/P5。
+"""LIR 优化 pass
 
-两个与特性无关的 pass（§6.3/§6.5）：
+两个与特性无关的 pass：
   1. inline_calls（T-43 消间接调用）：把小用户函数体复制进调用点。
      【当前默认禁用】——多遍展开的跳转坐标重定位存在未决 bug（详见
      inline_calls_with_tables 文档注释）。QOT_ENABLE_INLINE=1 可显式开启

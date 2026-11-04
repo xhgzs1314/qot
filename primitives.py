@@ -7149,6 +7149,18 @@ def _vg_set_radius(*args):
     import ctypes as _c
     return dll.qg_set_radius(int(_qg_num(args[0], 0)), _c.c_float(_qg_num(args[1], 8.0))) == 1
 
+def input_handler(*args):
+    """cinget 的 Python 参考实现（清单 interp 字段同名 'input_handler'）。
+
+    解释器正主是 builtin_func._register_builtin_functions 的内嵌闭包
+    （不可导入，语义含 IDE 模式提示符差异）；本表是【清单↔primitives.py
+    覆盖面对账表】，登记保证「native 声明的每个内置在 python 原语层都有
+    名字对得上的参考实现」——行为 oracle 由 --suite native 的 io 用例兜。
+    """
+    prompt = ' '.join(map(str, args)) if args else ''
+    return input(prompt)
+
+
 PRIMITIVE_IMPLS = {
     'json_encode': json_encode_handler,
     'json_decode': json_decode_handler,
@@ -7697,5 +7709,5 @@ PRIMITIVE_IMPLS = {
     'socket_udp_send': socket_udp_send_handler,
     'socket_udp_recv': socket_udp_recv_handler,
     'socket_select': socket_select_handler,
+    'cinget': input_handler,
 }
-

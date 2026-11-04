@@ -222,6 +222,10 @@ static V16 qotrt_bool(bool b)
 //   * 大块：直通 malloc/free（Windows 对大块走 VirtualAlloc，free 直还 OS）——
 //     数组/字典扩容的旧块因此能真实还给系统，压低扩容期提交峰值；
 //   * 单线程假设：qotrt 运行期是单线程执行模型（与现状一致），不加锁。
+// QOTNative：hex 查找表提升到文件作用域（原为函数内 static，宏翻转安全化）
+static const char *qotrt_hexd_lower = "0123456789abcdef";
+static const char *qotrt_hexd_upper = "0123456789ABCDEF";
+
 static const int QSC_N = 18;
 static const size_t QSC_SIZE[QSC_N] = {
     16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024, 1536, 2048, 3072, 4096, 6144
@@ -596,29 +600,32 @@ static QEnv *qotrt_env_new(int32_t n, QEnv *parent)
 }
 
 
+// QOTNative：函数内 static 提升为文件作用域（qotrt_lib.cpp 的
+// #define static extern "C" 宏翻转要求 static 只出现在文件作用域；
+// 单线程语义不变 —— 缓存/单例用途与函数内 static 等价）。
+static QEnv *qotrt_env_link0_cp = nullptr; // 上一父环境
+static QEnv *qotrt_env_link0_cl = nullptr; // 其链节
 static QEnv *qotrt_env_link0(QEnv *parent)
 {
-    static QEnv *cp = nullptr; // 上一父环境
-    static QEnv *cl = nullptr; // 其链节
-    if (cl != nullptr && cp == parent)
-        return cl;
+    if (qotrt_env_link0_cl != nullptr && qotrt_env_link0_cp == parent)
+        return qotrt_env_link0_cl;
     QEnv *e = qotrt_env_new(0, parent);
-    cp = parent;
-    cl = e;
+    qotrt_env_link0_cp = parent;
+    qotrt_env_link0_cl = e;
     return e;
 }
 
 // 读/写捕获槽的唯一入口：返回槽指针（cgen 以 (*qotrt_env_at(env,i)) 形式
 // 内联到读写表达式里；env 空或越界返回兜底槽而非 UB —— 上游编译器保证
 // 不发生，这里防御的是手写/反序列化产物）。
+static V16 qotrt_env_at_none_cell; // QOTNative：同上提升（VT_NONE 兜底槽单例）
 static V16 *qotrt_env_at(QEnv *e, int32_t i)
 {
-    static V16 none_cell;
     if (e == nullptr)
     {
-        none_cell.t = VT_NONE;
-        none_cell.u.p = nullptr;
-        return &none_cell;
+        qotrt_env_at_none_cell.t = VT_NONE;
+        qotrt_env_at_none_cell.u.p = nullptr;
+        return &qotrt_env_at_none_cell;
     }
     if (i < 0)
         i = 0;
@@ -816,7 +823,10 @@ struct QrtJmpBuf
 {
     void *rip, *rsp, *rbp, *rbx, *r12, *r13, *r14, *r15;
 };
-static __attribute__((returns_twice, noinline)) int qot_sjmp(QrtJmpBuf *j)
+// 【R0-O0】optimize("O2")：dev 档全 TU 走 -O0 时，这两函数仍按 O2 编——
+// -O0 强制帧指针（RBP 为帧基），与 asm 内改写 RSP/RBP 的恢复语义冲突
+// （实测 "bp cannot be used in 'asm' here"）；函数级钉死优化级后 -O0 可用。
+static __attribute__((returns_twice, noinline, optimize("O2"))) int qot_sjmp(QrtJmpBuf *j)
 {
     // SysV 与 Win64 的差别只在参数寄存器；%0 由编译器分配（任何 GP 寄存器皆可）。
     __asm__ __volatile__(
@@ -835,7 +845,7 @@ static __attribute__((returns_twice, noinline)) int qot_sjmp(QrtJmpBuf *j)
         : "rax", "memory");
     return 0; // 直接路径返回 0；恢复路径由 qot_ljmp 代返回 1
 }
-static __attribute__((noreturn, noinline)) void qot_ljmp(QrtJmpBuf *j, int v)
+static __attribute__((noreturn, noinline, optimize("O2"))) void qot_ljmp(QrtJmpBuf *j, int v)
 {
     __asm__ __volatile__(
         "movq 8(%0), %%rsp\n\t"  // 恢复调用者栈
@@ -1703,7 +1713,7 @@ static V16 qotrt_err(V16 *args, int argc)
     return qotrt_err_make(args[0]);
 }
 
-static V16 qotrt_is_err(V16 *args, int argc)
+static V16 qotrt_bi_is_err(V16 *args, int argc)
 {
     if (argc < 1)
         return qotrt_bool(false);
@@ -5531,7 +5541,7 @@ static QArr *qotrt_arr_of(V16 *v)
     return (v->t == VT_ARR) ? static_cast<QArr *>(v->u.p) : nullptr;
 }
 
-static V16 qotrt_arr_new(V16 *args, int argc)
+static V16 qotrt_bi_arr_new(V16 *args, int argc)
 {
     (void)args;
     (void)argc;
@@ -5602,7 +5612,7 @@ static V16 qotrt_arr_set(V16 *args, int argc)
     return qotrt_bool(true);
 }
 
-static V16 qotrt_arr_push(V16 *args, int argc)
+static V16 qotrt_bi_arr_push(V16 *args, int argc)
 {
     if (argc < 2)
         return qotrt_num(-1.0);
@@ -6111,7 +6121,7 @@ static char *qrt_slot_key(QDictSlot *sl, char kbuf[9])
     return sl->k.ext;
 }
 
-static V16 qotrt_dict_new(V16 *args, int argc)
+static V16 qotrt_bi_dict_new(V16 *args, int argc)
 {
     (void)args;
     (void)argc;
@@ -7233,12 +7243,11 @@ static V16 qotrt_bytes_to_hex(V16 *args, int argc)
         return qotrt_str("", 0);
     QrtBytes b;
     qotrt_prim_bytes(&args[0], &b);
-    static const char *HEXD = "0123456789abcdef";
     QBuf o = {nullptr, 0, 0};
     for (int32_t i = 0; i < b.len; i++)
     {
-        char t[2] = {HEXD[static_cast<unsigned char>(b.p[i]) >> 4],
-                     HEXD[static_cast<unsigned char>(b.p[i]) & 0x0F]};
+        char t[2] = {qotrt_hexd_lower[static_cast<unsigned char>(b.p[i]) >> 4],
+                     qotrt_hexd_lower[static_cast<unsigned char>(b.p[i]) & 0x0F]};
         qbuf_append(&o, t, 2);
     }
     qotrt_prim_bytes_free(&b);
@@ -7433,7 +7442,6 @@ static V16 qotrt_url_encode(V16 *args, int argc)
         return qotrt_str("", 0);
     QrtBytes b;
     qotrt_prim_bytes(&args[0], &b);
-    static const char *HEXD = "0123456789ABCDEF";
     QBuf o = {nullptr, 0, 0};
     for (int32_t i = 0; i < b.len; i++)
     {
@@ -7445,7 +7453,7 @@ static V16 qotrt_url_encode(V16 *args, int argc)
         }
         else
         {
-            char t[3] = {'%', HEXD[c >> 4], HEXD[c & 0x0F]};
+            char t[3] = {'%', qotrt_hexd_upper[c >> 4], qotrt_hexd_upper[c & 0x0F]};
             qbuf_append(&o, t, 3);
         }
     }
@@ -7797,25 +7805,30 @@ static void qotrt_init_args(int argc, char **argv)
     qotrt_os_argv = argv;
 }
 
+// QOTNative：懒探测缓存提升到文件作用域（原为函数内 static，宏翻转安全化）
+#if defined(_WIN32)
+typedef LPWSTR *(WINAPI *CmdLineToArgvWFn)(LPCWSTR, int *);
+static CmdLineToArgvWFn qotrt_cmdline_fn = nullptr;
+static bool qotrt_cmdline_probed = false;
+#endif
+
 static V16 qotrt_args_get(V16 *args, int argc)
 {
     (void)args;
     (void)argc;
 #if defined(_WIN32)
     // W 系命令行：Unicode 参数不经过 ANSI 撕裂。shell32 动态加载（不加链接依赖）。
-    typedef LPWSTR *(WINAPI *CmdLineToArgvWFn)(LPCWSTR, int *);
-    static CmdLineToArgvWFn fn = nullptr;
-    static bool probed = false;
-    if (!probed)
+    if (!qotrt_cmdline_probed)
     {
-        probed = true;
+        qotrt_cmdline_probed = true;
         HMODULE sh = LoadLibraryA("shell32.dll");
         if (sh)
         {
-            fn = reinterpret_cast<CmdLineToArgvWFn>(
+            qotrt_cmdline_fn = reinterpret_cast<CmdLineToArgvWFn>(
                 reinterpret_cast<void *>(GetProcAddress(sh, "CommandLineToArgvW")));
         }
     }
+    CmdLineToArgvWFn fn = qotrt_cmdline_fn;
     if (fn)
     {
         LPWSTR *w = fn(GetCommandLineW(), &qotrt_os_wargc);
@@ -8823,23 +8836,28 @@ static V16 qotrt_hostname(V16 *args, int argc)
 #endif
 }
 
+// QOTNative：懒探测缓存提升到文件作用域（原为函数内 static，宏翻转安全化）
+#if defined(_WIN32)
+typedef BOOL(WINAPI * GetUserNameWFn)(LPWSTR, LPDWORD);
+static GetUserNameWFn qotrt_username_fn = nullptr;
+static bool qotrt_username_probed = false;
+#endif
+
 static V16 qotrt_username(V16 *args, int argc)
 {
     (void)args;
     (void)argc;
 #if defined(_WIN32)
     // advapi32 动态加载（不加链接依赖）；失败回落 %USERNAME%
-    typedef BOOL(WINAPI * GetUserNameWFn)(LPWSTR, LPDWORD);
-    static GetUserNameWFn fn = nullptr;
-    static bool probed = false;
-    if (!probed)
+    if (!qotrt_username_probed)
     {
-        probed = true;
+        qotrt_username_probed = true;
         HMODULE h = LoadLibraryA("advapi32.dll");
         if (h)
-            fn = reinterpret_cast<GetUserNameWFn>(
+            qotrt_username_fn = reinterpret_cast<GetUserNameWFn>(
                 reinterpret_cast<void *>(GetProcAddress(h, "GetUserNameW")));
     }
+    GetUserNameWFn fn = qotrt_username_fn;
     if (fn)
     {
         wchar_t w[257];
@@ -9454,6 +9472,11 @@ static int qrt_ffi_family(const char *t)
     return -1;
 }
 
+// QOTNative：码表载体提升文件作用域（原为 qrt_ffi_types 内 static）
+static const char *qrt_ffi_types_buf[9]; // [0]=返回码 [1..]=实参码
+// QOTNative：ffi_call_impl 缓存命中时的 tbuf 载体提升文件作用域（指向 sym->tc_codes）
+static const char *qotrt_ffi_cache_buf[9];
+
 // types 数组（QOT 字符串数组）→ C 侧码表；返回参数个数（不含返回码），
 // ret 家族经 out；失败 nullptr。
 static const char **qrt_ffi_types(V16 *tv, int32_t *out_n, char (*codes)[16],
@@ -9465,7 +9488,7 @@ static const char **qrt_ffi_types(V16 *tv, int32_t *out_n, char (*codes)[16],
     int32_t n = a ? a->len : 0;
     if (n < 1 || n > max_n + 1)
         return nullptr;
-    static const char *buf[9]; // [0]=返回码 [1..]=实参码
+    const char **buf = qrt_ffi_types_buf; // QOTNative：文件作用域提升（宏翻转安全化）
     for (int32_t i = 0; i < n; i++)
     {
         QrtBytes tb;
@@ -9532,6 +9555,14 @@ static bool qrt_ffi_int_arg(V16 *v, int64_t *out, char **temps, int32_t ti)
 // 整数比较，FFI 调用本身 µs 级，成本可忽略）。模板形态用部分特化递归
 // （Live=false 为编译期递归底），不依赖 C++17 if-constexpr，MSVC 回退管线同源。
 #include <type_traits>
+
+// QOTNative：FFI 模板区在 qotrt_lib.cpp（QOT_RT_LIB_EXPORT）下暂时还原
+// 字面 static —— extern "C" 链接性不能修饰模板/模板成员；模板实例化
+// 本就是 COMDAT/weak 符号，静态库可解析，无需 extern 化。普通 TU 无感。
+#ifdef QOT_RT_LIB_EXPORT
+#pragma push_macro("static")
+#undef static
+#endif
 
 template <int M, int I>
 struct QrtFfiArgT
@@ -9616,6 +9647,10 @@ struct QrtFfiDisp<M, true>
     }
 };
 
+#ifdef QOT_RT_LIB_EXPORT
+#pragma pop_macro("static")
+#endif
+
 static V16 qotrt_ffi_call_impl(V16 *args, int argc, bool typed)
 {
     qotrt_ffi_clearerr();
@@ -9634,7 +9669,7 @@ static V16 qotrt_ffi_call_impl(V16 *args, int argc, bool typed)
     int arg_n = 0;
     char codes[9][16];
     const char **tbuf = nullptr;
-    static const char *cache_buf[9]; // 缓存命中时的 tbuf 载体（指向 sym->tc_codes）
+    const char **cache_buf = qotrt_ffi_cache_buf; // QOTNative：文件作用域提升（宏翻转安全化）
     if (typed)
     {
         // 【PROMAX-F1】缓存命中：类型数组对象 + 元素 QStr 指针串全等
@@ -10707,16 +10742,18 @@ typedef int qrt_net_sock_t;
 typedef socklen_t qrt_net_socklen_t;
 #endif
 
+// QOTNative：WSAStartup 懒初始化标志提升文件作用域（原为函数内 static，宏翻转安全化）
+static bool qotrt_net_init_done = false;
+
 static bool qotrt_net_init()
 {
 #if defined(_WIN32)
-    static bool done = false;
-    if (!done)
+    if (!qotrt_net_init_done)
     {
         WSADATA w;
         if (WSAStartup(MAKEWORD(2, 2), &w) != 0)
             return false;
-        done = true;
+        qotrt_net_init_done = true;
     }
 #endif
     return true;

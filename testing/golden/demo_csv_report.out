@@ -1,4 +1,4 @@
-== 销售报表（CSV -> 统计 -> 报表 · CP-3 验收）==
+== 销售报表（CSV -> 统计 -> 报表）==
 header : category,region,amount
 rows   : 8
 category count total    mean     min      max

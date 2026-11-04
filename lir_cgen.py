@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-"""LIR → C 源码发射器 ——  7.4 机器码 P3 / T-42（后端 A）。
+"""LIR → C 源码发射器
 
-三件套的兑现方式（T-43，与 §6.3 对应）：
+三件套的兑现方式：
   * 消 dispatch：LIR 线性指令流 → 直线 C 语句（switch 循环不复存在）；
   * 消栈搬运：每个 LIR 槽 → 一个 C 局部变量（/O2 落寄存器），无 push/pop；
   * 消间接调用：小函数已在 LIR 层内联（lir_opt.inline_calls_with_tables），
@@ -14,6 +14,7 @@ T-44：f64 指令发射为「guard + 快路径 + 通用兜底」双路径，guar
 """
 import re
 import sys
+import bisect as _bisect
 
 import qot_builtins as _qb
 import qot_hash as _qh
@@ -49,15 +50,11 @@ ARITH_FNS = {4: 'qotrt_fdiv', 5: 'qotrt_fmod_', 6: 'pow'}
 # 比较子码 → C 关系运算符
 CMP_PRED_TEXT = {7: '>', 8: '<', 9: '>=', 10: '<=', 11: '==', 12: '!='}
 
-# AOT 内置函数支持集：名字 → qotrt 符号后缀。
-# 【M1】不再在这里手写名单 —— 由 builtins.toml 派生（engines 含 native 的
-# 条目），别名单列由清单的 aliases 字段带出。这里只保留一次对账调用：
-# 清单与 AOT 侧若不一致，导入即失败（G-5 的两侧漂移不可能再静默存在）。
+
 SUPPORTED_BUILTINS = _qb.aot_supported()
 _qb.check_aot_symbols(SUPPORTED_BUILTINS)
 
-# N-05 内置快速通道：argc==1 时直连的运行时核心入口（qot_aot_runtime.h 提供，
-# 核心入口委托 argc 版本，语义单一来源不变）。
+
 BUILTIN_CORE1 = {
     '__iter_len': 'qotrt_iter_len1',
     '__is_number': 'qotrt_is_number1',
@@ -102,6 +99,143 @@ def _sanitize(name):
     return s
 
 
+class _FuncFlow(object):
+    """单函数流分析缓存（刀2 前端提速，2026-11-04）：
+
+    旧 _reaching_defs_before 每次查询都重建 CFG + 全函数集合不动点，同一
+    函数内成百次查询重复付 O(n·nb) 成本（tpl_v6 261 行实测前端 8.2s 里占
+    7.7s）。本类按函数缓存 CFG/前驱/后继/槽角色/def 反查表，per-槽的
+    IN/OUT 不动点（pc 位掩码 = Python 大整数）算一次后复用，工作表从
+    「含 def 的块」起种 —— 从 ⊥（空集）出发，def 影响区之外的块永不入队
+    （其 IN 恒为空，无需计算），键槽这类「单 def 近邻使用」的查询只碰
+    几十个块而不是全函数。
+
+    语义与旧集合实现逐位一致：数据流是单调并集（gen 杀全部旧定义），最小
+    不动点与遍历顺序/起点无关（⊥ 上单调）；三个调用方（_constkey_hash/
+    _append_eligible/_def_removed_reaches_read）均只做「存在性/全称量词」
+    判定，对集合遍历顺序不敏感（已逐一核对）。发射期 f.instrs 不可变
+    （融合只改发射不改指令流）→ 缓存安全；Cg._flow_of 持函数引用防 id 复用。
+
+    注：全槽联合 gen/kill 版实测反而 3 倍慢（tpl_v6 main ~2k 定义的大整
+    数掩码逐 bit 增量传播 → 30 万次工作表弹出），已弃。
+    """
+    __slots__ = ('ins', 'nt', 'n', 'blocks', 'bid_of', 'preds', 'succ_b',
+                 'dmap', 'roles', 'inout')
+
+    def __init__(self, cgen, f):
+        self.ins = f.instrs
+        self.nt = getattr(f, 'name_table', None) or []
+        blocks, bid_of, succs = cgen._cfg_blocks(f)
+        self.n = len(self.ins)
+        self.blocks = blocks
+        self.bid_of = bid_of
+        nb = len(blocks)
+        preds = [set() for _ in range(nb)]
+        succ_b = [set() for _ in range(nb)]
+        for bi in range(nb):
+            p = blocks[bi][1] - 1
+            for t in succs[p]:
+                if 0 <= t < self.n:
+                    tb = bid_of[t]
+                    preds[tb].add(bi)
+                    succ_b[bi].add(tb)
+        self.preds = preds
+        self.succ_b = succ_b
+        # 每指令槽角色只算一次（旧实现每次 defs 扫描都重调 _slot_roles，
+        # tpl_v6 实测 63 万次调用 0.42s —— 纯函数，缓存安全）
+        roles = [cgen._slot_roles(i, self.nt) for i in self.ins]
+        self.roles = roles
+        # 槽 → 定义 pc 升序表（反查一次建好；每指令至多 1 个 def 槽，
+        # 构造成本 O(n)，把每槽 O(n) 的重复扫描整个消灭）
+        dmap = {}
+        for p in range(self.n):
+            for s in roles[p][0]:
+                dmap.setdefault(s, []).append(p)
+        self.dmap = dmap
+        self.inout = {}   # slot → (IN, OUT)（惰性，pc 位掩码 int 列表）
+
+    def _slot_flow(self, cgen, x):
+        """slot x 的 IN/OUT 不动点（每槽只算一次；def 块起种的工作表）。"""
+        ent = self.inout.get(x)
+        if ent is not None:
+            return ent
+        dl = self.dmap.get(x, ())
+        m = 0
+        for p in dl:
+            m |= 1 << p
+        nb = len(self.blocks)
+        gen = [0] * nb
+        has = [False] * nb
+        preds, succs_b = self.preds, self.succ_b
+        bid_of = self.bid_of
+        work = []
+        inwork = [False] * nb
+        # dl 升序：同块后写的覆盖先写的 → 自然落成「块内最后一个定义」；
+        # 工作表从含 def 的块起种（⊥ 上单调，其余块 IN 恒空无需迭代）
+        for p in dl:
+            bi = bid_of[p]
+            gen[bi] = 1 << p
+            has[bi] = True
+            if not inwork[bi]:
+                inwork[bi] = True
+                work.append(bi)
+        IN = [0] * nb
+        OUT = [0] * nb
+        while work:
+            bi = work.pop()
+            inwork[bi] = False
+            ni = 0
+            for q in preds[bi]:
+                ni |= OUT[q]
+            IN[bi] = ni
+            no = gen[bi] if has[bi] else ni
+            if OUT[bi] != no:
+                OUT[bi] = no
+                for t in succs_b[bi]:
+                    if not inwork[t]:
+                        inwork[t] = True
+                        work.append(t)
+        ent = (IN, OUT)
+        self.inout[x] = ent
+        return ent
+
+    def reaching_before(self, cgen, x, target_pc):
+        """旧 _reaching_defs_before 的逐位等价替身（返回 def pc 集合）。
+
+        同块捷径：块内 [st, target_pc) 有 def ⇒ 最近一个杀掉全部入口集合，
+        直接 bisect 回答；跨块才查块入口 IN 掩码（per-槽不动点已缓存）。
+        """
+        if x < 0 or target_pc < 0 or target_pc >= self.n:
+            return set()
+        bid = self.bid_of[target_pc]
+        st, _en = self.blocks[bid]
+        dl = self.dmap.get(x, ())
+        i = _bisect.bisect_left(dl, target_pc) - 1
+        if i >= 0 and dl[i] >= st:
+            return {dl[i]}
+        IN, _OUT = self._slot_flow(cgen, x)
+        out = set()
+        iv = IN[bid]
+        while iv:
+            low = iv & (iv - 1)
+            out.add((iv ^ low).bit_length() - 1)
+            iv = low
+        return out
+
+    def reaches_at(self, cgen, x, target_pc, pc):
+        """`pc ∈ reaching_defs(x @ target_pc)` 的位测版（免建集合）。"""
+        if x < 0 or target_pc < 0 or target_pc >= self.n or pc < 0 or pc >= self.n:
+            return False
+        bid = self.bid_of[target_pc]
+        st, _en = self.blocks[bid]
+        dl = self.dmap.get(x, ())
+        i = _bisect.bisect_left(dl, target_pc) - 1
+        if i >= 0 and dl[i] >= st:
+            return dl[i] == pc
+        IN, _OUT = self._slot_flow(cgen, x)
+        return bool((IN[bid] >> pc) & 1)
+
+
 class Cg(object):
     # 「上帝法则」安全内置白名单：这些内置**不保留**任何实参引用（读完即弃），
     # 因此把它们当纯读取对待不破坏追加资格分析。push/dict_set/dict_keys 等会
@@ -126,6 +260,7 @@ class Cg(object):
         self.call_graph = {}   # LirFunction → set(LirFunction)（检测递归）
         self._uc = {}          # id(LirFunction) → v 槽读取次数（融合/死代码判定）
         self._ape = {}         # id(LirFunction) → 追加资格槽集合（缓存）
+        self._flow = {}        # id(LirFunction) → (f, _FuncFlow) 流分析缓存（刀2）
         # N-04 双体快速入口（QOT_NO_FCALL=1 关闭，A/B 归因）
         import os as _os
         # ---- 上帝法则（配置化取舍，开发者自担）----
@@ -516,6 +651,16 @@ class Cg(object):
                 bid_of[p] = bi
         return blocks, bid_of, succs
 
+    def _flow_of(self, f):
+        """函数流分析缓存（刀2）：key = id(f)，value 持 f 引用防 id 复用。"""
+        key = id(f)
+        ent = self._flow.get(key)
+        if ent is not None and ent[0] is f:
+            return ent[1]
+        fl = _FuncFlow(self, f)
+        self._flow[key] = (f, fl)
+        return fl
+
     def _reaching_defs_before(self, f, x, target_pc):
         """单槽 reaching-definitions：返回 target_pc 执行前，x 的哪些定义 pc
         可达（沿着任意控制流路径且中间无 x 的新定义）。
@@ -525,62 +670,22 @@ class Cg(object):
         结果、算术操作数）——全局计数把无害的远处活跃区误判成危险。
         数据流：IN[b] = ∪ OUT[pred]，OUT[b] = {gen[b]}（块内最后一个 x 定义
         杀掉全部旧定义）。
+
+        刀2：实现下沉到 _FuncFlow（按函数缓存 CFG+不动点，位掩码实现）——
+        语义不变，同一函数第 2..N 次查询从 O(n·nb) 降到 O(块内前缀扫描)。
         """
-        nt = getattr(f, 'name_table', None) or []
-        ins = f.instrs
-        n = len(ins)
-        if x < 0 or target_pc < 0 or target_pc >= n:
-            return set()
-        blocks, bid_of, succs = self._cfg_blocks(f)
-        nb = len(blocks)
-        gen = [None] * nb
-        succ_b = [set() for _ in range(nb)]
-        for bi, (st, en) in enumerate(blocks):
-            for p in range(st, en):
-                d, _r, _e = self._slot_roles(ins[p], nt)
-                if x in d:
-                    gen[bi] = p
-            p = en - 1
-            for t in succs[p]:
-                if 0 <= t < n:
-                    succ_b[bi].add(bid_of[t])
-        preds = [set() for _ in range(nb)]
-        for bi in range(nb):
-            for t in succ_b[bi]:
-                preds[t].add(bi)
-        IN = [set() for _ in range(nb)]
-        OUT = [set() for _ in range(nb)]
-        changed = True
-        while changed:
-            changed = False
-            for bi in range(nb):
-                ni = set()
-                for q in preds[bi]:
-                    ni |= OUT[q]
-                no = {gen[bi]} if gen[bi] is not None else ni
-                if IN[bi] != ni or OUT[bi] != no:
-                    IN[bi] = ni
-                    OUT[bi] = no
-                    changed = True
-        st, _en = blocks[bid_of[target_pc]]
-        reach = set(IN[bid_of[target_pc]])
-        for q in range(st, target_pc):
-            d, _r, _e = self._slot_roles(ins[q], nt)
-            if x in d:
-                reach = {q}
-        return reach
+        return self._flow_of(f).reaching_before(self, x, target_pc)
 
     def _def_removed_reaches_read(self, f, x, pc, pair_pcs):
         """【配对守卫】x 在 pc 处的定义（融合将移除它）是否可达任何配对外的
         x 读取点。可达 ⇒ 那次读取会观察到被移除的定义 ⇒ 必须拒绝融合。"""
-        nt = getattr(f, 'name_table', None) or []
+        flow = self._flow_of(f)
         for p, i in enumerate(f.instrs):
             if p in pair_pcs:
                 continue
-            _d, r, _e = self._slot_roles(i, nt)
-            if x not in r:
+            if x not in flow.roles[p][1]:
                 continue
-            if pc in self._reaching_defs_before(f, x, p):
+            if flow.reaches_at(self, x, p, pc):
                 return True
         return False
 
@@ -922,14 +1027,66 @@ class Cg(object):
         n = len(ins)
         if not (0 <= cmp_pc < n) or ins[cmp_pc].dst != vd:
             return False
-        for upc, i in enumerate(ins):
-            if vd not in slot_ops(i)[1]:
-                continue
-            if upc == cmp_pc + 1 and i.op in (BR_IF_NOT, BR_IF):
-                continue  # 紧邻分支 = 合法消费者
-            defs = self._reaching_defs_before(f, vd, upc)
-            if cmp_pc in defs:
-                return False  # 别的读取点看得到本 CMP 的结果
+        # 实现注记：本函数原按「每个读取点各跑一次
+        # _reaching_defs_before」判定 —— 不动点与块划分被重复执行
+        # O(读取点数) 次（std_data 实测：单次冷编 11881 次不动点 ≈ 200s，
+        # native/cpp 两后端同病，native 引入 B1/B2 融合后放大暴露）。
+        # IN/OUT 与查询点无关，本就是同一条数据流的批量查询 —— 对
+        # (f, vd) 只跑【一次】不动点，读取点判定降为「块内最后 def 或
+        # IN[块]」的 O(log #defs) 查询。接受/拒绝判定与原实现逐位一致
+        # （同一 IN 集 + 同一「块内最后 def 杀全部旧定义」语义）。
+        reads = [upc for upc, i in enumerate(ins)
+                 if vd in slot_ops(i)[1]
+                 and not (upc == cmp_pc + 1 and i.op in (BR_IF_NOT, BR_IF))]
+        if not reads:
+            return True
+        nt = getattr(f, 'name_table', None) or []
+        blocks, bid_of, succs = self._cfg_blocks(f)
+        nb = len(blocks)
+        gen = [None] * nb
+        succ_b = [set() for _ in range(nb)]
+        for bi, (st, en) in enumerate(blocks):
+            for p in range(st, en):
+                d, _r, _e = self._slot_roles(ins[p], nt)
+                if vd in d:
+                    gen[bi] = p
+            p = en - 1
+            for t in succs[p]:
+                if 0 <= t < n:
+                    succ_b[bi].add(bid_of[t])
+        preds = [set() for _ in range(nb)]
+        for bi in range(nb):
+            for t in succ_b[bi]:
+                preds[t].add(bi)
+        IN = [set() for _ in range(nb)]
+        OUT = [set() for _ in range(nb)]
+        changed = True
+        while changed:
+            changed = False
+            for bi in range(nb):
+                ni = set()
+                for q in preds[bi]:
+                    ni |= OUT[q]
+                no = {gen[bi]} if gen[bi] is not None else ni
+                if IN[bi] != ni or OUT[bi] != no:
+                    IN[bi] = ni
+                    OUT[bi] = no
+                    changed = True
+        # 逐读取点判定：reach(upc) = IN[块] 若 [st,upc) 无 def；
+        # 否则 = {块内最后一个 def}（杀全部旧定义，同原扫描语义）。
+        import bisect as _bisect
+        defs_pcs = sorted(p for p in range(n)
+                          if vd in self._slot_roles(ins[p], nt)[0])
+        for upc in reads:
+            b = bid_of[upc]
+            st = blocks[b][0]
+            k = _bisect.bisect_left(defs_pcs, upc)
+            if k > 0 and defs_pcs[k - 1] >= st:
+                if cmp_pc == defs_pcs[k - 1]:
+                    return False   # 块内最后 def = 本 CMP → 该读取可见
+            else:
+                if cmp_pc in IN[b]:
+                    return False   # 无块内 def → IN 集直达
         return True
 
     def _try_fused_arith_branch(self, f, pc, out):
@@ -2377,14 +2534,6 @@ class FastPlanner(object):
 
 
 def _emit_obj_table(cg, E):
-    """【M4】类型表发射：foff（fid→字段偏移）+ mfns（mid→方法函数指针）
-    + qotrt_types[] + qotrt_ntypes。主 TU 单点定义（qot_aot_runtime.h 已有
-    extern 声明 → 定义非 static，与 qot_clo_fns 同一模式；无类程序发射
-    空表 + 0 —— FIELD op 不可达，防御性兜底）。
-
-    前置：方法函数的前向声明已就位（单 TU：generate 的前向声明区；
-    split：qot_parts.h 的全函数 extern 声明）。
-    """
     meta = getattr(cg.prog, 'objmeta', None)
     if not meta or not meta.get('classes'):
         E('QTypeDesc qotrt_types[1] = { { "", 0, nullptr, nullptr } };')
@@ -2586,7 +2735,7 @@ RT_STATE_DEFS = (
     'QrtSockSlot *qotrt_stab = nullptr;',
     'int32_t qotrt_stab_cap = 0;',
     'int32_t qotrt_stab_free = -1;',
-    # ---- L2 原生插件（M7 · 0）----
+    # ---- L2 原生插件----
     'QrtPlugSlot *qotrt_plugtab = nullptr;',
     'int32_t qotrt_plugtab_cap = 0;',
     'int32_t qotrt_plugtab_free = -1;',
@@ -2613,12 +2762,6 @@ class SplitCtx(object):
 
 
 def prepare_split(prog, source_file='', fast_snaps=None, module_of=None):
-    """generate_split 的前半（CP-C5 拆分点）：Cg 上下文 + TU 归属 + 共享头。
-
-    调用时机 = stage-1（inline/promote/snapshot/infer，含全局分析）之后。
-    头部内容（函数声明 / g[N] / 快入口声明）只依赖签名面：stage-2（窥孔/
-    SSA/arena，均为逐函数 pass）不改签名与全局槽界，故在此一次成型、复用。
-    """
     module_of = module_of or {}
     cg = Cg(prog, fast_snaps=fast_snaps)
     cg.collect_calls()
@@ -2646,7 +2789,7 @@ def prepare_split(prog, source_file='', fast_snaps=None, module_of=None):
     fn_tu = {}
     for f in prog.funcs.values():
         if not f.name:
-            fn_tu[id(f)] = 'main'  # 防御：无名函数归主 TU（不丢弃）
+            fn_tu[id(f)] = 'main'  # 防御：无名函数归主 TU
             continue
         fn_tu[id(f)] = _tu_name(module_of.get(f.name, 'main'))
 
@@ -2760,7 +2903,7 @@ def emit_split_tu(ctx, tu, is_main_tu=False):
             E('// source: %s' % ctx.source_file.replace('\\', '/'))
             if cg.unsafe_index:
                 E('// CONFIG: QOT_UNSAFE_INDEX=1 —— 边界检查已按编译配置移除；'
-                  '越界为未定义行为，安全性由开发者自担（上帝法则）')
+                  '越界为未定义行为，安全性由开发者自担')
             if not cg.do_append:
                 E('// CONFIG: QOT_NO_APPEND=1 —— 独占追加快路径已关闭（A/B 归因用）')
             if not cg.do_idxfuse:
@@ -2815,7 +2958,7 @@ def emit_split_tu(ctx, tu, is_main_tu=False):
 
 
 def generate_split(prog, source_file='', fast_snaps=None, module_of=None):
-    """LirProgram → 多 TU C 包（CP-C2 既有契约）。返回 dict：
+    """LirProgram → 多 TU C 包。返回 dict：
 
         header  共享头（qot_parts.h 文本；含全部跨 TU 声明）
         main    主 TU 文本（状态定义 + g/consts/闭包表 + main 程序函数 + main()）

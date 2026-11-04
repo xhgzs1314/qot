@@ -94,7 +94,8 @@ foreach ($s in $sources) {
 $libs = @(
     'user32.lib', 'gdi32.lib', 'ole32.lib', 'oleaut32.lib', 'uuid.lib',
     'comctl32.lib', 'dwrite.lib', 'd2d1.lib', 'windowscodecs.lib',
-    'imm32.lib', 'winmm.lib', 'shell32.lib', 'oleacc.lib', 'comdlg32.lib'
+    'imm32.lib', 'winmm.lib', 'shell32.lib', 'oleacc.lib', 'comdlg32.lib',
+    'dxguid.lib', 'd3d11.lib'
 )
 
 if (-not $OutFile) { $OutFile = Join-Path $root 'qotrun.dll' }

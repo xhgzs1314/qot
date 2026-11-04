@@ -72,7 +72,7 @@ argc = 1
 args = ["any"]
 ret = "boolean"
 interp = "is_err_handler"
-native = "is_err"
+native = "bi_is_err"
 alloc_free = true
 desc = "值是否为错误对象"
 
@@ -5675,7 +5675,7 @@ argc = 0
 args = []
 ret = "array"
 interp = "arr_new_handler"
-native = "arr_new"
+native = "bi_arr_new"
 desc = "新建空数组"
 
 [[builtin]]
@@ -5745,7 +5745,7 @@ argc = 2
 args = ["any"]
 ret = "number"
 interp = "arr_push_handler"
-native = "arr_push"
+native = "bi_arr_push"
 numeric = true
 alloc_free = true
 mutates_container = true
@@ -6049,7 +6049,7 @@ argc = 0
 args = []
 ret = "dict"
 interp = "dict_new_handler"
-native = "dict_new"
+native = "bi_dict_new"
 desc = "新建空字典"
 
 [[builtin]]

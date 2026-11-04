@@ -1,0 +1,55 @@
+{
+ "built": "2026-11-04T10:46:32",
+ "ext_suffix": ".cp39-win_amd64.pyd",
+ "modules": {
+  "ast_encoder": {
+   "md5": "7a9e0ad1e82c3d95cc82f0567d2eddfa",
+   "pyd": "ast_encoder.cp39-win_amd64.pyd"
+  },
+  "astcomopt": {
+   "md5": "c53d929311340c9fc4700d845808634a",
+   "pyd": "astcomopt.cp39-win_amd64.pyd"
+  },
+  "bytecode": {
+   "md5": "f094c1f418a710076c734969dea2b9d9",
+   "pyd": "bytecode.cp39-win_amd64.pyd"
+  },
+  "lir": {
+   "md5": "634456f8baa6a069096eb64f1a7a8cc9",
+   "pyd": "lir.cp39-win_amd64.pyd"
+  },
+  "lir2": {
+   "md5": "bdff7825d701e0c44c953ea3606a02ec",
+   "pyd": "lir2.cp39-win_amd64.pyd"
+  },
+  "lir_cgen": {
+   "md5": "6a9adbbd6f930aeb3416efcad0e31440",
+   "pyd": "lir_cgen.cp39-win_amd64.pyd"
+  },
+  "lir_lower": {
+   "md5": "eb26f969946e9fd0311f55da7d37e411",
+   "pyd": "lir_lower.cp39-win_amd64.pyd"
+  },
+  "lir_native": {
+   "md5": "00f36467f1fb15d652e1bf84e1a728bd",
+   "pyd": "lir_native.cp39-win_amd64.pyd"
+  },
+  "lir_opt": {
+   "md5": "ecccbb7f50105a448123315789f80ef7",
+   "pyd": "lir_opt.cp39-win_amd64.pyd"
+  },
+  "lir_ssa": {
+   "md5": "6b3970b22dd9a125ae54edb7c53ac4ad",
+   "pyd": "lir_ssa.cp39-win_amd64.pyd"
+  },
+  "qot_builtins": {
+   "md5": "30116dd016da2464759293075d8c9587",
+   "pyd": "qot_builtins.cp39-win_amd64.pyd"
+  },
+  "qot_hash": {
+   "md5": "4deffc68df5888042ba1cb034100f1cf",
+   "pyd": "qot_hash.cp39-win_amd64.pyd"
+  }
+ },
+ "python": "3.9.12"
+}

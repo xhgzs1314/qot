@@ -78,10 +78,12 @@ class LirNodeTest(unittest.TestCase):
         # THROW..THROWVAL(36..41)（闭包与异常，号段只增不重编）
         # 【M4 】45 = FIELD_GET/FIELD_SET/CALL_OMETHOD(42..44)
         #（对象字段与方法分派，号段只增不重编）
-        self.assertEqual(len(ops), 45,
-                         'LIR 节点数应为 33(v1) + 1(GUARD_NUM) + 2(ARENA) + 6(F1/F2) + 3(M4)')
+        # 【G4】46 = GUARD_TYPE(45)（PROMAX 类型不变量版本化；发射侧
+        # lir_native/lir_cgen 均已注册，serialize 走既有 varint 路径）
+        self.assertEqual(len(ops), 46,
+                         'LIR 节点数应为 33(v1) + 1(GUARD_NUM) + 2(ARENA) + 6(F1/F2) + 3(M4) + 1(GUARD_TYPE)')
         for op in ops:
-            self.assertTrue(0 <= op <= 44, '指令号应落在冻结号段 0..44: %s' % op)
+            self.assertTrue(0 <= op <= 45, '指令号应落在冻结号段 0..45: %s' % op)
 
     def test_const_f64(self):
         (r,) = self._roundtrip([LirInstr(lir.CONST_F64, dst=1, imm=3.25)])
