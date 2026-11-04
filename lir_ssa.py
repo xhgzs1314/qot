@@ -1027,7 +1027,7 @@ class _DomainAlloc(object):
         if self.domain == 'v':
             n = replace_vuse(i, slot, color)
         else:
-            n = replace_fuse(i, slot, color)
+            raise SsaError('N-03 f 域 use 重写未实现 (槽 %d)' % slot)
         if n == 0:
             raise SsaError('N-03 %s 域: use_map 记录的读取未生效 (槽 %d)'
                            % (self.domain, slot))

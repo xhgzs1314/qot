@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""QOT-CI · --suite ci 的实现（ §9.5/§9.6 验收面）。
+"""QOT-CI · --suite ci 的实现
 
 进程内驱动（解释器常驻 → PCH 全程热；各步之间精确重置 qot_cache 的进程内
 统计，拿到**每层 hit/miss 的精确账目**，不靠外部猜测）。
@@ -141,15 +141,23 @@ def _reset_env_caches():
 
 
 def _compile(src, exe, *, opt=True, split=False, env=None):
-    """进程内 AOT 编译。env = dict（临时注入并复原）。返回 (ok, err)。"""
+    """进程内 AOT 编译。env = dict（临时注入并复原）。返回 (ok, err)。
+
+    【后端钉死】本套件是 cpp 管线的验收面（§9.5：K1~K5 审的是 C 文本/
+    toolchain 层缓存）——开发者 shell 里 QOT_AOT_BACKEND=native 会经
+    os.environ 泄漏进进程内编译，把整套断言打歪（toolchain hits=0、
+    k2_base_gen.cpp 不落盘、split 形态 4005）。凡进本套件的编译一律
+    显式钉回 cpp；native 后端的正确性口径在 --suite native（45 用例）。
+    """
     import index
     import qot_cache as qc
     old = {}
+    env = dict(env or {})
+    env['QOT_AOT_BACKEND'] = 'cpp'      # 强制覆盖（caller 传的也压掉）
     try:
-        if env:
-            for k, v in env.items():
-                old[k] = os.environ.get(k)
-                os.environ[k] = v
+        for k, v in env.items():
+            old[k] = os.environ.get(k)
+            os.environ[k] = v
         _reset_env_caches()
         index._aot_compile(src, exe, opt, split_tu=split)
         # 统计在 env 作用域内冲刷（隔离存储场景下文件落对位置）
@@ -160,12 +168,11 @@ def _compile(src, exe, *, opt=True, split=False, env=None):
     except Exception as e:  # noqa: BLE001
         return os.path.exists(exe), '%s: %s' % (type(e).__name__, e)[:300]
     finally:
-        if env:
-            for k, v in old.items():
-                if v is None:
-                    os.environ.pop(k, None)
-                else:
-                    os.environ[k] = v
+        for k, v in old.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
         _reset_env_caches()
 
 
@@ -558,6 +565,7 @@ def ci_concurrency():
     iso_store = _iso_dir('qot_ci_conc_store_')
     env = dict(os.environ)
     env['QOT_CACHE_DIR'] = iso_store
+    env['QOT_AOT_BACKEND'] = 'cpp'   # ci 验收面 = cpp 管线（防 shell 泄漏）
     exes = [os.path.join(ART, '_conc_%d.exe' % i) for i in range(4)]
     procs = []
     try:
@@ -608,9 +616,12 @@ def ci_watch_daemon():
     exe = os.path.join(ART, '_watch.exe')
     if os.path.exists(exe):
         os.remove(exe)
+    _wenv = dict(os.environ)
+    _wenv['QOT_AOT_BACKEND'] = 'cpp'   # ci 验收面 = cpp 管线（防 shell 泄漏）
     p = subprocess.Popen([sys.executable, 'index.py', 'watch', src, exe],
                          cwd=ROOT, stdin=subprocess.PIPE,
                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                         env=_wenv,
                          text=True, encoding='utf-8', errors='replace')
     try:
         t0 = time.perf_counter()

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""QOT 原生（后端 A）基准台架 ——  S-04 /  §6.4。
+"""QOT 原生（后端 A）基准台架
 
 为什么不用「跑一次 exe 减掉固定启动底噪」：
   G-7 已记录 /MT 静态 CRT 的进程启动 ≈9-10ms，而它的抖动与负载、磁盘缓存、
@@ -335,9 +335,14 @@ def _gen_variant(src_path, n, out_path):
 
 # ---------------------------------------------------------------- 编译
 # 编译链源文件：任一比 exe 新就必须重编（否则会拿旧产物冒充新优化的数字）
+# 【v2 补登记】lir_native.py（native 后端发射器）、qot_cache.py（obj/exe
+# CAS 的 key 语义影响产物）、qot_builtins.py（内置清单派生）——漏登记 =
+# 改后端不重编 = 静默用旧产物测速（本会话实测踩中：N-04 后不重建会
+# 全盘假数字）。
 PIPELINE_SRCS = ['index.py', 'lir.py', 'lir_lower.py', 'lir_opt.py',
                  'lir_cgen.py', 'lir2.py', 'bytecode.py', 'grammar.py',
-                 'builtin_func.py', 'lir_ssa.py',
+                 'builtin_func.py', 'lir_ssa.py', 'lir_native.py',
+                 'qot_cache.py', 'qot_builtins.py',
                  os.path.join('ot-asset', 'c', 'aot', 'qot_aot_runtime.h')]
 
 

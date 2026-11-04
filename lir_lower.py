@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""字节码 → LIR 降级器 ——  7.4 机器码 P2 / T-41。
+"""字节码 → LIR 降级器
 
 输入：bytecode.Compiler 产出的 VMCode（主块 + 常量池里的函数块）。
 输出：lir.LirProgram。

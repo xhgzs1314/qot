@@ -40,7 +40,7 @@ tokens = (
 )
 
 precedence = (
-    # 【G-00 修复 0】比较运算符必须**低于**加减（C 系惯例）。
+    # 比较运算符必须**低于**加减（C 系惯例）。
     # 旧表把比较排在加减之上 → `i == n - 1` 在状态
     #   relational_expression : relational_expression EQUALS additive_expression .
     # 遇 MINUS 时按"规则优先级 > 记号优先级"判为 REDUCE → 随后无处可放
@@ -330,11 +330,7 @@ def p_primary_expression_function_ref(p):
     '''primary_expression : FUNCTION_REF function_call'''
     p[0] = ('function_ref', p[2][1], p[2][2], get_line_number(p))
 def p_expression(p):
-    # 【G-11 0】旧语法把 `static_method_call` 挂在**表达式顶层**
-    # （`expression : logical_expression | static_method_call`）→ `mod##f()`
-    # 必须是整个表达式，`mod##f() == 7` 直接语法错误。改为只挂在
-    # primary 层级（可作任意子表达式）；顶层那条若不摘会与新规则形成
-    # 归约冲突并被先声明者抢走（实测 `==` 仍然报错）。
+    
     '''expression : logical_expression'''
     p[0] = p[1]
 
@@ -634,7 +630,18 @@ def p_error(p):
 class QotPlyParser:
     def __init__(self):
         self.lexer = Lexer()
-        self.parser = yacc.yacc(debug=False, write_tables=False,outputdir=None)
+        # 前端提速：LALR 表落盘缓存（write_tables=False 曾让每次冷启动
+        # 重算整张 LALR 表 ~0.4s）。表带规则签名，grammar 规则一变自动失效
+        # 重建，无陈旧风险；表文件 qot_parsetab.py 写在本目录旁（随源码走，
+        # 不依赖 cwd）。任何异常回落旧路径（不落表）。
+        _tabdir = os.path.dirname(os.path.abspath(__file__))
+        try:
+            self.parser = yacc.yacc(debug=False, write_tables=True,
+                                    outputdir=_tabdir, optimize=True,
+                                    tabmodule='qot_parsetab',
+                                    module=sys.modules.get(__name__))
+        except Exception:
+            self.parser = yacc.yacc(debug=False, write_tables=False, outputdir=None)
         self.errors = []
         
     def parse(self, filename):

@@ -36,3 +36,5 @@
  17:50:25  commit=860d9fc  reason=M5: std.cli 新用例（参数解析标准库）
  19:27:10  commit=860d9fc  reason=P0-D 补：位运算 6 条差分（int64 域 + uint64 承载移位）
  19:27:41  commit=860d9fc  reason=P0-D 补：位运算差分（边界段改位恒等自证）
+2026-11-03 22:13:05  commit=f6f79a4  reason=存量 golden 陈旧：p16 源用例时间用例演进（date_str 行新增、第17断言语义反转），解释器 oracle 与 native 现行输出逐位一致，按 native 口径重录
+2026-11-03 22:13:08  commit=f6f79a4  reason=存量 golden 陈旧：demo_csv 源标题不再含『· CP-3 验收』后缀（先于 QOTNative 改动），解释器 oracle 与 native 现行输出逐位一致，按 native 口径重录

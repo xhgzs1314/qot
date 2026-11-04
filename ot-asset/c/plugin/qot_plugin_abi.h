@@ -11,8 +11,8 @@
 extern "C" {
 #endif
 
-/* ABI 版本：C 标量调用面（ffi_*）；
- * ffi_call_v 分派器 + 本插件 ABI） */
+/* ABI 版本：v1 = CP-4 的 C 标量调用面（ffi_*）；v2 = M7 冻结（混族
+ * ffi_call_v 分派器 + 本插件 ABI）。插件按它判兼容。 */
 #define QOT_PLUGIN_ABI_VERSION 2u
 
 /* qot_value 标签（V16 布局的 t 字段；宿主私有标签不进本表） */

@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-"""qot_cache —— 编译管线 CI 的 L0 层（ §9.4 / CP-C1）。
+"""qot_cache —— 编译管线 CI 的 L0 层
 
 工具链调用缓存（ccache 语义）+ 预编译头（PCH）+ 内容寻址存储（CAS）+ 统计/
 解释/GC。**不懂 QOT 语义**：输入是"C 源文本 + 编译身份"，输出是"工具链产物"。
 
-正确性铁律（§9.3，逐条落在本文件里）：
+正确性铁律：
   K1 缓存只能加速，不能改变输出 —— 命中 = 交付上次产物的副本；命中与冷编
      产物的逐字节等价由 testing 的 ci_cache_equivalence 用例交叉断言。
   K2 所有影响输出的输入必须进 key —— 组件表 COMPONENTS 机械清点（见
@@ -15,7 +15,7 @@
      PCH 被 g++ 拒绝 = 硬报错（-Winvalid-pch 输出检测），不许静默退化。
   K5 逃生 —— QOT_CACHE=off 一键全冷（连 PCH 一起关，等价性用例的冷臂）。
 
-目录布局（§9.4 L0，永不落在源码树内 —— §9.7-6）：
+目录布局：
   <root>/objects/<hash[:2]>/<hash>     内容寻址产物（exe/.o/C 文本）
   <root>/objects/<hash[:2]>/<hash>.key.json   key 组件（explain 与审计用）
   <root>/pch/<pchkey>/qot_aot_runtime.h{,.gch}
@@ -65,6 +65,8 @@ QOT_NO_SWITCHES = (
     'QOT_NO_CONSTKEY', 'QOT_UNSAFE_INDEX',
     # PROMAX（0）：新增 A/B 开关（类型不变量守卫 / 自制跳转原语回落）
     'QOT_NO_TGUARD', 'QOT_NO_FAST_SJ',
+    # FE4（2026-11-04）：native f 域寄存器分配回落（lir_native.py 自检）
+    'QOT_NO_FRA',
 )
 
 # 影响 AOT 前端语义的源文件清单（L2 前端缓存 key 的一部分；改一个文件 =
@@ -74,7 +76,7 @@ PIPELINE_FILES = (
     'builtin_func.py', 'require_inliner.py', 'error_system.py',
     'lir.py', 'lir2.py', 'lir_lower.py', 'lir_opt.py', 'lir_ssa.py',
     'lir_cgen.py', 'qot_hash.py', 'qot_builtins.py', 'qot_toml.py',
-    'qot_cache.py', 'qot_build.py',
+    'qot_cache.py', 'qot_build.py', 'lir_native.py',
 )
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -180,6 +182,12 @@ def switch_fingerprint() -> dict:
         fp['QOT_TIMEOUT_MS'] = os.environ.get('QOT_TIMEOUT_MS', '')
         # 静态链接形态（也进 flags → key；进指纹是 K2 的双保险）
         fp['QOT_STATIC'] = os.environ.get('QOT_STATIC', '1')
+        # R0 · dev 档（也进 flags → key；登记同 QOT_STATIC 双保险口径）
+        fp['QOT_AOT_DEV'] = os.environ.get('QOT_AOT_DEV', '')
+        fp['QOT_AOT_DEV_INLINE'] = os.environ.get('QOT_AOT_DEV_INLINE', '')
+        # QOTNative（刀1）：后端选择（native | cpp 缺省）—— 影响产物形态，
+        # 进指纹防串味（两后端缓存互不可见）
+        fp['QOT_AOT_BACKEND'] = os.environ.get('QOT_AOT_BACKEND', '')
         _SWITCH_FP = fp
     return dict(_SWITCH_FP)
 
@@ -390,8 +398,10 @@ def _check_output(proc, out_path, context, keep_tail=900):
 # ---------------------------------------------------------------- PCH（L0）
 
 def pch_flags_for(base_flags, split=False) -> list:
-    """PCH 生成 flags = 编译 flags 的"影响 PCH 合法性"子集（顺序稳定）。"""
-    f = ['-std=c++17', '-O2', '-finput-charset=utf-8']
+    """PCH 生成 flags = 编译 flags 的"影响 PCH 合法性"子集（顺序稳定）。
+    R0：-O 级随 dev 档走（PCH 与使用侧 flags 必须同源，否则 -Winvalid-pch
+    硬失败——K4 禁止静默退化，这里同步换级保证 PCH 合法性判定成立）。"""
+    f = ['-std=c++17'] + _opt_level() + ['-finput-charset=utf-8']
     if split:
         f.append('-DQOT_RT_SPLIT')
     return f
@@ -589,13 +599,52 @@ def compile_exe(c_path: str, out_exe: str, *, rt_src: str, keep_c: bool = False,
             'elapsed': time.perf_counter() - t0, 'pch': bool(pch_dir)}
 
 
+def dev_mode() -> bool:
+    """R0 · dev 档（QOT_AOT_DEV=1|true）：本地迭代形态，速度优先。
+
+    语义：
+      -O 级 -O2 → -O1（g++ 对生成 C 的优化耗时大降，运行性能让步——
+      dev 档明示放弃运行性能闸门，release（默认）维持 -O2 现状）；
+      链接默认动态（libgcc/libstdc++ 随 MinGW 运行时分发）——静态链
+      接的产物分发独立，但 ld 重定位全量静态库是冷编大头之一。
+    该开关进 flags 与开关指纹（→ 进 key，K2）：dev/release 两形态各自
+    缓存、互不串味；--explain 可指认"QOT_AOT_DEV 变了"。
+    """
+    v = os.environ.get('QOT_AOT_DEV', '')
+    return v.strip().lower() in ('1', 'true', 'yes', 'on')
+
+
+def _opt_level() -> list:
+    """编译 O 级（单点定义；_exe/_obj/pch 三面同源）。
+
+    R0 实测斜率（tpl_v6 生成 C，compile-only）：
+      -O2 = 52.6s | -O1 = 27.2s | -O1 -fno-inline = 8.5s | -O0 ≈ 5s
+    dev 档默认 -O0（业主裁决：优化全关）——唯一障碍是 runtime 头的
+    qot_sjmp/qot_ljmp asm 原语与 -O0 帧指针冲突，已在原语函数级钉死
+    optimize("O2")（runtime 头 R0-O0）后解除。
+    QOT_AOT_DEV_INLINE=1 → -O1（dev 期要近似 release 运行性能时的中间档，
+    仍无内联）；release（默认）维持 -O2 现状。
+    """
+    if dev_mode():
+        if os.environ.get('QOT_AOT_DEV_INLINE', '').strip().lower() \
+                in ('1', 'true', 'yes', 'on'):
+            return ['-O1']
+        return ['-O0']
+    return ['-O2']
+
+
 def static_link_enabled() -> bool:
     """静态链接开关（QOT_STATIC，默认 1 = 现状：产物无 DLL 依赖）。
 
     关掉（=0）→ 动态链接 libgcc/libstdc++：链接更快、产物更小，代价是分发
     需要带运行时 DLL（或目标机有 MinGW 运行时）。该设置进 flags（→ 进 key），
     两种形态各自缓存、互不串味（K2）。
+    R0 · dev 档下默认翻转为动态（速度优先）；显式 QOT_STATIC=1 仍可强制
+    静态（显式用户意志覆盖档位默认）。
     """
+    if dev_mode():
+        explicit = os.environ.get('QOT_STATIC', '').strip().lower()
+        return explicit in ('1', 'true', 'yes', 'on')
     return os.environ.get('QOT_STATIC', '1').strip().lower() not in ('0', 'off', 'no', 'false')
 
 
@@ -659,9 +708,228 @@ def uses_gui(c_path):
         return False
 
 
+# ---------------------------------------------------------------- QOTNative（刀1）
+_RT_LIB = None
+
+
+def ensure_runtime_lib() -> str:
+    """QOTNative：qotrt.lib 预编（ot-asset/c/aot/qotrt_lib.cpp → build/qotrt_<hash>.lib）。
+
+    runtime 头（header-only、函数全 static）经 qotrt_lib.cpp 的
+    `#define static extern "C"` 宏翻转变 C ABI 导出面，一次编译终身复用 ——
+    native 后端的 obj 直调其中 qotrt_* 符号，不再随程序重编 runtime。
+    key = qotrt_lib.cpp + runtime 头内容 hash + 编译器身份（任一变化 → 重编）。
+    返回 .lib 路径；失败抛 _ToolchainFailure。
+    """
+    global _RT_LIB
+    if _RT_LIB is not None:
+        return _RT_LIB
+    root = os.path.dirname(os.path.abspath(__file__))
+    cpp = os.path.join(root, 'ot-asset', 'c', 'aot', 'qotrt_lib.cpp')
+    rt = os.path.join(root, 'ot-asset', 'c', 'aot', 'qot_aot_runtime.h')
+    flags = ['-std=c++17', '-O2', '-finput-charset=utf-8', '-w']
+    material = '|'.join([file_hash(cpp), file_hash(rt),
+                         compiler_id().get('path', ''), ' '.join(flags),
+                         SEMANTIC_VERSION])
+    h = sha256_bytes(material.encode('utf-8'))[:16]
+    build_dir = os.path.join(root, 'build')
+    os.makedirs(build_dir, exist_ok=True)
+    lib = os.path.join(build_dir, 'qotrt_%s.lib' % h)
+    if not os.path.exists(lib) or os.path.getsize(lib) == 0:
+        cid = compiler_id()
+        obj = os.path.join(build_dir, 'qotrt_lib_%s.o' % h)
+        ar = os.path.join(os.path.dirname(cid['path']), 'ar')
+        if not os.path.exists(ar):
+            ar = 'ar'
+        p1 = run_toolchain([cid['path']] + flags + ['-c', cpp, '-o', obj],
+                           timeout=600)
+        if p1.returncode != 0 or not os.path.exists(obj):
+            raise _ToolchainFailure(
+                'qotrt.lib 编译失败(rc=%s):\n%s'
+                % (p1.returncode, (p1.stderr or '')[-3000:]), p1)
+        p2 = run_toolchain([ar, 'rcs', lib, obj], timeout=120)
+        if p2.returncode != 0 or not os.path.exists(lib):
+            raise _ToolchainFailure(
+                'qotrt.lib 打包失败(ar rc=%s):\n%s'
+                % (p2.returncode, (p2.stderr or '')[-800:]), p2)
+        try:
+            os.remove(obj)
+        except OSError:
+            pass
+    _RT_LIB = lib
+    return lib
+
+
+def native_prog_get(merged_text: str, want_stats: dict = None):
+    """QOTNative · 前端 prog CAS（K2 形态）：同源热编免全量 Python 前端。
+
+    native 分支绕开 C 文本/frontend 文本缓存（它要的是 prog 对象不是 C
+    文本）——代价是每次重编都全量跑 parse→bytecode→LIR 全管线（大程序
+    ~6.5s）。本层把 (prog, snaps) pickle 进 CAS：key = 源文本内容 hash +
+    管线指纹（PIPELINE_FILES 含 lir_native.py → 发射器改动 = 全 miss）+
+    开关指纹 + semver。命中返回反序列化的 (prog, snaps)（pickle 保全部
+    属性：name_table/objmeta/_src_op/_jt_cache），发射产物逐字节一致
+    （K1 由 testing/unit/test_native_prog_pickle.py 断言）。
+    返回 (prog, snaps) 或 None（miss/停用）。
+    """
+    if not enabled_for('frontend'):
+        if want_stats is not None:
+            want_stats['frontend'] = 'off'
+        return None
+    key, comps = toolchain_key(c_text=merged_text, flags=['native-prog'],
+                               form='prog', extra={'backend': 'native',
+                                                   'fmt': 'pickle-v1'})
+    blob_path = _cas_get(key)
+    if blob_path is None:
+        record_stats('frontend', False)
+        if want_stats is not None:
+            want_stats['frontend'] = 'miss'
+        return None
+    import pickle
+    try:
+        with open(blob_path, 'rb') as f:
+            bundle = pickle.load(f)
+        prog, snaps = bundle['prog'], bundle['snaps']
+    except Exception:
+        # 缓存体损坏 = 当 miss（K4：可解释降级，不阻断）
+        record_stats('frontend', False)
+        if want_stats is not None:
+            want_stats['frontend'] = 'corrupt'
+        return None
+    record_stats('frontend', True)
+    if want_stats is not None:
+        want_stats['frontend'] = 'hit'
+    return prog, snaps
+
+
+def native_prog_store(merged_text: str, prog, snaps) -> None:
+    """QOTNative · 前端 prog CAS 写入（幂等；失败不阻断编译）。"""
+    if not enabled_for('frontend'):
+        return
+    import pickle
+    key, comps = toolchain_key(c_text=merged_text, flags=['native-prog'],
+                               form='prog', extra={'backend': 'native',
+                                                   'fmt': 'pickle-v1'})
+    import tempfile
+    fd, tmp = tempfile.mkstemp(suffix='.prog.pkl')
+    try:
+        with os.fdopen(fd, 'wb') as f:
+            pickle.dump({'prog': prog, 'snaps': snaps}, f,
+                        protocol=pickle.HIGHEST_PROTOCOL)
+        _cas_put(key, tmp, comps)
+    except Exception:
+        pass  # CAS 写失败不阻断（K4）
+    finally:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+
+
+def native_assemble_cached(asm_text: str, out_obj: str,
+                           want_stats: dict = None) -> dict:
+    """QOTNative · obj CAS（K2 形态）：asm 文本 → COFF 目标。
+
+    key 组件（机械清点，逐项对 §9.3-K2）：asm **内容** hash（lir_native.py
+    或任何管线源变化 → 发射产物变 → 必 miss，无需另行登记）、编译器身份、
+    '-c' flags、开关指纹、semver、backend='native'。GAS 汇编不读 runtime 头
+    （纯文本→COFF），rt_hash 不参与本层 —— runtime 的正确性由链接层 key
+    （qotrt.lib 内容 hash）覆盖。
+    QOT_CACHE=off/pch → 全冷直通（K5）。命中交付 CAS 副本（K1：命中与冷编
+    等价 = 同一 g++ 对同一 asm 文本的确定性产物）。
+    返回 {'hit', 'sha', 'path', 'elapsed'}。
+    """
+    t0 = time.perf_counter()
+    cid = compiler_id()
+    if not enabled_for('object'):
+        import lir_native as _ln
+        el, _n = _ln.assemble_obj(asm_text, out_obj, cid['path'])
+        return {'hit': False, 'sha': text_hash(asm_text), 'path': out_obj,
+                'elapsed': time.perf_counter() - t0}
+    key, comps = toolchain_key(c_text=asm_text, flags=['-c'], form='obj',
+                               extra={'backend': 'native'})
+    obj = _cas_get(key)
+    if obj is not None:
+        deliver(obj, out_obj)
+        record_stats('object', True)
+        if want_stats is not None:
+            want_stats['object'] = 'hit'
+        return {'hit': True, 'sha': key, 'path': out_obj,
+                'elapsed': time.perf_counter() - t0}
+    record_stats('object', False)
+    if want_stats is not None:
+        want_stats['object'] = 'miss'
+    import lir_native as _ln
+    _ln.assemble_obj(asm_text, out_obj, cid['path'])
+    _cas_put(key, out_obj, comps)
+    return {'hit': False, 'sha': key, 'path': out_obj,
+            'elapsed': time.perf_counter() - t0}
+
+
+def link_native(obj_path: str, out_exe: str, netlibs=None,
+                gui: bool = False, want_stats: dict = None) -> dict:
+    """QOTNative：native obj + qotrt.lib → exe（g++ 驱动链接；crt/libgcc 自动）。
+
+    v2：exe CAS（form='link'，K2 形态）。key = qotrt.lib **内容** hash +
+    obj **内容** hash + 链接 flags（static/-s/确定性）+ netlibs/gui +
+    编译器/开关/semver。命中交付副本（K1）；PE 时间戳由 K3 的
+    --no-insert-timestamp 归零 → 同 key 重链逐字节可复现，缓存不改变输出。
+    """
+    t0 = time.perf_counter()
+    lib = ensure_runtime_lib()
+    cid = compiler_id()
+    if not enabled_for('link'):
+        _link_native_cold(obj_path, out_exe, cid, lib, netlibs, gui)
+        return {'hit': False, 'sha': file_hash(out_exe),
+                'elapsed': time.perf_counter() - t0}
+    flags = _static_link_flags() + ['-s'] + determinism_link_flags()
+    key, comps = toolchain_key(
+        rt_hash=file_hash(lib), flags=flags, form='link',
+        extra={'objs': [file_hash(obj_path)], 'gui': bool(gui),
+               'netlibs': sorted(netlibs or [])})
+    exe = _cas_get(key)
+    if exe is not None:
+        deliver(exe, out_exe)
+        record_stats('link', True)
+        if want_stats is not None:
+            want_stats['link'] = 'hit'
+        return {'hit': True, 'sha': key, 'elapsed': time.perf_counter() - t0}
+    record_stats('link', False)
+    if want_stats is not None:
+        want_stats['link'] = 'miss'
+    _link_native_cold(obj_path, out_exe, cid, lib, netlibs, gui)
+    _cas_put(key, out_exe, comps)
+    return {'hit': False, 'sha': key, 'elapsed': time.perf_counter() - t0}
+
+
+def _link_native_cold(obj_path: str, out_exe: str, cid: dict, lib: str,
+                      netlibs, gui: bool):
+    """link_native 冷路径（原实现本体）。"""
+    if os.path.exists(out_exe):
+        try:
+            os.remove(out_exe)
+        except PermissionError:
+            time.sleep(0.5)
+            os.remove(out_exe)
+    cmd = [cid['path']] + _static_link_flags() + ['-s',
+           os.path.abspath(obj_path), os.path.abspath(lib),
+           '-o', os.path.abspath(out_exe)]
+    if gui:
+        objs = gui_objects()
+        if not objs:
+            raise CacheDisabled('GUI 目标文件构建失败（vg_* 程序无法链接）')
+        cmd += objs + GUI_LIBS
+    if netlibs:
+        cmd += list(netlibs)
+    cmd += determinism_link_flags()
+    proc = run_toolchain(cmd, cwd=os.path.dirname(os.path.abspath(out_exe)) or '.',
+                         timeout=300)
+    _check_output(proc, out_exe, 'QOTNative 链接')
+
+
 def _exe_flags(pch_dir, netlibs, gui=False) -> list:
     """key 用语义 flags（稳定序；不含源/目标路径）。"""
-    flags = ['-std=c++17', '-O2', '-finput-charset=utf-8']
+    flags = ['-std=c++17'] + _opt_level() + ['-finput-charset=utf-8']
     if pch_dir:
         flags += ['-Winvalid-pch', '-I' + pch_dir]
     flags += _static_link_flags() + ['-s']
@@ -677,7 +945,7 @@ def _exe_cmd(gxx, pch_dir, netlibs, c_path, out_exe) -> list:
     """实际命令行：库/链接 flags 必须在输入文件**之后**（GNU ld 按序解析
     库：`-l` 放源文件前面 = 源文件需要的符号不被解析 —— std_net 实证的
     __imp_htonl 未定义即此因）。"""
-    cmd = [gxx, '-std=c++17', '-O2', '-finput-charset=utf-8']
+    cmd = [gxx, '-std=c++17'] + _opt_level() + ['-finput-charset=utf-8']
     if pch_dir:
         cmd += ['-Winvalid-pch', '-I' + pch_dir]
     cmd += _static_link_flags() + ['-s',
@@ -824,7 +1092,7 @@ def _sanitize_tu(name: str) -> str:
 
 
 def _obj_flags(pch_dir, split: bool) -> list:
-    flags = ['-std=c++17', '-O2', '-finput-charset=utf-8']
+    flags = ['-std=c++17'] + _opt_level() + ['-finput-charset=utf-8']
     if split:
         flags.append('-DQOT_RT_SPLIT')
     if pch_dir:

@@ -1,3 +1,4 @@
+import _frontend_ext_guard 
 import base64
 import shutil
 import sys
@@ -2200,23 +2201,7 @@ def _aot_compile(source_file: str, out_exe: str, enable_opt: bool,
                  keep_c: bool = False, emit_c: str = None,
                  split_tu: bool = None, jobs: int = None,
                  dll_out: str = None) -> str:
-    """后端 A：.qot → LIR →（内联 + F64 特化）→ C 源码 → g++ -O2 → exe。返回 C 源路径。
-
-    F0（S-15 根治，0）：native 支持 require —— 编译期把被 require
-    的 .qot 模块【内联】进主程序（require_inliner，与解释器的 .qot 模块语义
-    同源：模块顶层名 = 全量导出，`mod##fn` 调用点改写为直呼）。循环依赖在
-    内联期显式报错；.dll require 不适用 native（保持编译期明确报错）。
-
-    【QOT-CI · CP-C1/C2/C3】编译管线 CI 线接入（ §9）：
-      * L2 前端缓存（qot_build.frontend_bundle）：合并源+开关+管线指纹 →
-        C 文本（纯文本 JSON，禁 pickle）；命中跳过 parse/LIR/优化/cgen 全链。
-      * split_tu（--split-tu / QOT_SPLIT_TU）：L1 切分 TU —— 同一份全程序
-        LIR（G1：与单 TU 同一条语义管线），generate_split 发射共享头+主 TU+
-        模块 TU；对象/链接走 qot_cache 的 CAS（qot_build.build_split）。
-      * 工具链缓存（qot_cache.compile_exe）：C → exe 内容寻址；PCH 由内容
-        hash 管理；QOT_CACHE=off 一键全冷（K5）。gcc 主线之外的 MSVC 兜底
-        保持既有 bat 路径（无缓存 —— 回退形态，主线是 MinGW g++）。
-    """
+   
     import tempfile
     from error_system import get_error_handler
     handler = get_error_handler()
@@ -2236,18 +2221,18 @@ def _aot_compile(source_file: str, out_exe: str, enable_opt: bool,
     temp_src = None
     merged_text = None
     module_of = {}
+   
+    _native_backend = (os.environ.get('QOT_AOT_BACKEND', '') or ''
+                       ).strip().lower() == 'native'
+    _native_prog_holder = {}
+    if _native_backend and (dll_out or split_tu):
+        _native_backend = False
     try:
         with open(source_file, 'r', encoding='utf-8') as _f:
             merged_text = _f.read()
         _has_require = 'require ' in merged_text
         if _has_require:
-            # 【P1030-4】合并单元写系统临时目录 —— 此前写在源文件同目录，
-            # 编译中断（Ctrl+C/异常）时残留 aot_req_*.qot 在 cases/ 里，
-            # 套件 discover_cases 会因缺 .json 元数据而中断。
-            # require 的相对解析基于 source_file 原路径（inliner 的
-            # current_file），与合并单元落点无关。
-            # 【QOT-CI】改用 RequireInliner 实例直调（被动登记模块 DAG，
-            # split TU 的归属数据源；合并文本与 inline_requires 逐字节一致）。
+          
             from require_inliner import RequireInliner
             fd, temp_src = tempfile.mkstemp(suffix='.qot', prefix='aot_req_',
                                             text=True)
@@ -2299,21 +2284,11 @@ def _aot_compile(source_file: str, out_exe: str, enable_opt: bool,
             _snaps = snapshot_user_funcs(prog)   # N-04：内联后/推断前快照
             infer_f64(prog)
             if split_tu:
-                # QOT-CI · CP-C5：stage-1（全局分析：内联/F64 解/全局槽提升）
-                # 到此为止；stage-2（窥孔/SSA/arena/cgen，均为逐函数 pass）由
-                # qot_build.tu_bundle 按 TU 记忆化 —— 改一个模块只付该模块
-                # 的 stage-2 与 g++。单 TU 路径保持全程序顺序（产物不变）。
+                
                 return _qcb.tu_bundle(prog, source_file, _snaps, module_of,
                                       enable_opt)
             _opt_stats = optimize_f64(prog)      # 窥孔 + unbox + f 域合并
-            # N-03：SSA + 槽合并（v 域）。放在【全部槽级分析之后】——infer_f64
-            # 与 unbox 的约束求解都是槽级的，槽共享发生在它们之前会互相毒化
-            # （三轮实测：null 临时毒化数值证明 18.5 ns；const 临时毒化 A2 →
-            # 快循环全灭 203/337 ns）。放在它们之后是安全的：
-            #   * 候选槽 V16 在快循环内本就陈旧、出边回写覆盖 —— dead 临时
-            #     写入无害（写写之间无读）；
-            #   * 其余 V16 的读取由干涉图保护（活区间点精确）；
-            #   * 组指令不被值级死定义删除触碰（STORE/LOAD/CMP ∉ 纯集合）。
+          
             import lir_ssa
             _ssa_stats = lir_ssa.ssa_regalloc(prog)
             # M-PERF 收尾二：循环 arena 回收插桩（b3a 形态；QOT_NO_ARENA 关）。
@@ -2321,6 +2296,14 @@ def _aot_compile(source_file: str, out_exe: str, enable_opt: bool,
             # 快体不含 ARENA op；此后无人再改写指令流，插桩坐标稳定。
             from lir_opt import arena_loops
             _arena_stats = arena_loops(prog)
+            if _native_backend:
+                # QOTNative：LIR → x64（GAS）COFF 直链 qotrt.lib ——
+                # prog 移交外层发射/链接（不经 C 文本与 frontend 文本缓存）。
+                # 快照随行（N-04 快入口规划输入；快拍点=内联后/推断前，
+                # 与 cpp 后端同一来源 —— 两后端快体语义单一真相源）。
+                _native_prog_holder['prog'] = prog
+                _native_prog_holder['snaps'] = _snaps
+                return None
             if split_tu:
                 return generate_split(prog, source_file, fast_snaps=_snaps,
                                       module_of=module_of)
@@ -2332,6 +2315,40 @@ def _aot_compile(source_file: str, out_exe: str, enable_opt: bool,
             record_exception(ErrorCode.ERR_COMPILE_QTC_FAILED, f"AOT 编译异常: {e}")
 
     try:
+        if _native_backend:
+           
+            _warm = _qcc.native_prog_get(merged_text)
+            if _warm is not None:
+                _prog, _snaps = _warm
+                _native_prog_holder['prog'] = _prog
+                _native_prog_holder['snaps'] = _snaps
+            else:
+                _compute_frontend()
+                _prog = _native_prog_holder.get('prog')
+                _snaps = _native_prog_holder.get('snaps')
+                if _prog is not None:
+                    _qcc.native_prog_store(merged_text, _prog, _snaps)
+            if _prog is None:
+                record_exception(ErrorCode.ERR_COMPILE_QTC_FAILED,
+                                 "native 后端未捕获 LIR（前端管线异常）")
+            build_dir = os.path.dirname(os.path.abspath(out_exe)) or '.'
+            os.makedirs(build_dir, exist_ok=True)
+            _netlibs = ['-lws2_32'] if os.name == 'nt' else []
+            import lir_native as _ln
+            obj_path = os.path.join(
+                build_dir,
+                os.path.splitext(os.path.basename(out_exe))[0] + '_native.o')
+            _asm = _ln.generate_asm(_prog, _native_prog_holder.get('snaps'))
+            _qcc.native_assemble_cached(_asm, obj_path)
+            _gui = False
+            for _f in _prog.all_funcs():
+                _nt = getattr(_f, 'name_table', None) or []
+                if any(str(n).startswith('vg_') for n in _nt):
+                    _gui = True
+                    break
+            _qcc.link_native(obj_path, out_exe, netlibs=_netlibs, gui=_gui)
+            _qcc.flush_stats()
+            return obj_path
         if dll_out:
             # dll 形态的 C 文本含导出桥（与 exe 产物不同）：绕开 L2 前端缓存，
             # 防止同源 exe/dll 先后编译时命中对方的 C 文本（缓存毒化）。
@@ -2613,11 +2630,14 @@ def main() -> int:
         if len(sys.argv) < 4:
             print("用法: aot <input.qot> <output.exe> [--opt] [--keep-c] "
                   "[--emit-c <file.cpp>] [--unsafe-index] [--split-tu] "
-                  "[-j N] [--cache-stats] [--explain] [--determinism] [--gc-cache]")
+                  "[-j N] [--cache-stats] [--explain] [--determinism] [--gc-cache] "
+                  "[--dev]")
             print("  把 QOT 程序定形编译为独立原生程序（后端 A：LIR → C → g++）")
             print("  --unsafe-index  上帝法则配置：移除下标边界检查（越界=UB，")
             print("                  性能取舍由开发者自担；默认关闭=越界得 null）")
             print("  --split-tu      切分 TU 增量编译（模块对象缓存 + 增量链接）")
+            print("  --dev           R0 dev 档：-O1 + 默认动态链接（编译速度优先，")
+            print("                  运行性能让步；QOT_AOT_DEV=1 同）")
             print("  --cache-stats   打印编译缓存命中率（工具链/PCH/前端/对象/链接）")
             print("  --determinism   确定性自测：同输入连编两次比产物 hash（K3）")
             print("  --static/--no-static  链接形态（默认静态 = 无 DLL 依赖；")
@@ -2646,6 +2666,11 @@ def main() -> int:
             os.environ['QOT_STATIC'] = '0'
         elif '--static' in sys.argv:
             os.environ['QOT_STATIC'] = '1'
+        # R0 · dev 档（QOT_AOT_DEV）：-O1 + 默认动态链接的本地迭代形态。
+        # 运行性能让步是档位语义（release 默认维持 -O2 -static）。
+        # 开关进 flags 与指纹 → 进 key（K2），两形态缓存互不串味。
+        if '--dev' in sys.argv:
+            os.environ['QOT_AOT_DEV'] = '1'
         aot_emit_c = None
         aot_jobs = None
         aot_dll = None
@@ -2679,6 +2704,8 @@ def main() -> int:
                                 dll_out=aot_dll)
             if aot_dll:
                 print(f"AOT 编译成功: {aot_dll} (C 源: {csrc})")
+            elif str(csrc).endswith('_native.o'):
+                print(f"AOT 编译成功: {output_file} (QOTNative obj: {csrc})")
             else:
                 print(f"AOT 编译成功: {output_file} (C 源: {csrc})")
             if aot_determinism:

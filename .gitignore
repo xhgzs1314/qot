@@ -5,3 +5,10 @@ env/
 example.qot
 example.qtc
 testing/.artifacts/
+*.pyd
+*.bak_*
+build/*
+!build/libqotgui.a
+!build/qotgui.dll
+!build/qotrt_788c4448e98c67f0.lib
+!build/qot_aot_runtime.h
